@@ -10,7 +10,7 @@
 ## 結構
 
 ```
-web/index.html                 前端（單檔，無建置流程）
+docs/index.html                前端（單檔，無建置流程）
 supabase/functions/game/       牌局伺服器：發牌、驗證出牌、AI
 supabase/migrations/           資料表與 RLS
 updown.html                    Claude artifact 版（單人）
