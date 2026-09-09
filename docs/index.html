@@ -68,6 +68,11 @@ img{max-width:100%}
   --die:       #F5F0E1;
   --die-ink:   #1A1714;
 
+  /* 一張牌的尺寸。中央檯面由 JS 依人數算出「放得下的最大值」覆寫，
+     手牌與墩堆各自覆寫成自己的尺寸 */
+  --cw: 82px;
+  --ch: 116px;
+
   --sh-1: 0 1px 2px rgba(0,0,0,.34), 0 6px 16px rgba(0,0,0,.30);
   --sh-2: 0 2px 5px rgba(0,0,0,.38), 0 16px 38px rgba(0,0,0,.42);
   --sh-glass: 0 1px 1px rgba(0,0,0,.20), 0 10px 30px rgba(0,0,0,.34);
@@ -296,12 +301,14 @@ input{font:inherit}
 
 /* ================= 中央：牌庫與檯面 ================= */
 .center{
+  position:relative;z-index:5;
   flex:1;display:flex;align-items:center;justify-content:center;gap:42px;
-  flex-wrap:wrap;padding:10px 0;min-height:206px;
+  flex-wrap:wrap;padding:10px 0;min-height:calc(var(--ch) + 46px);
 }
 .deckwrap{display:flex;flex-direction:column;align-items:center;gap:11px}
-.deck{position:relative;width:74px;height:104px;perspective:1000px}
-.deck .back{
+.deck{position:relative;width:var(--cw);height:var(--ch);perspective:1000px}
+/* 牌背：牌庫與墩堆共用同一張背面 */
+.back{
   position:absolute;inset:0;border-radius:6px;
   background:
     radial-gradient(circle at 50% 50%, rgba(255,255,255,.16) 0 14%, transparent 15%),
@@ -313,8 +320,7 @@ input{font:inherit}
     inset 0 0 0 4px rgba(26,23,20,.22),
     0 2px 6px rgba(0,0,0,.4);
 }
-.deck .back:nth-child(1){translate:-4px -4px;opacity:.55}
-.deck .back:nth-child(2){translate:-2px -2px;opacity:.8}
+/* 疊在王牌底下的那幾張：偏移與濃淡由 JS 依深度給，張數＝副數 */
 .deck .trumpcard{position:absolute;inset:0;rotate:6.5deg;transform-origin:50% 62%}
 /* 焦點時刻：翻王牌 */
 .deck .trumpcard.is-flip{animation:flip .62s var(--e-out) both}
@@ -344,28 +350,45 @@ input{font:inherit}
   100%{opacity:0;transform:scale(1.5)}
 }
 
-.trick{display:flex;gap:13px;align-items:flex-end;min-height:132px;flex-wrap:wrap;justify-content:center}
-.play{display:flex;flex-direction:column;align-items:center;gap:7px}
+.trick{display:flex;gap:13px;align-items:flex-end;min-height:calc(var(--ch) + 30px);flex-wrap:wrap;justify-content:center}
+/* 變形的支點放在牌面中心，不是連名字一起的方框中心 */
+.play{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;transform-origin:50% 55%}
 .play .who{font-size:10.5px;letter-spacing:.09em;color:var(--ink-3);transition:color .25s}
 .play.is-taking .who{color:var(--good)}
 .play.is-taking .card{box-shadow:0 0 0 1.5px var(--good), var(--sh-1)}
 .trick-empty{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);opacity:.7}
 
-/* 出牌：從出牌者的方向飛進來 */
+/* 別人出牌：從那個座位的方向帶進來 */
 .play.is-new{animation:toss .34s var(--e-out) both}
 @keyframes toss{
   from{transform:translate(var(--fx,0), var(--fy,-30px)) rotate(var(--fr,-7deg)) scale(.9);opacity:0}
   to  {transform:none;opacity:1}
 }
-/* 收墩：四張牌被贏家吸走 */
-.trick.is-collecting .play{animation:collect .44s var(--e-in) both}
-@keyframes collect{
-  to{transform:translate(var(--cx,0),var(--cy,-40px)) scale(.55);opacity:0}
+/* 自己出牌：從手上那一張的位置整段飛到檯面，順路放大成檯面尺寸 */
+.play.is-new.from-hand{animation:toss-hand var(--th,.34s) var(--e-out) both}
+@keyframes toss-hand{
+  from{transform:translate(var(--fx,0),var(--fy,140px)) rotate(var(--fr,-3deg)) scale(var(--fs,.66));opacity:0}
+  22% {opacity:1}
+  to  {transform:none;opacity:1}
 }
+/* 收墩：檯面上的牌先疊成一疊，整疊再被贏家收走 */
+.trick.is-collecting{position:relative;z-index:8}
+.trick.is-collecting .play.is-taking{z-index:2}
+.trick.is-collecting .play{
+  animation:collect var(--cdur,.6s) linear both,
+            collect-fade var(--cdur,.6s) linear both;
+}
+@keyframes collect{
+  0%  {transform:none;animation-timing-function:var(--e-out)}
+  30% {transform:translate(var(--sx,0),var(--sy,0)) rotate(var(--sr,0deg)) scale(1.03);animation-timing-function:linear}
+  44% {transform:translate(var(--sx,0),var(--sy,0)) rotate(var(--sr,0deg)) scale(1);animation-timing-function:var(--e-in)}
+  100%{transform:translate(var(--cx,0),var(--cy,-40px)) rotate(var(--sr,0deg)) scale(.42)}
+}
+@keyframes collect-fade{0%,84%{opacity:1}100%{opacity:0}}
 
 /* ================= 牌 ================= */
 .card{
-  position:relative;width:82px;height:116px;flex:none;
+  position:relative;width:var(--cw);height:var(--ch);flex:none;
   display:block;padding:0;border-radius:6px;
   color:var(--card-ink);
   /* 紙面：左上斜光 ＋ 象牙底 */
@@ -389,7 +412,6 @@ input{font:inherit}
 .card .cf use{fill:currentColor}
 .card .cf .ornament{fill:none}
 .card.red{color:var(--card-red)}
-.card.sm{width:70px;height:99px}
 .card.trump-mark{
   box-shadow:inset 0 0 0 2px var(--brass), var(--sh-1), inset 0 0 0 3px rgba(255,255,255,.5);
 }
@@ -438,9 +460,14 @@ input{font:inherit}
 }
 .bidbtn:hover{background:var(--brass);color:oklch(.22 .04 84);font-weight:600;transform:translateY(-1px)}
 
+/* 下一局自己會開始：用一條走完的線代替倒數字 */
+.autonext{flex:none;display:block;width:120px;height:2px;border-radius:2px;background:var(--hair-2);overflow:hidden}
+.autonext i{display:block;height:100%;background:var(--brass);transform-origin:left;animation:autonext var(--d,2600ms) linear both}
+@keyframes autonext{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
 /* ================= 手牌 ================= */
-.myhand{display:flex;flex-direction:column;gap:12px}
-.hand{display:flex;gap:8px;flex-wrap:wrap;min-height:120px;align-items:flex-end;justify-content:center}
+.myhand{display:flex;align-items:flex-end;gap:20px}
+.hand{flex:1;min-width:0;display:flex;gap:8px;flex-wrap:wrap;min-height:120px;align-items:flex-end;justify-content:center}
 .hand .card{transition-property:translate,box-shadow,opacity,filter}
 .hand .card:not(:disabled):hover,
 .hand .card:not(:disabled):focus-visible{translate:0 -10px;box-shadow:var(--sh-2), inset 0 0 0 1px rgba(255,255,255,.6)}
@@ -449,8 +476,28 @@ input{font:inherit}
   content:"";position:absolute;left:10px;right:10px;bottom:-6px;height:2px;border-radius:2px;
   background:var(--brass);
 }
-.hand .card.is-leaving{animation:leave .2s var(--e-in) both}
-@keyframes leave{to{translate:0 -30px;opacity:0}}
+.hand .card.is-leaving{animation:leave .16s linear both}
+@keyframes leave{to{translate:0 -6px;opacity:0}}
+
+/* ================= 我贏到的墩 ================= */
+/* 跟實體牌一樣：收下的牌背朝上疊在自己的右手邊，一墩一疊，數得出來 */
+.tricks{
+  --cw:60px;--ch:85px;
+  flex:none;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+/* 上緣留白給疊高之後往上長的位移 */
+.tricks .pile{position:relative;width:var(--cw);height:var(--ch);margin-top:20px}
+.tricks .pile.empty{border:1px dashed var(--hair);border-radius:6px}
+.tricks .pile .back{translate:var(--dx,0) var(--dy,0);rotate:var(--rz,0deg)}
+/* 從檯面飛過來的那一疊落到堆上 */
+.tricks .pile .back.is-land{animation:land .46s var(--e-out) both}
+@keyframes land{
+  from{transform:translate(var(--lx,0),var(--ly,-140px)) rotate(-11deg) scale(1.6);opacity:0}
+  30% {opacity:1}
+  to  {transform:none;opacity:1}
+}
+.tricks .label{white-space:nowrap}
 
 /* ================= 計分表 ================= */
 /* 右欄不做卡也不加底色，只用一條 hairline 分欄 */
@@ -601,12 +648,11 @@ table.score tr.now .sz span{color:var(--brass)}
   .mi{padding:0 10px}
   .mi .k{font-size:9.5px}
   .table{padding:16px 14px 20px}
-  .center{gap:24px;min-height:180px}
-  .card{width:62px;height:88px}
-  .card.sm{width:56px;height:79px}
-  .deck{width:60px;height:85px}
+  .center{gap:24px}
+  .myhand{--cw:62px;--ch:88px;gap:12px}
+  .tricks{--cw:44px;--ch:62px}
   .hand{min-height:96px;gap:6px}
-  .trick{min-height:104px;gap:9px}
+  .trick{gap:9px}
   .seat{min-width:0;padding:10px 12px}
   .roomcode{font-size:44px}
   .sheet{padding:22px 20px 20px;border-radius:18px}
@@ -623,7 +669,9 @@ table.score tr.now .sz span{color:var(--brass)}
     transition-duration:.01ms !important;
   }
   html{transition:--felt 400ms linear, --felt-deep 400ms linear, --glow 400ms linear !important}
-  .card.is-dealt,.play.is-new,.die.is-cast,.deck .trumpcard.is-flip{animation:fade-in .28s ease both !important}
+  .card.is-dealt,.play.is-new,.play.is-new.from-hand,.die.is-cast,
+  .deck .trumpcard.is-flip,.tricks .pile .back.is-land{animation:fade-in .28s ease both !important}
+  .autonext i{animation:none !important;transform:scaleX(1)}
   .trick.is-collecting .play{animation:fade-out .22s ease both !important}
   .bloom.go{animation:none !important}
   @keyframes fade-in{from{opacity:0}to{opacity:1}}
@@ -675,13 +723,14 @@ table.score tr.now .sz span{color:var(--brass)}
   <main class="main">
     <section class="table">
       <div class="seats" id="seats"></div>
-      <div class="center">
+      <div class="center" id="center">
         <div class="deckwrap" id="deckwrap"></div>
         <div class="trick" id="trick"></div>
       </div>
       <div class="status" id="status"></div>
       <div class="myhand">
         <div class="hand" id="hand"></div>
+        <div class="tricks" id="tricks" aria-live="polite"></div>
       </div>
     </section>
 
@@ -998,7 +1047,12 @@ const NET = {code:null, chan:null, sb:null, state:"ok", err:"", busy:false};
 let G = null, MODE = "solo", SPEED = 520, applying = false;
 let MYHAND = [], MYHAND_RI = -1;
 
-const SEEN = {round:-1, phase:"", bids:{}, keys:{}, scores:[], flip:-1};
+const SEEN = {round:-1, phase:"", bids:{}, keys:{}, scores:[], flip:-1, won:0};
+
+/* 我剛按下的那張牌在畫面上的位置——出牌動畫要從那裡起飛 */
+let PLAY_FROM = null;
+/* 一局打完到下一局自動開始之間的停頓 */
+const roundGap = () => Math.max(2200, SPEED * 4);
 
 const mySeat = () => {
   if(!G) return -1;
@@ -1048,6 +1102,8 @@ setInterval(function(){
     applyPlay(G, G.turn, aiCard(G, G.turn).id); changed = true;
   }else if(G.phase === "trickend" && now - G.at > d*1.7){
     resolveTrick(G); changed = true;
+  }else if(G.phase === "roundend" && now - G.at > roundGap()){
+    nextRound(); return;
   }
   if(changed) push();
 }, 240);
@@ -1057,13 +1113,18 @@ setInterval(function(){
    敲的人關掉分頁，他的 seen 會過期，下一位自動遞補。 */
 setInterval(function(){
   if(MODE !== "net" || !G || NET.busy || !NET.code) return;
-  if(G.phase !== "bid" && G.phase !== "play" && G.phase !== "trickend") return;
-  if(G.phase !== "trickend" && !seatPlayable(G.turn)) return;
+  const rounding = G.phase === "roundend";
+  if(!rounding){
+    if(G.phase !== "bid" && G.phase !== "play" && G.phase !== "trickend") return;
+    if(G.phase !== "trickend" && !seatPlayable(G.turn)) return;
+  /* 每局自動開始：停頓夠久了才敲，讓大家看得完這局的結算 */
+  }else if(Date.now() - G.at < roundGap()) return;
   let ticker = -1;
   for(let i=0;i<G.seats.length;i++)
     if(G.seats[i].kind === "human" && isLive(G.seats[i].cid)){ ticker = i; break; }
   if(ticker < 0 || G.seats[ticker].cid !== MY.pid) return;
-  api("tick", {code:NET.code, speed:SPEED});
+  if(rounding) api("next", {code:NET.code});
+  else api("tick", {code:NET.code, speed:SPEED});
 }, 420);
 
 /* 心跳：告訴大家我還在（不然 30 秒後我的位子會被 AI 接手） */
@@ -1116,7 +1177,9 @@ function applyRow(row, hand){
     score:row.score || [], log:row.log || [],
     host:row.host_pid, rev:row.rev, seen:row.seen || {},
     deckSize:(15 - row.cfg.minRank) * 4 * row.cfg.decks,
-    at:Date.now(), hands:[]
+    at:(G && MODE === "net" && NET.code === row.code &&
+        (G.rev||0) === (row.rev||0) && G.phase === row.phase) ? G.at : Date.now(),
+    hands:[]
   };
   for(let i=0;i<g.cfg.n;i++) g.hands[i] = [];
   G = g; MODE = "net"; NET.code = row.code;
@@ -1172,10 +1235,22 @@ function doBid(v){
   if(MODE === "solo"){ applying = true; applyBid(G, s, v); applying = false; push(); }
   else api("bid", {code:NET.code, v:v});
 }
+/* 一局打完就自己接下一局；打完最後一局就收桌 */
+function nextRound(){
+  if(!G) return;
+  if(MODE === "net"){ api("next", {code:NET.code}); return; }
+  if(G.ri + 1 >= G.ladder.length){ G.phase = "over"; G.at = Date.now(); }
+  else startRound(G);
+  push();
+}
 function doPlay(cardId, el){
   const s = mySeat();
   if(s < 0 || !G || G.phase !== "play" || G.turn !== s) return;
-  if(el && !REDUCED) el.classList.add("is-leaving");
+  if(el && !REDUCED){
+    const r = el.getBoundingClientRect();
+    PLAY_FROM = {seat:s, x:r.left + r.width/2, y:r.top + r.height/2, w:r.width, at:Date.now()};
+    el.classList.add("is-leaving");
+  }
   if(MODE === "solo"){ applying = true; applyPlay(G, s, cardId); applying = false; push(); }
   else api("play", {code:NET.code, card:cardId});
 }
@@ -1242,7 +1317,7 @@ function cardFace(card){
 function cardHTML(card, o){
   o = o || {};
   const su = SUITS[card.s];
-  const cls = ["card", su.red ? "red" : "", o.small ? "sm" : "",
+  const cls = ["card", su.red ? "red" : "",
                o.trumpMark ? "trump-mark" : ""].join(" ");
   const face = cardFace(card);
   return o.button
@@ -1313,6 +1388,22 @@ function paintTable(){
   st.setProperty("--glow",      "oklch(" + (L+.115).toFixed(3) + " " + (C*1.4).toFixed(4) + " " + t.h + ")");
 }
 
+/* 中間的牌能多大就多大：留下牌庫一張的寬度，其餘平分給這一墩的每一張 */
+function sizeCenter(){
+  const c = $("center");
+  if(!c || !G) return;
+  const avail = c.clientWidth;
+  if(!avail) return;
+  const n = G.cfg.n, gap = 13, deckGap = 42;
+  let w = (avail - deckGap - gap * (n - 1) - 10) / (n + 1);
+  /* 高度也要放得下：其餘元件大約吃掉 380px */
+  w = Math.min(w, (window.innerHeight - 380) / 1.4146);
+  w = Math.max(64, Math.min(152, Math.floor(w)));
+  c.style.setProperty("--cw", w + "px");
+  c.style.setProperty("--ch", Math.round(w * 1.4146) + "px");
+}
+window.addEventListener("resize", sizeCenter);
+
 function renderLadder(){
   if(!G) return;
   const peak = Math.max.apply(null, G.ladder);
@@ -1327,6 +1418,7 @@ function render(){
   if(!G) return;
   const me = mySeat();
   paintTable();
+  sizeCenter();
   renderLadder();
 
   const freshRound = SEEN.round !== G.ri;
@@ -1346,11 +1438,21 @@ function render(){
   for(let i=0;i<G.cfg.n;i++) all.push(i);
   setHTML($("seats"), all.map(seatHTML).join(""));
 
+  /* 牌庫疊幾張＝這局用幾副牌，翻出來的王牌算最上面那一張。
+     以前固定疊三張，看起來像三副牌 */
+  const decks = Math.max(1, G.cfg.decks);
+  const backs = function(k){
+    let h = "";
+    for(let i = k; i >= 1; i--)   /* i：離牌堆頂端第幾張，越深越偏、越淡 */
+      h += '<div class="back" style="translate:' + (-2*i) + 'px ' + (-2*i) +
+           'px;opacity:' + Math.max(.35, .95 - i*.18).toFixed(2) + '"></div>';
+    return h;
+  };
   setHTML($("deckwrap"), G.trumpCard
-    ? '<div class="deck"><div class="back"></div><div class="back"></div>' +
+    ? '<div class="deck">' + backs(decks - 1) +
       '<div class="trumpcard">' + cardHTML(G.trumpCard, {trumpMark:true}) + '</div></div>' +
       '<div class="label">王牌 <b>' + SUITS[G.trump].name + '</b></div>'
-    : '<div class="deck"><div class="back"></div><div class="back"></div><div class="back"></div></div>' +
+    : '<div class="deck">' + backs(decks) + '</div>' +
       '<div class="label">' + (G.phase === "lobby" ? "等待開始" : "本局無王") + '</div>');
 
   const bi = G.trick.length ? trickBest(G) : -1;
@@ -1358,7 +1460,7 @@ function render(){
     ? G.trick.map(function(t, i){
         return '<div class="play ' + (i === bi ? "is-taking" : "") + '" data-play="' + t.p + '">' +
           '<span class="who">' + seatLabel(t.p) + '</span>' +
-          cardHTML(t.card, {small:true}) + '</div>';
+          cardHTML(t.card) + '</div>';
       }).join("")
     : '<span class="trick-empty">' +
       (G.phase === "lobby" ? "尚未開始" : G.phase === "bid" ? "等所有人放好骰子" : "等待出牌") + '</span>');
@@ -1368,6 +1470,7 @@ function render(){
 
   renderStatus(me);
   const handChanged = renderHand(me);
+  const pileGrew = renderTricks(me);
   renderLedger();
   $("btnRoom").textContent = MODE === "net" ? "房間 " + NET.code : "和朋友玩";
 
@@ -1378,13 +1481,50 @@ function render(){
   }
   castDice();
   tossCards();
+  if(pileGrew) landTrick();
   if(SEEN.phase !== G.phase){
     const was = SEEN.phase;
     SEEN.phase = G.phase;
     if(G.phase === "trickend") scheduleCollect();
     if(was === "roundend" || G.phase === "roundend") tallyScores();
+    if(G.phase === "over") showFinal();
   }
   SEEN.scores = G.score.slice();
+}
+
+/* 我贏到的墩：背朝上疊在右手邊，一墩一疊 */
+function renderTricks(me){
+  const el = $("tricks");
+  if(!el) return false;
+  const show = me >= 0 && G.phase !== "lobby";
+  el.hidden = !show;
+  if(!show){ setHTML(el, ""); SEEN.won = 0; return false; }
+
+  const got = G.won[me] || 0;
+  let h = '<div class="pile' + (got ? "" : " empty") + '" role="img" aria-label="我贏得 ' + got + ' 墩">';
+  for(let i=0;i<got;i++){
+    /* 疊高了就把位移收斂，免得整疊爬到狀態列上 */
+    const k = i < 6 ? i : 6 + (i - 6) * .42;
+    h += '<div class="back" style="--dx:' + (k * -1.2).toFixed(1) + 'px;--dy:' +
+      (k * -2.1).toFixed(1) + 'px;--rz:' + (((i * 37) % 9) - 4) + 'deg"></div>';
+  }
+  h += '</div>';
+  setHTML(el, '<div class="label">本局 <b>' + got + '</b> 墩</div>' + h);
+
+  const grew = got === SEEN.won + 1;
+  SEEN.won = got;
+  return grew;
+}
+/* 那一疊從檯面落到堆上，接住收墩動畫的尾巴 */
+function landTrick(){
+  if(REDUCED) return;
+  const el = $("tricks").querySelector(".pile .back:last-child");
+  const trick = $("trick");
+  if(!el || !trick) return;
+  const a = trick.getBoundingClientRect(), b = el.getBoundingClientRect();
+  el.style.setProperty("--lx", Math.round(a.left + a.width/2 - b.left - b.width/2) + "px");
+  el.style.setProperty("--ly", Math.round(a.top + a.height/2 - b.top - b.height/2) + "px");
+  el.classList.add("is-land");
 }
 
 function dealIn(){
@@ -1412,7 +1552,7 @@ function castDice(){
     if(!REDUCED) d.classList.add("is-cast");
   });
 }
-/* 出的牌從出牌者的座位方向飛進檯面 */
+/* 自己的牌從手上那一張整段飛進檯面；別人的牌從他的座位方向帶進來 */
 function tossCards(){
   if(REDUCED) return;
   document.querySelectorAll(".play").forEach(function(el){
@@ -1420,31 +1560,63 @@ function tossCards(){
     const id = seat + "#" + G.played + "#" + [].indexOf.call(el.parentNode.children, el);
     if(SEEN.keys[id]) return;
     SEEN.keys[id] = 1;
+    const b = (el.querySelector(".card") || el).getBoundingClientRect();
+
+    const mine = PLAY_FROM && +seat === PLAY_FROM.seat && Date.now() - PLAY_FROM.at < 2500;
+    if(mine){
+      el.style.setProperty("--fx", Math.round(PLAY_FROM.x - (b.left + b.width/2)) + "px");
+      el.style.setProperty("--fy", Math.round(PLAY_FROM.y - (b.top + b.height/2)) + "px");
+      el.style.setProperty("--fr", "-3deg");
+      el.style.setProperty("--fs", (PLAY_FROM.w / (b.width || 1)).toFixed(3));
+      el.style.setProperty("--th", Math.round(Math.min(460, Math.max(240, SPEED * .62))) + "ms");
+      el.classList.add("is-new", "from-hand");
+      PLAY_FROM = null;
+      return;
+    }
     const from = document.querySelector('.seat[data-seat="' + seat + '"]');
     if(from){
-      const a = from.getBoundingClientRect(), b = el.getBoundingClientRect();
-      el.style.setProperty("--fx", Math.round((a.left + a.width/2 - b.left - b.width/2) * .62) + "px");
-      el.style.setProperty("--fy", Math.round((a.top + a.height/2 - b.top - b.height/2) * .62) + "px");
+      const a = from.getBoundingClientRect();
+      el.style.setProperty("--fx", Math.round((a.left + a.width/2 - b.left - b.width/2) * .68) + "px");
+      el.style.setProperty("--fy", Math.round((a.top + a.height/2 - b.top - b.height/2) * .68) + "px");
       el.style.setProperty("--fr", (Math.random()*14 - 7).toFixed(1) + "deg");
     }
     el.classList.add("is-new");
   });
 }
-/* 收墩：四張牌被贏家吸走 */
+/* 收墩：檯面上的牌先聚成一疊，整疊再飛向贏家——是我贏的就飛進右手邊的墩堆 */
 function scheduleCollect(){
-  const wait = Math.max(140, SPEED*1.7 - 470);
+  const total = Math.max(320, SPEED*1.7 - 60);
+  const dur = Math.min(760, Math.max(300, Math.round(total * .72)));
+  const wait = Math.max(80, total - dur);
   const at = G.at;
   setTimeout(function(){
     if(!G || G.phase !== "trickend" || G.at !== at) return;
     const trick = $("trick");
     if(!trick || !G.trick.length) return;
     const w = G.trick[trickBest(G)].p;
-    const seat = document.querySelector('.seat[data-seat="' + w + '"]');
-    trick.querySelectorAll(".play").forEach(function(el){
-      if(seat){
-        const a = seat.getBoundingClientRect(), b = el.getBoundingClientRect();
-        el.style.setProperty("--cx", Math.round(a.left + a.width/2 - b.left - b.width/2) + "px");
-        el.style.setProperty("--cy", Math.round(a.top + a.height/2 - b.top - b.height/2) + "px");
+    const pile = $("tricks").querySelector(".pile");
+    const target = (w === mySeat() && pile && !$("tricks").hidden)
+      ? pile : document.querySelector('.seat[data-seat="' + w + '"]');
+    /* 疊起來的位置：這一墩所有牌面的正中間 */
+    const plays = [].slice.call(trick.querySelectorAll(".play"));
+    const mid = plays.map(function(el){
+      const b = (el.querySelector(".card") || el).getBoundingClientRect();
+      return {x:b.left + b.width/2, y:b.top + b.height/2};
+    });
+    if(!mid.length) return;
+    const gx = mid.reduce((a, m) => a + m.x, 0) / mid.length;
+    const gy = mid.reduce((a, m) => a + m.y, 0) / mid.length;
+
+    trick.style.setProperty("--cdur", dur + "ms");
+    plays.forEach(function(el, i){
+      const bx = mid[i].x, by = mid[i].y;
+      el.style.setProperty("--sx", Math.round(gx - bx) + "px");
+      el.style.setProperty("--sy", Math.round(gy - by) + "px");
+      el.style.setProperty("--sr", (((i * 53) % 11) - 5) + "deg");
+      if(target){
+        const a = target.getBoundingClientRect();
+        el.style.setProperty("--cx", Math.round(a.left + a.width/2 - bx) + "px");
+        el.style.setProperty("--cy", Math.round(a.top + a.height/2 - by) + "px");
       }
     });
     trick.classList.add("is-collecting");
@@ -1525,11 +1697,14 @@ function renderStatus(me){
         (c.pts >= 0 ? "+" : "−") + Math.abs(c.pts) + '</span></span>';
     }).join('<span class="sep">·</span>');
     const more = G.ri + 1 < G.ladder.length;
+    /* 下一局會自己開始，按鈕只是給想快轉的人。伺服器允許任何在座的人開下一局 */
     setHTML(el, '<span class="msg">第 ' + (G.ri+1) + ' 局結束</span>' + line +
-      '<span class="bidrow">' + (amHost()
-        ? '<button class="btn primary" id="btnNext">' +
-          (more ? '下一局 · 每人 ' + G.ladder[G.ri+1] + ' 張' : '看最終結果') + '</button>'
-        : '<span class="hint">等房主開下一局</span>') + '</span>');
+      '<span class="bidrow">' +
+        '<span class="autonext" style="--d:' + roundGap() + 'ms"><i></i></span>' +
+        '<span class="hint">' +
+          (more ? '下一局 · 每人 ' + G.ladder[G.ri+1] + ' 張' : '準備收桌') + '</span>' +
+        (me >= 0 ? '<button class="btn primary" id="btnNext">馬上開始</button>' : "") +
+      '</span>');
     return;
   }
   if(G.phase === "over")
@@ -1670,12 +1845,7 @@ document.addEventListener("click", function(e){
   if(card && !card.disabled){ doPlay(card.dataset.card, card); return; }
   const seat = e.target.closest("[data-seat]");
   if(seat && seat.tagName === "BUTTON"){ takeSeat(+seat.dataset.seat).then(paintNet); return; }
-  if(e.target.id === "btnNext"){
-    if(MODE === "net"){ api("next", {code:NET.code}); return; }
-    if(G.ri + 1 >= G.ladder.length){ G.phase = "over"; G.at = Date.now(); push(); showFinal(); }
-    else { startRound(G); push(); }
-    return;
-  }
+  if(e.target.id === "btnNext"){ nextRound(); return; }
   if(e.target.id === "btnFinal"){ showFinal(); return; }
   if(e.target.id === "btnLobby"){ openNet(); return; }
   const sp = e.target.closest("#speed button");
@@ -1781,7 +1951,7 @@ function startSolo(){
   G.seats[0] = {name:"你", kind:"human", cid:"me"};
   for(let i=1;i<G.cfg.n;i++) G.seats[i] = {name:String.fromCharCode(65+i), kind:"ai", cid:null};
   G.host = "me";
-  SEEN.round = -1; SEEN.phase = ""; SEEN.flip = -1; SEEN.bids = {}; SEEN.keys = {}; SEEN.scores = [];
+  SEEN.round = -1; SEEN.phase = ""; SEEN.flip = -1; SEEN.bids = {}; SEEN.keys = {}; SEEN.scores = []; SEEN.won = 0;
   startRound(G);
   render();
 }

@@ -303,8 +303,7 @@ input{font:inherit}
     inset 0 0 0 4px rgba(26,23,20,.22),
     0 2px 6px rgba(0,0,0,.4);
 }
-.deck .back:nth-child(1){translate:-4px -4px;opacity:.55}
-.deck .back:nth-child(2){translate:-2px -2px;opacity:.8}
+/* 疊在王牌底下的那幾張：偏移與濃淡由 JS 依深度給，張數＝副數 */
 .deck .trumpcard{position:absolute;inset:0;rotate:6.5deg;transform-origin:50% 62%}
 /* 焦點時刻：翻王牌 */
 .deck .trumpcard.is-flip{animation:flip .62s var(--e-out) both}
@@ -445,7 +444,7 @@ input{font:inherit}
 .bidbtn:hover{background:var(--brass);color:oklch(.22 .04 84);font-weight:600;transform:translateY(-1px)}
 
 /* 下一局自己會開始：用一條走完的線代替倒數字 */
-.autonext{display:block;width:120px;height:2px;border-radius:2px;background:var(--hair-2);overflow:hidden}
+.autonext{flex:none;display:block;width:120px;height:2px;border-radius:2px;background:var(--hair-2);overflow:hidden}
 .autonext i{display:block;height:100%;background:var(--brass);transform-origin:left;animation:autonext var(--d,2600ms) linear both}
 @keyframes autonext{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 
@@ -467,11 +466,11 @@ input{font:inherit}
 /* 跟實體牌一樣：收下的牌背朝上疊在自己的右手邊，一墩一疊，數得出來 */
 .tricks{
   --cw:60px;--ch:85px;
-  flex:none;align-self:flex-end;
-  display:flex;flex-direction:column;align-items:center;gap:10px;
-  padding-top:24px;
+  flex:none;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
 }
-.tricks .pile{position:relative;width:var(--cw);height:var(--ch)}
+/* 上緣留白給疊高之後往上長的位移 */
+.tricks .pile{position:relative;width:var(--cw);height:var(--ch);margin-top:20px}
 .tricks .pile.empty{border:1px dashed var(--hair);border-radius:6px}
 .tricks .pile .back{translate:var(--dx,0) var(--dy,0);rotate:var(--rz,0deg)}
 /* 從檯面飛過來的那一疊落到堆上 */
@@ -634,7 +633,7 @@ table.score tr.now .sz span{color:var(--brass)}
   .table{padding:16px 14px 20px}
   .center{gap:24px}
   .myhand{--cw:62px;--ch:88px;gap:12px}
-  .tricks{--cw:44px;--ch:62px;padding-top:18px}
+  .tricks{--cw:44px;--ch:62px}
   .hand{min-height:96px;gap:6px}
   .trick{gap:9px}
   .seat{min-width:0;padding:10px 12px}
@@ -1390,6 +1389,8 @@ function sizeCenter(){
   if(!avail) return;
   const n = G.cfg.n, gap = 13, deckGap = 42;
   let w = (avail - deckGap - gap * (n - 1) - 10) / (n + 1);
+  /* 高度也要放得下：其餘元件大約吃掉 380px */
+  w = Math.min(w, (window.innerHeight - 380) / 1.4146);
   w = Math.max(64, Math.min(152, Math.floor(w)));
   c.style.setProperty("--cw", w + "px");
   c.style.setProperty("--ch", Math.round(w * 1.4146) + "px");
@@ -1430,11 +1431,21 @@ function render(){
   for(let i=0;i<G.cfg.n;i++) all.push(i);
   setHTML($("seats"), all.map(seatHTML).join(""));
 
+  /* 牌庫疊幾張＝這局用幾副牌，翻出來的王牌算最上面那一張。
+     以前固定疊三張，看起來像三副牌 */
+  const decks = Math.max(1, G.cfg.decks);
+  const backs = function(k){
+    let h = "";
+    for(let i = k; i >= 1; i--)   /* i：離牌堆頂端第幾張，越深越偏、越淡 */
+      h += '<div class="back" style="translate:' + (-2*i) + 'px ' + (-2*i) +
+           'px;opacity:' + Math.max(.35, .95 - i*.18).toFixed(2) + '"></div>';
+    return h;
+  };
   setHTML($("deckwrap"), G.trumpCard
-    ? '<div class="deck"><div class="back"></div><div class="back"></div>' +
+    ? '<div class="deck">' + backs(decks - 1) +
       '<div class="trumpcard">' + cardHTML(G.trumpCard, {trumpMark:true}) + '</div></div>' +
       '<div class="label">王牌 <b>' + SUITS[G.trump].name + '</b></div>'
-    : '<div class="deck"><div class="back"></div><div class="back"></div><div class="back"></div></div>' +
+    : '<div class="deck">' + backs(decks) + '</div>' +
       '<div class="label">' + (G.phase === "lobby" ? "等待開始" : "本局無王") + '</div>');
 
   const bi = G.trick.length ? trickBest(G) : -1;
@@ -1490,8 +1501,8 @@ function renderTricks(me){
     h += '<div class="back" style="--dx:' + (k * -1.2).toFixed(1) + 'px;--dy:' +
       (k * -2.1).toFixed(1) + 'px;--rz:' + (((i * 37) % 9) - 4) + 'deg"></div>';
   }
-  h += '</div><div class="label">本局 <b>' + got + '</b> 墩</div>';
-  setHTML(el, h);
+  h += '</div>';
+  setHTML(el, '<div class="label">本局 <b>' + got + '</b> 墩</div>' + h);
 
   const grew = got === SEEN.won + 1;
   SEEN.won = got;
@@ -1579,13 +1590,19 @@ function scheduleCollect(){
     const pile = $("tricks").querySelector(".pile");
     const target = (w === mySeat() && pile && !$("tricks").hidden)
       ? pile : document.querySelector('.seat[data-seat="' + w + '"]');
-    const tb = trick.getBoundingClientRect();
-    const gx = tb.left + tb.width/2, gy = tb.top + tb.height/2;
+    /* 疊起來的位置：這一墩所有牌面的正中間 */
+    const plays = [].slice.call(trick.querySelectorAll(".play"));
+    const mid = plays.map(function(el){
+      const b = (el.querySelector(".card") || el).getBoundingClientRect();
+      return {x:b.left + b.width/2, y:b.top + b.height/2};
+    });
+    if(!mid.length) return;
+    const gx = mid.reduce((a, m) => a + m.x, 0) / mid.length;
+    const gy = mid.reduce((a, m) => a + m.y, 0) / mid.length;
 
     trick.style.setProperty("--cdur", dur + "ms");
-    trick.querySelectorAll(".play").forEach(function(el, i){
-      const b = (el.querySelector(".card") || el).getBoundingClientRect();
-      const bx = b.left + b.width/2, by = b.top + b.height/2;
+    plays.forEach(function(el, i){
+      const bx = mid[i].x, by = mid[i].y;
       el.style.setProperty("--sx", Math.round(gx - bx) + "px");
       el.style.setProperty("--sy", Math.round(gy - by) + "px");
       el.style.setProperty("--sr", (((i * 53) % 11) - 5) + "deg");
@@ -1928,7 +1945,7 @@ function startSolo(){
   G.seats[0] = {name:"你", kind:"human", cid:MY.cid};
   for(let i=1;i<G.cfg.n;i++) G.seats[i] = {name:String.fromCharCode(65+i), kind:"ai", cid:null};
   G.host = MY.cid;
-  SEEN.round = -1; SEEN.phase = ""; SEEN.flip = -1; SEEN.bids = {}; SEEN.keys = {}; SEEN.scores = [];
+  SEEN.round = -1; SEEN.phase = ""; SEEN.flip = -1; SEEN.bids = {}; SEEN.keys = {}; SEEN.scores = []; SEEN.won = 0;
   startRound(G);
   render();
 }
