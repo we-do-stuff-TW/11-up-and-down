@@ -1,0 +1,2 @@
+-- 見 README。實際已套用於專案 psuchtzacdppdpltpglg。
+-- 0001 建表與 RLS、0002 touch_seen、0003 撤銷函式的 PUBLIC 執行權。
