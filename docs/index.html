@@ -173,7 +173,7 @@ input{font:inherit}
 .pip-i{width:12px;height:12px;fill:currentColor;vertical-align:-1.5px}
 .pip-i.r{fill:var(--bad)}
 
-.tools{display:flex;gap:7px;align-items:center;margin-left:auto}
+.tools{display:flex;gap:7px;align-items:center;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 .btn{
   padding:7px 13px;border-radius:99px;
   border:1px solid var(--hair);
@@ -351,9 +351,18 @@ input{font:inherit}
 }
 
 .trick{display:flex;gap:13px;align-items:flex-end;min-height:calc(var(--ch) + 30px);flex-wrap:wrap;justify-content:center}
-/* 變形的支點放在牌面中心，不是連名字一起的方框中心 */
-.play{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;transform-origin:50% 55%}
-.play .who{font-size:10.5px;letter-spacing:.09em;color:var(--ink-3);transition:color .25s}
+/* 一格就是一張牌寬，而且不准被壓縮：
+   以前名字比牌寬時會把格子撐大，格子被擠扁後裡面固定寬的牌就溢出去蓋到隔壁的花色。
+   變形的支點放在牌面中心，不是連名字一起的方框中心。 */
+.play{
+  position:relative;flex:none;width:var(--cw);
+  display:flex;flex-direction:column;align-items:center;gap:7px;
+  transform-origin:50% 55%;
+}
+.play .who{
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:10.5px;letter-spacing:.09em;color:var(--ink-3);transition:color .25s;
+}
 .play.is-taking .who{color:var(--good)}
 .play.is-taking .card{box-shadow:0 0 0 1.5px var(--good), var(--sh-1)}
 .trick-empty{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);opacity:.7}
@@ -487,11 +496,14 @@ input{font:inherit}
   display:flex;flex-direction:column;align-items:center;gap:6px;
 }
 /* 上緣留白給疊高之後往上長的位移 */
-.tricks .pile{position:relative;width:var(--cw);height:var(--ch);margin-top:20px}
+/* 上緣留白給疊高之後往上長的位移，數得出來比省空間重要 */
+.tricks .pile{position:relative;width:var(--cw);height:var(--ch);margin-top:var(--lift,58px)}
 .tricks .pile.empty{border:1px dashed var(--hair);border-radius:6px}
-.tricks .pile .back{translate:var(--dx,0) var(--dy,0);rotate:var(--rz,0deg)}
+/* 一墩是一小疊：pack 決定這一墩擺在哪，裡面每張牌再錯開一點點做出厚度 */
+.tricks .pack{position:absolute;inset:0;translate:var(--dx,0) var(--dy,0);rotate:var(--rz,0deg)}
+.tricks .pack .back{translate:var(--bx,0) var(--by,0);rotate:var(--br,0deg)}
 /* 從檯面飛過來的那一疊落到堆上 */
-.tricks .pile .back.is-land{animation:land .46s var(--e-out) both}
+.tricks .pack.is-land{animation:land .46s var(--e-out) both}
 @keyframes land{
   from{transform:translate(var(--lx,0),var(--ly,-140px)) rotate(-11deg) scale(1.6);opacity:0}
   30% {opacity:1}
@@ -502,12 +514,31 @@ input{font:inherit}
 /* ================= 計分表 ================= */
 /* 右欄不做卡也不加底色，只用一條 hairline 分欄 */
 .ledger{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--hair)}
-@media (max-width:960px){ .ledger{border-left:none;border-top:1px solid var(--hair)} }
+/* 桌機右欄常駐就看得到，不需要那顆按鈕，也不需要關閉 */
+#btnScore,.ledger-close{display:none}
+
+/* 窄螢幕：計分表不佔版面、也不會在局末把畫面捲走，
+   改成一顆隨時可以點開的浮層 */
+@media (max-width:960px){
+  #btnScore{display:inline-block}
+  .ledger-close{display:inline-block;margin-left:10px;padding:5px 11px;font-size:12px}
+  .ledger{
+    position:fixed;inset:0;z-index:60;display:none;
+    border-left:none;border-top:none;
+    /* 跟著桌面顏色走，不然王牌換成紅花色時表頭那條會穿幫 */
+    background:linear-gradient(170deg, var(--felt) 0%, var(--felt-deep) 100%);
+    padding-bottom:env(safe-area-inset-bottom);
+    animation:sheet .28s var(--e-out) both;
+  }
+  body.score-open .ledger{display:flex}
+  body.score-open{overflow:hidden}
+  .ledger-head{padding:16px 16px 12px;border-bottom:1px solid var(--hair)}
+  .ledger-scroll{max-height:none;flex:1;padding:0 12px 20px}
+}
 .ledger-head{display:flex;align-items:baseline;gap:9px;padding:13px 16px 10px}
 .ledger-head h2{font-size:10px;letter-spacing:.17em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
 .ledger-head .of{margin-left:auto;font-size:10.5px;color:var(--ink-3);font-family:"IBM Plex Mono",monospace}
 .ledger-scroll{overflow:auto;flex:1;max-height:min(66vh,640px);padding:0 8px 14px}
-@media (max-width:960px){ .ledger-scroll{max-height:330px} }
 
 table.score{border-collapse:collapse;width:100%;table-layout:fixed;
   font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
@@ -650,7 +681,7 @@ table.score tr.now .sz span{color:var(--brass)}
   .table{padding:16px 14px 20px}
   .center{gap:24px}
   .myhand{--cw:62px;--ch:88px;gap:12px}
-  .tricks{--cw:44px;--ch:62px}
+  .tricks{--cw:44px;--ch:62px;--lift:46px}
   .hand{min-height:96px;gap:6px}
   .trick{gap:9px}
   .seat{min-width:0;padding:10px 12px}
@@ -670,7 +701,7 @@ table.score tr.now .sz span{color:var(--brass)}
   }
   html{transition:--felt 400ms linear, --felt-deep 400ms linear, --glow 400ms linear !important}
   .card.is-dealt,.play.is-new,.play.is-new.from-hand,.die.is-cast,
-  .deck .trumpcard.is-flip,.tricks .pile .back.is-land{animation:fade-in .28s ease both !important}
+  .deck .trumpcard.is-flip,.tricks .pack.is-land{animation:fade-in .28s ease both !important}
   .autonext i{animation:none !important;transform:scaleX(1)}
   .trick.is-collecting .play{animation:fade-out .22s ease both !important}
   .bloom.go{animation:none !important}
@@ -714,6 +745,7 @@ table.score tr.now .sz span{color:var(--brass)}
         <button data-sp="520" aria-pressed="true">中</button>
         <button data-sp="200" aria-pressed="false">快</button>
       </div>
+      <button class="btn" id="btnScore">計分</button>
       <button class="btn" id="btnRules">規則</button>
       <button class="btn" id="btnRoom">和朋友玩</button>
       <button class="btn" id="btnSetup">新局</button>
@@ -738,6 +770,7 @@ table.score tr.now .sz span{color:var(--brass)}
       <div class="ledger-head">
         <h2>計分表</h2>
         <span class="of" id="ledgerOf"></span>
+        <button class="btn ledger-close" id="scoreClose">關閉</button>
       </div>
       <div class="ledger-scroll"><table class="score" id="score"></table></div>
     </aside>
@@ -1501,12 +1534,17 @@ function renderTricks(me){
   if(!show){ setHTML(el, ""); SEEN.won = 0; return false; }
 
   const got = G.won[me] || 0;
+  const per = G.cfg.n;   /* 一墩就是每人各一張 */
   let h = '<div class="pile' + (got ? "" : " empty") + '" role="img" aria-label="我贏得 ' + got + ' 墩">';
   for(let i=0;i<got;i++){
-    /* 疊高了就把位移收斂，免得整疊爬到狀態列上 */
-    const k = i < 6 ? i : 6 + (i - 6) * .42;
-    h += '<div class="back" style="--dx:' + (k * -1.2).toFixed(1) + 'px;--dy:' +
-      (k * -2.1).toFixed(1) + 'px;--rz:' + (((i * 37) % 9) - 4) + 'deg"></div>';
+    /* 每一墩明顯錯開一格，數得出來；疊到第 7 墩之後步距減半，免得爬進狀態列 */
+    const k = i < 6 ? i : 6 + (i - 6) * .5;
+    h += '<div class="pack" style="--dx:' + (k * -2.4).toFixed(1) + 'px;--dy:' +
+      (k * -6.4).toFixed(1) + 'px;--rz:' + (((i * 37) % 11) - 5) + 'deg">';
+    for(let c=0;c<per;c++)   /* 這一墩的厚度 */
+      h += '<div class="back" style="--bx:' + (c * .9).toFixed(1) + 'px;--by:' +
+        (c * -1).toFixed(1) + 'px;--br:' + ((c - (per-1)/2) * 1.3).toFixed(1) + 'deg"></div>';
+    h += '</div>';
   }
   h += '</div>';
   setHTML(el, '<div class="label">本局 <b>' + got + '</b> 墩</div>' + h);
@@ -1518,7 +1556,7 @@ function renderTricks(me){
 /* 那一疊從檯面落到堆上，接住收墩動畫的尾巴 */
 function landTrick(){
   if(REDUCED) return;
-  const el = $("tricks").querySelector(".pile .back:last-child");
+  const el = $("tricks").querySelector(".pile .pack:last-child");
   const trick = $("trick");
   if(!el || !trick) return;
   const a = trick.getBoundingClientRect(), b = el.getBoundingClientRect();
@@ -1755,8 +1793,13 @@ function renderLedger(){
     h += '</tr>';
   });
   if(setHTML($("score"), h + '</tbody>')){
-    const tr = $("score").querySelector("tr.now");
-    if(tr && tr.scrollIntoView) tr.scrollIntoView({block:"nearest"});
+    /* 只捲計分表自己的容器。用 scrollIntoView 會連整頁一起捲——
+       在手機的直式版面，那等於每一輪結束都把人拉到計分表去 */
+    const tr = $("score").querySelector("tr.now"), box = $("score").parentNode;
+    if(tr && box){
+      const a = tr.getBoundingClientRect(), b = box.getBoundingClientRect();
+      box.scrollTop += (a.top - b.top) - (b.height - a.height) / 2;
+    }
   }
   $("ledgerOf").textContent = G.cfg.decks + " 副 · " + G.deckSize + " 張 · " + G.cfg.n + " 人";
 }
@@ -1902,6 +1945,13 @@ function showFinal(){
   $("endOv").hidden = false;
 }
 
+/* 窄螢幕才看得到這顆：計分表平常不佔版面，要看隨時點開 */
+function setScore(open){
+  document.body.classList.toggle("score-open", open);
+  $("btnScore").setAttribute("aria-expanded", open ? "true" : "false");
+}
+$("btnScore").onclick = function(){ setScore(!document.body.classList.contains("score-open")); };
+$("scoreClose").onclick = function(){ setScore(false); };
 $("btnRules").onclick = function(){ $("rulesOv").hidden = false; };
 $("rulesClose").onclick = function(){ $("rulesOv").hidden = true; };
 $("btnRoom").onclick = openNet;
@@ -1910,7 +1960,7 @@ $("setupCancel").onclick = function(){ $("setupOv").hidden = true; };
 $("endClose").onclick = function(){ $("endOv").hidden = true; };
 $("endAgain").onclick = function(){ $("endOv").hidden = true; openSetup(); };
 document.addEventListener("keydown", function(e){
-  if(e.key === "Escape"){ $("rulesOv").hidden = true; $("setupOv").hidden = true; $("netOv").hidden = true; }
+  if(e.key === "Escape"){ $("rulesOv").hidden = true; $("setupOv").hidden = true; $("netOv").hidden = true; setScore(false); }
 });
 
 /* ================= 單人設定 ================= */
