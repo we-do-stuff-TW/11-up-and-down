@@ -365,6 +365,16 @@ input{font:inherit}
 }
 .play.is-taking .who{color:var(--good)}
 .play.is-taking .card{box-shadow:0 0 0 1.5px var(--good), var(--sh-1)}
+/* 一墩打完先定格：贏的那張往贏家的方向推出去、其餘的暗下來，停兩秒才收墩，
+   讓所有人都看清楚是誰贏的。推的方向 --px/--py 由 JS 量出贏家座位在哪邊。
+   --kx/--ky/--ks 是收墩動畫的起點，接在推出去的位置上，不然收的瞬間會彈回原位。 */
+.trick .play{transition:transform .3s var(--e-out), opacity .3s var(--e-out)}
+.trick.is-won .play{--ko:.6;opacity:var(--ko)}
+.trick.is-won .play.is-taking{
+  --ko:1;--kx:var(--px,0);--ky:var(--py,-18px);--ks:1.08;
+  opacity:1;z-index:3;transform:translate(var(--kx),var(--ky)) scale(var(--ks));
+}
+.trick.is-won .play.is-taking .card{box-shadow:0 0 0 2px var(--good), var(--sh-2)}
 .trick-empty{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);opacity:.7}
 
 /* 別人出牌：從那個座位的方向帶進來 */
@@ -388,12 +398,12 @@ input{font:inherit}
             collect-fade var(--cdur,.6s) linear both;
 }
 @keyframes collect{
-  0%  {transform:none;animation-timing-function:var(--e-out)}
+  0%  {transform:translate(var(--kx,0),var(--ky,0)) scale(var(--ks,1));animation-timing-function:var(--e-out)}
   30% {transform:translate(var(--sx,0),var(--sy,0)) rotate(var(--sr,0deg)) scale(1.03);animation-timing-function:linear}
   44% {transform:translate(var(--sx,0),var(--sy,0)) rotate(var(--sr,0deg)) scale(1);animation-timing-function:var(--e-in)}
   100%{transform:translate(var(--cx,0),var(--cy,-40px)) rotate(var(--sr,0deg)) scale(.42)}
 }
-@keyframes collect-fade{0%,84%{opacity:1}100%{opacity:0}}
+@keyframes collect-fade{0%,84%{opacity:var(--ko,1)}100%{opacity:0}}
 
 /* ================= 牌 ================= */
 .card{
@@ -692,6 +702,83 @@ table.score tr.now .sz span{color:var(--brass)}
   .readout .v{font-size:22px}
 }
 
+/* ================= 立體模式 ================= */
+/* 牌桌換成一張 WebGL 畫布。座位牌、狀態列、手牌按鈕仍然是 DOM，
+   疊在畫布上、由 JS 投影定位——文字保持向量清晰，鍵盤與螢幕閱讀器照常運作。 */
+body.is3d .table{position:relative;padding:0;gap:0;overflow:hidden}
+body.is3d .stage{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:manipulation}
+body.is3d .center,
+body.is3d .tricks{display:none}
+
+/* 座位牌浮在對應的 3D 座位上方 */
+body.is3d .seats{position:absolute;inset:0;display:block;pointer-events:none;z-index:2}
+body.is3d .seat{
+  position:absolute;left:0;top:0;translate:-50% -50%;
+  min-width:0;padding:8px 12px;border-radius:12px;
+  background:oklch(.17 .022 250 / .52);
+  box-shadow:inset 0 0 0 1px var(--hair-2), 0 8px 22px rgba(0,0,0,.34);
+  backdrop-filter:blur(9px) saturate(1.2);-webkit-backdrop-filter:blur(9px) saturate(1.2);
+  transition:opacity .3s var(--e-out), box-shadow .3s var(--e-out);
+  white-space:nowrap;
+}
+body.is3d .seat::before,
+body.is3d .seat + .seat::before{display:none}
+body.is3d .seat.is-active{
+  transform:none;background:oklch(.20 .026 250 / .62);
+  box-shadow:inset 0 0 0 1px var(--glass-lip), 0 10px 30px rgba(0,0,0,.42);
+}
+body.is3d .seat .spread{display:none}   /* 剩幾張牌由桌上那疊牌背自己說 */
+
+/* 手牌：3D 負責畫，DOM 只留下按得到、也讀得到的那一層。
+   透明但可對焦，位置貼著投影後的牌面，所以焦點框會框在正確的那張牌上。 */
+body.is3d .myhand{position:absolute;inset:0;display:block;pointer-events:none;z-index:2}
+body.is3d .hand{
+  position:absolute;inset:0;display:block;min-height:0;
+  gap:0;flex:none;pointer-events:none;
+}
+body.is3d .hand .card{
+  position:absolute;left:0;top:0;translate:-50% -50%;
+  background:none;box-shadow:none;border:2px solid transparent;border-radius:8px;
+  transition:none;opacity:1;filter:none;
+}
+body.is3d .hand .card::after{display:none}
+body.is3d .hand .card .cf{visibility:hidden}
+body.is3d .hand .card.legal::before{display:none}
+body.is3d .hand .card:focus-visible{
+  outline:none;border-color:var(--brass);
+  box-shadow:0 0 0 4px oklch(.845 .128 84 / .28);
+}
+body.is3d .hand .spectate,
+body.is3d .hand .trick-empty{
+  position:absolute;left:50%;bottom:12%;translate:-50% 0;pointer-events:auto;
+}
+
+/* 狀態列浮在手牌上方，不擋牌 */
+body.is3d .status{
+  position:absolute;left:50%;translate:-50% 0;bottom:var(--status-b,25%);
+  z-index:3;width:min(92%,720px);pointer-events:none;
+}
+body.is3d .status > *{pointer-events:auto}
+body.is3d .status .msg,
+body.is3d .status .hint{text-shadow:0 2px 10px rgba(0,0,0,.6)}
+body.is3d .bidrow .pill,
+body.is3d .status .btn{
+  background:oklch(.17 .022 250 / .62);
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+}
+
+/* 載入中／不支援 */
+.stage-note{
+  position:absolute;left:50%;top:50%;translate:-50% -50%;z-index:4;
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);
+}
+
+@media (max-width:700px){
+  body.is3d .seat{padding:6px 9px;border-radius:10px}
+  body.is3d .seat-name{font-size:12px}
+  body.is3d .seat-score{font-size:13px}
+}
+
 /* ================= 動作偏好 ================= */
 /* 拿掉位移，保留顏色、透明度與狀態變化——那些是資訊不是裝飾 */
 @media (prefers-reduced-motion: reduce){
@@ -740,6 +827,10 @@ table.score tr.now .sz span{color:var(--brass)}
     <div class="ladder" id="ladder" role="img" aria-label="局數階梯"></div>
     <div class="meta" id="meta"></div>
     <div class="tools">
+      <div class="seg" id="dim">
+        <button data-dim="2" aria-pressed="true">平面</button>
+        <button data-dim="3" aria-pressed="false">立體</button>
+      </div>
       <div class="seg" id="speed">
         <button data-sp="900" aria-pressed="false">慢</button>
         <button data-sp="520" aria-pressed="true">中</button>
@@ -754,6 +845,7 @@ table.score tr.now .sz span{color:var(--brass)}
 
   <main class="main">
     <section class="table">
+      <canvas class="stage" id="stage" hidden></canvas>
       <div class="seats" id="seats"></div>
       <div class="center" id="center">
         <div class="deckwrap" id="deckwrap"></div>
@@ -892,6 +984,7 @@ const rankLabel = r => FACE[r] || String(r);
 const PEAK_CAP = 11;
 const $ = id => document.getElementById(id);
 const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const IS3D = () => document.body.classList.contains("is3d");
 
 function pip(s, cls){
   if(s === null || s === undefined) return "";
@@ -1086,6 +1179,9 @@ const SEEN = {round:-1, phase:"", bids:{}, keys:{}, scores:[], flip:-1, won:0};
 let PLAY_FROM = null;
 /* 一局打完到下一局自動開始之間的停頓 */
 const roundGap = () => Math.max(2200, SPEED * 4);
+/* 一墩打完到收墩之間的停頓。至少兩秒：贏的那張推出來定在那裡，
+   讓大家看完是誰用哪張牌贏的，才把牌收走、開下一墩 */
+const trickGap = () => Math.max(2000, SPEED * 2.6);
 
 const mySeat = () => {
   if(!G) return -1;
@@ -1133,7 +1229,7 @@ setInterval(function(){
     applyBid(G, G.turn, aiBid(G, G.turn)); changed = true;
   }else if(G.phase === "play" && seatPlayable(G.turn) && now - G.at > d*.8){
     applyPlay(G, G.turn, aiCard(G, G.turn).id); changed = true;
-  }else if(G.phase === "trickend" && now - G.at > d*1.7){
+  }else if(G.phase === "trickend" && now - G.at > trickGap()){
     resolveTrick(G); changed = true;
   }else if(G.phase === "roundend" && now - G.at > roundGap()){
     nextRound(); return;
@@ -1415,6 +1511,7 @@ function paintTable(){
   d = Math.max(0, Math.min(1, d));
   const L = .285 - .062 * d;
   const C = t.c * (.70 + .58 * d);
+  UD.felt = {L:L, C:C, h:t.h, d:d};
   const st = document.documentElement.style;
   st.setProperty("--felt",      "oklch(" + L.toFixed(3) + " " + C.toFixed(4) + " " + t.h + ")");
   st.setProperty("--felt-deep", "oklch(" + (L-.088).toFixed(3) + " " + (C*.8).toFixed(4) + " " + t.h + ")");
@@ -1499,7 +1596,7 @@ function render(){
       (G.phase === "lobby" ? "尚未開始" : G.phase === "bid" ? "等所有人放好骰子" : "等待出牌") + '</span>');
   /* 收墩動畫的 class 掛在容器上，只換 innerHTML 不會清掉它——不在收墩階段就一定要拿掉，
      否則之後每張出的牌一出現就被套上「飛走」動畫，看起來像瞬間消失 */
-  if(G.phase !== "trickend") $("trick").classList.remove("is-collecting");
+  if(G.phase !== "trickend") $("trick").classList.remove("is-collecting", "is-won");
 
   renderStatus(me);
   const handChanged = renderHand(me);
@@ -1521,8 +1618,11 @@ function render(){
     if(G.phase === "trickend") scheduleCollect();
     if(was === "roundend" || G.phase === "roundend") tallyScores();
     if(G.phase === "over") showFinal();
-  }
+  /* 定格中又重畫了：牌是剛換上去的 DOM，身上的 --px/--py 沒了，重新量一次補回去。
+     連線模式每 420ms 敲一次伺服器，敲一次就重畫一次，不補的話會看到那張牌跳一下 */
+  }else if(G.phase === "trickend" && $("trick").classList.contains("is-won")) pushWinner();
   SEEN.scores = G.score.slice();
+  if(UD.sync3d) UD.sync3d();
 }
 
 /* 我贏到的墩：背朝上疊在右手邊，一墩一疊 */
@@ -1555,7 +1655,7 @@ function renderTricks(me){
 }
 /* 那一疊從檯面落到堆上，接住收墩動畫的尾巴 */
 function landTrick(){
-  if(REDUCED) return;
+  if(REDUCED || IS3D()) return;
   const el = $("tricks").querySelector(".pile .pack:last-child");
   const trick = $("trick");
   if(!el || !trick) return;
@@ -1566,14 +1666,14 @@ function landTrick(){
 }
 
 function dealIn(){
-  if(REDUCED) return;
+  if(REDUCED || IS3D()) return;
   const cards = $("hand").querySelectorAll(".card");
   cards.forEach(function(c, i){ c.style.setProperty("--i", i); c.classList.add("is-dealt"); });
 }
 function flipTrump(){
   if(SEEN.flip === G.ri || !G.trumpCard) return;
   SEEN.flip = G.ri;
-  if(REDUCED) return;
+  if(REDUCED || IS3D()) return;
   const tc = $("deckwrap").querySelector(".trumpcard");
   if(tc) tc.classList.add("is-flip");
   const b = document.createElement("div");
@@ -1592,7 +1692,7 @@ function castDice(){
 }
 /* 自己的牌從手上那一張整段飛進檯面；別人的牌從他的座位方向帶進來 */
 function tossCards(){
-  if(REDUCED) return;
+  if(REDUCED || IS3D()) return;
   document.querySelectorAll(".play").forEach(function(el){
     const seat = el.dataset.play;
     const id = seat + "#" + G.played + "#" + [].indexOf.call(el.parentNode.children, el);
@@ -1621,25 +1721,67 @@ function tossCards(){
     el.classList.add("is-new");
   });
 }
-/* 收墩：檯面上的牌先聚成一疊，整疊再飛向贏家——是我贏的就飛進右手邊的墩堆 */
+/* 定格：贏的那張往贏家的座位方向推出去、其餘的暗下來，停在那裡讓大家看清楚是誰贏的。
+   推了多遠記在 PUSH_BY，收墩量位移的時候要把這一段扣回來。 */
+const PUSH_BY = {x:0, y:0};
+function pushWinner(){
+  const trick = $("trick");
+  if(!trick || !G.trick.length) return;
+  if(trick.classList.contains("is-collecting")) return;    /* 已經在收了，別再量 */
+  /* 飛進場的動畫是 fill:both，不拿掉的話它會一直把 transform 釘在原位 */
+  trick.querySelectorAll(".play").forEach(function(p){
+    p.classList.remove("is-new", "from-hand");
+  });
+  const el = trick.querySelector(".play.is-taking");
+  const seat = document.querySelector('.seat[data-seat="' + G.trick[trickBest(G)].p + '"]');
+  PUSH_BY.x = 0; PUSH_BY.y = 0;
+  if(el && seat){
+    const a = seat.getBoundingClientRect(), b = el.getBoundingClientRect();
+    const dx = a.left + a.width/2 - b.left - b.width/2;
+    const dy = a.top + a.height/2 - b.top - b.height/2;
+    /* 推出去一小段就好，長度跟著牌的高度走：窄螢幕的小牌才不會推到蓋住座位那一行 */
+    const len = Math.hypot(dx, dy) || 1;
+    const out = Math.min(len * .22, Math.max(12, Math.round(b.height * .18)));
+    PUSH_BY.x = Math.round(dx / len * out);
+    PUSH_BY.y = Math.round(dy / len * out);
+    el.style.setProperty("--px", PUSH_BY.x + "px");
+    el.style.setProperty("--py", PUSH_BY.y + "px");
+  }
+  trick.classList.add("is-won");
+}
+/* 定格夠久了才收墩——檯面上的牌先聚成一疊，整疊再飛向贏家，是我贏的就飛進右手邊的墩堆 */
 function scheduleCollect(){
-  const total = Math.max(320, SPEED*1.7 - 60);
-  const dur = Math.min(760, Math.max(300, Math.round(total * .72)));
-  const wait = Math.max(80, total - dur);
+  if(IS3D()) return;
+  const total = trickGap() - 60;
+  const dur = Math.min(620, Math.max(280, Math.round(SPEED * .8)));   /* 收墩飛多久 */
+  const land = Math.max(380, Math.round(SPEED * .7));                 /* 等最後一張牌落定 */
+  const wait = Math.max(land + 420, total - dur);                     /* 定格到什麼時候 */
   const at = G.at;
+  const still = function(){
+    if(!G || G.phase !== "trickend" || G.at !== at || !G.trick.length) return null;
+    const el = $("trick");
+    return el && el.querySelector(".play") ? el : null;
+  };
+
+  /* 一、贏的那張往贏家的方向推出去，然後整桌定格 */
+  setTimeout(function(){ if(still()) pushWinner(); }, land);
+
+  /* 二、時間到才收墩 */
   setTimeout(function(){
-    if(!G || G.phase !== "trickend" || G.at !== at) return;
-    const trick = $("trick");
-    if(!trick || !G.trick.length) return;
+    const trick = still();
+    if(!trick) return;
     const w = G.trick[trickBest(G)].p;
     const pile = $("tricks").querySelector(".pile");
     const target = (w === mySeat() && pile && !$("tricks").hidden)
       ? pile : document.querySelector('.seat[data-seat="' + w + '"]');
-    /* 疊起來的位置：這一墩所有牌面的正中間 */
+    /* 疊起來的位置：這一墩所有牌面的正中間。
+       量的是牌現在真正在的位置，所以贏的那張已經推出去了也算得對 */
     const plays = [].slice.call(trick.querySelectorAll(".play"));
     const mid = plays.map(function(el){
       const b = (el.querySelector(".card") || el).getBoundingClientRect();
-      return {x:b.left + b.width/2, y:b.top + b.height/2};
+      /* 收墩的位移是從「沒有推出去的位置」算起的，所以要把推的那一段扣回來 */
+      const o = el.classList.contains("is-taking") ? PUSH_BY : {x:0, y:0};
+      return {x:b.left + b.width/2 - o.x, y:b.top + b.height/2 - o.y};
     });
     if(!mid.length) return;
     const gx = mid.reduce((a, m) => a + m.x, 0) / mid.length;
@@ -2006,8 +2148,1031 @@ function startSolo(){
   render();
 }
 
+/* ============ 3D 呈現層的橋接 ============
+   引擎與連線層完全不知道有 3D 這回事，這個物件是它們之間唯一的接縫。
+   three.js 載入失敗、或裝置根本沒有 WebGL 時沒有人來取用它，
+   上面那張 2D 牌桌就原封不動繼續運作——3D 是加上去的一層，不是取代。 */
+const UD = window.UD = {
+  SUITS:SUITS, LAY:LAY, rankLabel:rankLabel, legalCards:legalCards, REDUCED:REDUCED,
+  get G(){ return G; },
+  get MODE(){ return MODE; },
+  get SPEED(){ return SPEED; },
+  mySeat:mySeat, seatLabel:seatLabel, handCount:handCount, trickBest:trickBest,
+  trickGap:trickGap,
+  doPlay:doPlay,
+  felt:null,      /* paintTable 算好的桌色，3D 層拿去染桌布 */
+  sync3d:null     /* 3D 層裝好之後掛上來；沒掛就等於這段不存在 */
+};
+
 startSolo();
 })();
+</script>
+
+<script type="module">
+/* ============================================================
+   立體牌桌 — WebGL 呈現層
+   ------------------------------------------------------------
+   規則引擎與連線層在上面那支 script 裡，這裡一行都不碰它們，
+   只透過 window.UD 讀狀態、回報「我要出這張」。所以：
+     · three.js 載不到、或裝置沒有 WebGL → 這整段安靜地不啟動，
+       原本的 2D 牌桌照常運作。
+     · 文字（座位名、骰子、分數、狀態列）仍然是 DOM，疊在畫布上、
+       由投影定位。向量字保持清晰，鍵盤與螢幕閱讀器也不會失去入口。
+   ============================================================ */
+const UD = window.UD;
+const $  = id => document.getElementById(id);
+const CANVAS = $("stage");
+
+function webglOK(){
+  try{
+    const c = document.createElement("canvas");
+    return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl")));
+  }catch(e){ return false; }
+}
+
+let THREE = null;      /* 模組本體 */
+let S = null;          /* 場景控制器，boot() 之後才有 */
+let booting = null;
+
+/* ================= 顏色 ================= */
+/* CSS 那邊整套用 oklch 描述，這裡要餵給 three 的是線性 sRGB。
+   自己換算比讓瀏覽器解析可靠：computed style 回傳的還是 oklch 字串。 */
+function oklchLinear(L, C, h){
+  const r = h * Math.PI / 180, a = C * Math.cos(r), b = C * Math.sin(r);
+  const l_ = L + .3963377774*a + .2158037573*b;
+  const m_ = L - .1055613458*a - .0638541728*b;
+  const s_ = L - .0894841775*a - 1.2914855480*b;
+  const l = l_*l_*l_, m = m_*m_*m_, q = s_*s_*s_;
+  return [
+    Math.max(0,  4.0767416621*l - 3.3077115913*m + 0.2309699292*q),
+    Math.max(0, -1.2684380046*l + 2.6097574011*m - 0.3413193965*q),
+    Math.max(0, -0.0041960863*l - 0.7034186147*m + 1.7076147010*q)
+  ];
+}
+function feltColor(){
+  const f = UD.felt || {L:.245, C:.042, h:168};
+  return oklchLinear(f.L, f.C, f.h);
+}
+
+/* ================= 牌面 ================= */
+/* 跟 2D 版的 cardFace() 是同一套版面（viewBox 0 0 100 140），
+   只是改用 canvas 畫成貼圖。花色路徑直接沿用頁面上那四個 symbol。 */
+const SUIT_D = [
+  "M12 2.2C12 2.2 3.3 8.9 3.3 13.7c0 2.7 1.9 4.5 4.2 4.5 1.5 0 2.8-.8 3.5-2 0 2.4-.9 4.4-2.5 5.6h7c-1.6-1.2-2.5-3.2-2.5-5.6.7 1.2 2 2 3.5 2 2.3 0 4.2-1.8 4.2-4.5C20.7 8.9 12 2.2 12 2.2z",
+  "M12 21.6S2.8 14.7 2.8 8.9c0-3.4 2.5-5.6 5.2-5.6 1.9 0 3.4 1.1 4 2.4.6-1.3 2.1-2.4 4-2.4 2.7 0 5.2 2.2 5.2 5.6 0 5.8-9.2 12.7-9.2 12.7z",
+  "M12 1.8 20.6 12 12 22.2 3.4 12z",
+  "M12 2.4a3.9 3.9 0 0 0-3.3 6 3.9 3.9 0 1 0-1.1 7.5c1.2 0 2.3-.6 3-1.5.1 3-.8 5.3-2.2 6.5h7.2c-1.4-1.2-2.3-3.5-2.2-6.5.7.9 1.8 1.5 3 1.5a3.9 3.9 0 1 0-1.1-7.5A3.9 3.9 0 0 0 12 2.4z"
+];
+const CARD_BG = "#F7F3E7", CARD_BG2 = "#E8E0CB";
+const CARD_INK = "#1A1714", CARD_RED = "#A32B25";
+const FW = 256, FH = 362;            /* 每格貼圖的像素尺寸 */
+const CARD_W = 1, CARD_H = 1.4146;   /* 世界單位：一張牌寬 = 1 */
+const THICK = .0125;
+
+let SUIT_PATH = null;
+function suitPath(i){
+  if(!SUIT_PATH) SUIT_PATH = SUIT_D.map(d => new Path2D(d));
+  return SUIT_PATH[i];
+}
+
+function paperFill(g, w, h){
+  const lg = g.createLinearGradient(0, 0, w * .42, h);
+  lg.addColorStop(0, CARD_BG); lg.addColorStop(1, CARD_BG2);
+  g.fillStyle = lg; g.fillRect(0, 0, w, h);
+  /* 左上斜光，跟 2D 版同一道 */
+  const hl = g.createLinearGradient(0, 0, w * .55, h * .42);
+  hl.addColorStop(0, "rgba(255,255,255,.85)"); hl.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = hl; g.fillRect(0, 0, w, h);
+}
+
+/* 一張牌面。座標系與 cardFace() 完全一致，改動時兩邊要一起改。 */
+function drawFace(g, rank, suit){
+  const S1 = FW / 100;
+  g.save();
+  g.scale(S1, S1);
+  g.fillStyle = UD.SUITS[suit].red ? CARD_RED : CARD_INK;
+  g.strokeStyle = g.fillStyle;
+  const path = suitPath(suit);
+  const lab = UD.rankLabel(rank);
+
+  function glyph(cx, cy, w, flip){
+    g.save(); g.translate(cx, cy);
+    if(flip) g.rotate(Math.PI);
+    g.scale(w/24, w/24); g.translate(-12, -12);
+    g.fill(path); g.restore();
+  }
+  function unit(x, y, w){
+    glyph(28 + x*44, 33 + y*74, w, y > .5);
+  }
+  function text(str, x, y, size){
+    g.font = '700 ' + size + 'px "Bodoni Moda", Georgia, serif';
+    g.textAlign = "center"; g.textBaseline = "alphabetic";
+    try{ g.letterSpacing = (-.02 * size) + "px"; }catch(e){}
+    g.fillText(str, x, y);
+    try{ g.letterSpacing = "0px"; }catch(e){}
+  }
+
+  /* 中央 */
+  if(rank === 14){
+    unit(.5, .5, 42);
+  }else if(rank >= 11){
+    g.save();
+    g.globalAlpha = .34; g.lineWidth = 1;
+    g.beginPath(); g.roundRect(23.5, 23.5, 53, 93, 4); g.stroke();
+    g.globalAlpha = .2; g.lineWidth = .7;
+    g.beginPath(); g.roundRect(26.5, 26.5, 47, 87, 2.5); g.stroke();
+    g.beginPath(); g.moveTo(26.5, 70); g.lineTo(73.5, 70); g.stroke();
+    g.restore();
+    for(const turn of [0, 1]){
+      g.save();
+      if(turn){ g.translate(50, 70); g.rotate(Math.PI); g.translate(-50, -70); }
+      text(lab, 50, 55, 30);
+      glyph(50, 62, 12, false);
+      g.restore();
+    }
+  }else{
+    for(const pt of UD.LAY[rank]) unit(pt[0], pt[1], 15);
+  }
+
+  /* 角標：左上一組，右下同一組轉 180 度 */
+  for(const turn of [0, 1]){
+    g.save();
+    if(turn){ g.translate(50, 70); g.rotate(Math.PI); g.translate(-50, -70); }
+    text(lab, 12.5, 26, lab.length > 1 ? 17 : 22);
+    glyph(12.5, 34.5, 10, false);
+    g.restore();
+  }
+  g.restore();
+}
+
+/* 一張大圖裝下這副牌所有的面，只上傳一次紋理。 */
+function buildAtlas(minRank){
+  const ranks = [];
+  for(let r = minRank; r <= 14; r++) ranks.push(r);
+  const cells = ranks.length * 4;
+  const cols = Math.min(8, cells), rows = Math.ceil(cells / cols);
+  const cv = document.createElement("canvas");
+  cv.width = cols * FW; cv.height = rows * FH;
+  const g = cv.getContext("2d");
+  const cell = {};
+  let n = 0;
+  for(const r of ranks) for(let s = 0; s < 4; s++){
+    const cx = (n % cols) * FW, cy = Math.floor(n / cols) * FH;
+    g.save(); g.translate(cx, cy);
+    g.beginPath(); g.rect(0, 0, FW, FH); g.clip();
+    paperFill(g, FW, FH);
+    drawFace(g, r, s);
+    g.restore();
+    cell[r + ":" + s] = {c: n % cols, r: Math.floor(n / cols)};
+    n++;
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = S ? S.maxAniso : 4;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  return {tex, cell, cols, rows};
+}
+
+/* 牌背：與 2D 版 .back 同一張圖 */
+function buildBack(){
+  const cv = document.createElement("canvas");
+  cv.width = FW; cv.height = FH;
+  const g = cv.getContext("2d");
+  const lg = g.createLinearGradient(0, 0, FW * .5, FH);
+  lg.addColorStop(0, "#35395E"); lg.addColorStop(1, "#1E2140");
+  g.fillStyle = lg; g.fillRect(0, 0, FW, FH);
+  g.save();
+  g.strokeStyle = "rgba(255,255,255,.10)"; g.lineWidth = 2;
+  const step = 13;
+  for(let i = -FH; i < FW + FH; i += step){
+    g.beginPath(); g.moveTo(i, 0); g.lineTo(i + FH, FH); g.stroke();
+    g.beginPath(); g.moveTo(i, FH); g.lineTo(i + FH, 0); g.stroke();
+  }
+  g.restore();
+  const rg = g.createRadialGradient(FW/2, FH/2, 0, FW/2, FH/2, FW * .42);
+  rg.addColorStop(0, "rgba(255,255,255,.17)"); rg.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = rg; g.fillRect(0, 0, FW, FH);
+  g.strokeStyle = CARD_BG; g.lineWidth = 14;
+  g.strokeRect(7, 7, FW - 14, FH - 14);
+  g.strokeStyle = "rgba(26,23,20,.22)"; g.lineWidth = 3;
+  g.strokeRect(15, 15, FW - 30, FH - 30);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/* ================= 幾何 ================= */
+/* 圓角、有厚度。三個群組分別吃正面／背面／側邊三種材質。 */
+const geoCache = new Map();
+function cardGeo(depth){
+  const key = depth.toFixed(4);
+  if(geoCache.has(key)) return geoCache.get(key);
+  const w = CARD_W, h = CARD_H, r = .062;
+  const x = -w/2, y = -h/2;
+  const sh = new THREE.Shape();
+  sh.moveTo(x + r, y);
+  sh.lineTo(x + w - r, y); sh.quadraticCurveTo(x + w, y, x + w, y + r);
+  sh.lineTo(x + w, y + h - r); sh.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  sh.lineTo(x + r, y + h); sh.quadraticCurveTo(x, y + h, x, y + h - r);
+  sh.lineTo(x, y + r); sh.quadraticCurveTo(x, y, x + r, y);
+
+  const g = new THREE.ExtrudeGeometry(sh, {depth, bevelEnabled:false, curveSegments:5, steps:1});
+  g.translate(0, 0, -depth/2);
+
+  const pos = g.attributes.position, uv = g.attributes.uv;
+  for(let i = 0; i < pos.count; i++){
+    const u = (pos.getX(i) - x) / w, v = (pos.getY(i) - y) / h;
+    uv.setXY(i, pos.getZ(i) < 0 ? 1 - u : u, v);   /* 背面左右鏡射 */
+  }
+  uv.needsUpdate = true;
+
+  /* 三角形依 z 分成正面(0)／背面(1)／側邊(2)，同類是連續的，直接切成幾段群組 */
+  const kind = t => {
+    const a = pos.getZ(t), b = pos.getZ(t+1), c = pos.getZ(t+2);
+    if(a !== b || b !== c) return 2;
+    return a > 0 ? 0 : 1;
+  };
+  g.clearGroups();
+  let start = 0, cur = kind(0);
+  for(let t = 3; t <= pos.count; t += 3){
+    const k = t < pos.count ? kind(t) : -1;
+    if(k !== cur){ g.addGroup(start, t - start, cur); start = t; cur = k; }
+  }
+  g.computeVertexNormals();
+  geoCache.set(key, g);
+  return g;
+}
+
+/* ================= 補間 ================= */
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const easeIO  = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+const tweens = [];
+const nowMs = () => performance.now();
+
+const snap = (target, to) => { const f = {}; for(const k in to) f[k] = target[k]; return f; };
+function tween(target, to, o){
+  o = o || {};
+  let base = nowMs();
+  for(let i = tweens.length - 1; i >= 0; i--){
+    if(tweens[i].target !== target) continue;
+    /* queue：排在前一段之後，不打斷它——「推出來 → 定格 → 收走」就是這樣接起來的。
+       起點要等輪到它才知道，所以 from 先留空，開始跑的那一格才量。 */
+    if(o.queue) base = Math.max(base, tweens[i].t0 + tweens[i].dur);
+    else tweens.splice(i, 1);                      /* 平常同一個目標只留最新一段 */
+  }
+  const t = {
+    target, from: o.queue ? null : snap(target, to), to, t0: base + (o.delay || 0),
+    dur: Math.max(16, o.dur == null ? 340 : o.dur),
+    ease: o.ease || easeOut, arc: o.arc || 0, onEnd: o.onEnd || null
+  };
+  tweens.push(t);
+  return t;
+}
+function jump(target, to){
+  for(let i = tweens.length - 1; i >= 0; i--)
+    if(tweens[i].target === target) tweens.splice(i, 1);
+  for(const k in to) target[k] = to[k];
+}
+function stepTweens(t){
+  for(let i = tweens.length - 1; i >= 0; i--){
+    const w = tweens[i];
+    if(t < w.t0) continue;
+    if(!w.from) w.from = snap(w.target, w.to);
+    let k = Math.min(1, (t - w.t0) / w.dur);
+    const e = w.ease(k);
+    for(const p in w.to) w.target[p] = w.from[p] + (w.to[p] - w.from[p]) * e;
+    if(w.arc) w.target.y += Math.sin(k * Math.PI) * w.arc;
+    if(k >= 1){ tweens.splice(i, 1); if(w.onEnd) w.onEnd(); }
+  }
+}
+/* ================= 排位 ================= */
+/* 一切都用極座標排。角度 0 就是我，往右數過去是下一位——
+   跟 2D 版座位由左到右的順序一致。 */
+/* 牌寬 = 1 個世界單位，其餘都用牌寬量。真實牌桌大約是 14 張牌寬，
+   這裡收到 9.5 左右——再大遠端的牌就讀不出來了。 */
+const HAND_Y = .28, HAND_Z = 3.02, HAND_PITCH = -1.04, HAND_S = .72;
+const R_SEAT = 4.32, R_PLAY = 1.06, R_FAN = 3.16, R_PILE = 3.34;
+const FELT_R = 4.46, PILE_OUT = 1.02;
+
+function ang(i){
+  const G = UD.G;
+  return (i - S.me) * Math.PI * 2 / G.cfg.n;
+}
+/* xs 是 x 方向的壓扁係數：直式螢幕把圓桌壓成橢圓，
+   座位靠得近一點，整張桌子才進得了畫面。牌本身不壓，只壓位置。 */
+const polar = (r, a) => ({x: r * Math.sin(a) * S.xs, z: r * Math.cos(a)});
+/* 不壓扁的版本，給檯面那一墩用 */
+const polarR = (r, a) => ({x: r * Math.sin(a), z: r * Math.cos(a)});
+/* 從那個座位面向中央時的「右手邊」 */
+const side  = a => ({x: Math.cos(a) * S.xs, z: -Math.sin(a)});
+
+/* 牌庫塞在兩個座位之間的空檔，半徑取在「檯面之外、手牌之內」，
+   這樣不管幾個人都不會壓到誰的牌 */
+function deckSpot(){
+  const n = UD.G.cfg.n;
+  const a = (Math.floor(n/2) + .5) * Math.PI * 2 / n;
+  const p = polar(2.25, a);
+  return {x:p.x, z:p.z, ry:a + .11, a:a};
+}
+function seatAnchor(i){
+  if(i === S.me){ const m = S.mePlate; return {x:m[0] * S.xs, y:m[1], z:m[2]}; }
+  const p = polar(R_SEAT, ang(i));
+  /* 直式螢幕把名牌抬高、再往桌子深處挪一點：座位在桌子中線上，
+     不挪的話兩側的名牌會正好壓在檯面那一墩的左右兩張上 */
+  return {x:p.x, y:S.plateY, z:p.z - S.plateBack};
+}
+function playSlot(i, k){
+  const a = ang(i), p = polarR(R_PLAY, a);
+  return {x:p.x, y:.004 + k * (THICK + .002), z:p.z,
+          rx:-Math.PI/2, ry:Math.sin(a) * .5 + (((i * 37) % 9) - 4) * .014, rz:0, flip:0, s:1};
+}
+function fanSlot(i, k, n){
+  const a = ang(i), p = polar(R_FAN, a), sd = side(a);
+  const dx = Math.min(.19, 1.45 / Math.max(n, 1));
+  const off = (k - (n - 1) / 2) * dx;
+  return {x:p.x + sd.x * off, y:.004 + k * .0035, z:p.z + sd.z * off,
+          rx:-Math.PI/2, ry:a + off * .13, rz:0, flip:Math.PI, s:.74};
+}
+/* 贏得的墩收在自己的右手邊，一墩一疊真的疊上去。
+   每疊的厚度就是一墩的張數，所以塔的高度＝墩數，數得出來；
+   再加一點角度亂數，看起來才像手收的而不是機器堆的。 */
+function pileSlot(i, k, per){
+  const a = ang(i), sd = side(a);
+  /* 自己那疊要讓開手牌，所以給固定位置；別人的收在座位外側 */
+  const p = (i === S.me) ? {x:S.mePile * S.xs, z:2.42} : polar(R_PILE, a);
+  const th = THICK * per;
+  const drift = k * .062;
+  const out = (i === S.me ? 0 : PILE_OUT) + drift;
+  return {x:p.x + sd.x * out, y:.006 + (k * th + th/2) * .78,
+          z:p.z + sd.z * out,
+          rx:-Math.PI/2, ry:a + (((k * 53) % 13) - 6) * .026, rz:0, flip:Math.PI, s:.78};
+}
+function handSlot(k, n){
+  const dx = Math.min(S.handDx, S.handSpan / Math.max(n, 1));
+  const t = n > 1 ? (k - (n - 1) / 2) / ((n - 1) / 2) : 0;
+  return {x: (k - (n - 1) / 2) * dx,
+          y: HAND_Y - t * t * .09 + k * .0015,
+          z: HAND_Z + t * t * .14 - k * .002,
+          rx: HAND_PITCH, ry: 0, rz: -t * Math.min(.30, .045 * n), flip:0, s:HAND_S};
+}
+
+/* ================= 場景 ================= */
+function build(){
+  const r = new THREE.WebGLRenderer({canvas:CANVAS, antialias:true, powerPreference:"high-performance"});
+  r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  r.shadowMap.enabled = true;
+  r.shadowMap.type = THREE.PCFShadowMap;
+  r.toneMapping = THREE.ACESFilmicToneMapping;
+  r.toneMappingExposure = .94;
+
+  const scene = new THREE.Scene();
+  const bg = new THREE.Color().setRGB(.012, .014, .020, THREE.LinearSRGBColorSpace);
+  scene.background = bg;
+  scene.fog = new THREE.Fog(bg, 17, 34);   /* 只吃掉桌沿外的空氣，不准碰到對面的人 */
+
+  const camera = new THREE.PerspectiveCamera(42, 1, .1, 60);
+
+  /* 桌布：中央亮、邊緣暗，燈罩下的感覺由這張圖給，不是靠燈算 */
+  const vg = document.createElement("canvas");
+  vg.width = vg.height = 512;
+  const vc = vg.getContext("2d");
+  const rg = vc.createRadialGradient(256, 256, 10, 256, 256, 250);
+  rg.addColorStop(0, "#f2f2f2"); rg.addColorStop(.62, "#d2d2d2");
+  rg.addColorStop(1, "#8f8f8f");
+  vc.fillStyle = rg; vc.fillRect(0, 0, 512, 512);
+  const vig = new THREE.CanvasTexture(vg);
+  vig.colorSpace = THREE.SRGBColorSpace;
+
+  const feltMat = new THREE.MeshStandardMaterial({map:vig, roughness:.99, metalness:0});
+  const table = new THREE.Group();
+  scene.add(table);
+
+  const felt = new THREE.Mesh(new THREE.CircleGeometry(FELT_R, 96), feltMat);
+  felt.rotation.x = -Math.PI/2;
+  felt.receiveShadow = true;
+  table.add(felt);
+
+  const rim = new THREE.Mesh(new THREE.RingGeometry(FELT_R, FELT_R + .34, 96),
+    new THREE.MeshStandardMaterial({color:0x1d1610, roughness:.72, metalness:.1}));
+  rim.rotation.x = -Math.PI/2; rim.position.y = -.002;
+  rim.receiveShadow = true;
+  table.add(rim);
+
+  const brass = new THREE.Mesh(new THREE.RingGeometry(FELT_R - .028, FELT_R + .008, 96),
+    new THREE.MeshStandardMaterial({color:0x8f6b33, roughness:.42, metalness:.8}));
+  brass.rotation.x = -Math.PI/2; brass.position.y = .001;
+  table.add(brass);
+
+  scene.add(new THREE.HemisphereLight(0x93a8c4, 0x0a0c12, .78));
+
+  const lamp = new THREE.SpotLight(0xffe6c4, 168, 26, 1.16, .92, 1.1);
+  lamp.position.set(-.35, 7.6, .9);
+  lamp.target.position.set(0, 0, .3);
+  lamp.castShadow = true;
+  lamp.shadow.mapSize.set(2048, 2048);
+  lamp.shadow.camera.near = 1.5;
+  lamp.shadow.camera.far = 14;
+  lamp.shadow.bias = -.0007;
+  lamp.shadow.normalBias = .022;
+  scene.add(lamp, lamp.target);
+
+  const fill = new THREE.DirectionalLight(0xa8bcd8, .55);
+  fill.position.set(2.2, 3.6, 6.2);
+  scene.add(fill);
+
+  return {r, scene, camera, table, felt, feltMat, rim, brass, lamp, fill, xs:1, handSpan:3.15, handDx:.56, plateY:.46, plateBack:0, mePile:2.52,
+          mePlate:[-3.15,.50,2.85], portrait:false,
+          maxAniso: r.capabilities.getMaxAnisotropy(),
+          cards:new Map(), me:0, round:-2, playedN:-1, sweep:null,
+          dirty:6, lampBase:168, atlas:null, backTex:null, mats:new Map(),
+          backMat:null, edgeMat:null, hover:null, ray:new THREE.Raycaster(),
+          ptr:new THREE.Vector2(), minRank:null};
+}
+
+/* ================= 材質 ================= */
+function faceMat(rank, suit){
+  const k = rank + ":" + suit;
+  if(S.mats.has(k)) return S.mats.get(k);
+  const a = S.atlas, c = a.cell[k];
+  const t = a.tex.clone();
+  t.repeat.set(1 / a.cols, 1 / a.rows);
+  t.offset.set(c.c / a.cols, 1 - (c.r + 1) / a.rows);
+  t.needsUpdate = true;
+  const m = new THREE.MeshStandardMaterial({map:t, roughness:.86, metalness:0});
+  S.mats.set(k, m);
+  return m;
+}
+
+/* ================= 牌 ================= */
+function spawn(key, card, depth, own){
+  const geo = cardGeo(depth || THICK);
+  /* own：自己的手牌要能單獨調暗，所以複製一份材質。
+     複製只複製設定，貼圖是共用的 source，不會多上傳一張圖。 */
+  const front = card ? (own ? faceMat(card.r, card.s).clone() : faceMat(card.r, card.s)) : S.backMat;
+  const mesh = new THREE.Mesh(geo, [front, S.backMat, S.edgeMat]);
+  mesh.rotation.order = "XYZ";   /* 只轉 y：翻面。躺平交給外層 holder 的 rx */
+  mesh.castShadow = true;
+  const holder = new THREE.Object3D();
+  holder.rotation.order = "YXZ";
+  holder.add(mesh);
+  S.scene.add(holder);
+  const c = {key, holder, mesh, card, ownMat:!!own, shade:1,
+             t:{x:0, y:0, z:0, rx:-Math.PI/2, ry:0, rz:0, flip:0, s:1}, slot:""};
+  if(card) mesh.userData.cardId = card.id;
+  S.cards.set(key, c);
+  return c;
+}
+/* 1＝可以出；.70＝還沒輪到你；.38＝輪到你但這張不合跟牌花色。
+   平面版是 opacity + 去飽和，這裡改用材質顏色乘上去，讀起來一樣。 */
+function shade(c, k){
+  if(c.shade === k) return;
+  c.shade = k;
+  c.mesh.material[0].color.setRGB(k, k, k, THREE.LinearSRGBColorSpace);
+}
+function applyCard(c){
+  const t = c.t;
+  c.holder.position.set(t.x, t.y, t.z);
+  c.holder.rotation.set(t.rx, t.ry, t.rz);
+  c.holder.scale.setScalar(t.s);
+  c.mesh.rotation.y = t.flip;
+}
+function kill(c, to, dur){
+  S.cards.delete(c.key);
+  const end = () => {
+    S.scene.remove(c.holder);
+    if(c.ownMat) c.mesh.material[0].dispose();
+  };
+  if(!to){ end(); return; }
+  tween(c.t, Object.assign({s:.28}, to), {dur:dur || 300, ease:easeIO, onEnd:end});
+  c.dying = true;
+  S.dead.push(c);
+}
+
+/* ================= 同步 ================= */
+/* 宣告式：算出「現在桌上應該有哪些牌、各自該在哪」，再讓場景收斂過去。
+   誰要飛、飛多久，是位置變了才產生的結果，不是一段段寫死的動畫腳本——
+   所以狀態跳著來（連線延遲、對手秒出、重新整理）也不會卡在半路。 */
+function rebuildAtlas(minRank){
+  if(S.minRank === minRank) return;
+  S.minRank = minRank;
+  for(const m of S.mats.values()){ if(m.map) m.map.dispose(); m.dispose(); }
+  S.mats.clear();
+  if(S.atlas) S.atlas.tex.dispose();
+  S.atlas = buildAtlas(minRank);
+  S.atlas.tex.anisotropy = S.maxAniso;
+  for(const c of S.cards.values())
+    if(c.card){
+      if(c.ownMat) c.mesh.material[0].dispose();
+      const m = faceMat(c.card.r, c.card.s);
+      c.mesh.material[0] = c.ownMat ? m.clone() : m;
+      const k = c.shade; c.shade = null; shade(c, k == null ? 1 : k);
+    }
+}
+
+/* 牌的 key 帶著局數：同一副牌每局重洗，牌 id 會重複出現 */
+const cardKey = id => "c:" + (UD.G ? UD.G.ri : 0) + ":" + id;
+
+function deckTop(){
+  const d = deckSpot();
+  return {x:d.x, y:.16, z:d.z, rx:-Math.PI/2, ry:d.ry, rz:0, flip:Math.PI, s:1};
+}
+
+function sync(){
+  const G = UD.G;
+  if(!S || !G || !document.body.classList.contains("is3d")) return;
+  const n = G.cfg.n;
+  const seat = UD.mySeat();
+  S.me = seat < 0 ? 0 : seat;
+  rebuildAtlas(G.cfg.minRank);
+
+  const fresh = S.round !== G.ri;
+  const swept = S.playedN >= 0 && S.playedN !== G.played;
+  if(fresh){ S.round = G.ri; const t = S.cards.get("tc"); if(t) kill(t, null); }
+  S.playedN = G.played;
+  if(swept) S.sweep = pileSlot(G.leader, Math.max(0, (G.won[G.leader]||1) - 1), n);
+
+  const sp = UD.SPEED;
+  const fly = Math.min(480, Math.max(230, sp * .62));
+  const ds = deckSpot();
+  const live = new Set();
+  let order = 0;
+
+  function place(key, card, spec, o){
+    live.add(key);
+    let c = S.cards.get(key);
+    if(!c){
+      c = spawn(key, card, o.depth, o.own);
+      if(o.from && !UD.REDUCED){
+        jump(c.t, o.from); applyCard(c);                          /* 從某處飛過來 */
+      }else{
+        c.slot = o.slot; jump(c.t, spec); applyCard(c); return c;  /* 本來就該在那 */
+      }
+    }
+    if(c.slot === o.slot) return c;
+    c.slot = o.slot;
+    if(UD.REDUCED) jump(c.t, spec);
+    else tween(c.t, spec, {dur:o.dur || fly, delay:o.delay || 0, arc:o.arc || 0, ease:o.ease});
+    return c;
+  }
+
+  /* ---- 牌庫與王牌 ---- */
+  const started = G.ri >= 0 && G.phase !== "lobby";
+  const left = started ? Math.max(0, G.deckSize - n * G.hs - (G.trumpCard ? 1 : 0)) : 10;
+  const stack = Math.min(left, 18);
+  for(let k = 0; k < stack; k++)
+    place("dk:" + k, null, {x:ds.x, y:.006 + k * THICK, z:ds.z,
+      rx:-Math.PI/2, ry:ds.ry, rz:0, flip:Math.PI, s:1}, {slot:"deck:" + k});
+  /* ---- 我的手牌 ---- */
+  const hand = (seat >= 0 && G.hands[seat]) || [];
+  const myTurn = G.phase === "play" && G.turn === seat;
+  hand.forEach(function(card, k){
+    /* 這張能不能出，問的是既有那顆 DOM 按鈕——規則只寫一次，
+       點擊、鍵盤、螢幕閱讀器與這裡的明暗都以它為準 */
+    const b = btnFor(card.id);
+    const ok = !!(b && !b.disabled);
+    const spec = handSlot(k, hand.length);
+    if(ok){ spec.y += .055; spec.z += .045; }        /* 能出的往前浮起一點 */
+    const c = place(cardKey(card.id), card, spec, {
+      slot:"hand:" + hand.length + ":" + k + ":" + (ok ? 1 : 0),
+      own:true,
+      from: fresh ? deckTop() : null,
+      delay: fresh ? (order++ * Math.min(64, Math.max(26, sp * .09))) : 0,
+      dur: fresh ? 430 : fly, arc: fresh ? .30 : 0
+    });
+    if(c) shade(c, ok ? 1 : (myTurn ? .38 : .70));
+  });
+
+  /* ---- 別人手上的牌：只有張數是公開的，所以永遠背面朝上 ---- */
+  for(let i = 0; i < n; i++){
+    if(i === seat) continue;
+    const cnt = started ? UD.handCount(i) : 0;
+    for(let k = 0; k < cnt; k++)
+      place("f:" + i + ":" + k, null, fanSlot(i, k, cnt), {
+        slot:"fan:" + i + ":" + cnt + ":" + k,
+        from: fresh ? deckTop() : null,
+        delay: fresh ? (order++ * Math.min(64, Math.max(26, sp * .09))) : 0,
+        dur: fresh ? 430 : Math.min(300, fly), arc: fresh ? .30 : 0
+      });
+  }
+
+  /* ---- 王牌：發完才翻，翻的是牌庫最上面那一張 ---- */
+  if(G.trumpCard){
+    const sd2 = side(ds.a);
+    const base = {x:ds.x + sd2.x * .46, y:.006 + stack * THICK, z:ds.z + sd2.z * .46,
+                  rx:-Math.PI/2, ry:ds.ry + .22, rz:0, s:1};
+    place("tc", G.trumpCard, Object.assign({flip:0}, base), {
+      slot:"trump:" + G.ri, from:Object.assign({flip:Math.PI}, base),
+      dur:640, delay:fresh ? Math.min(900, order * 22 + 200) : 0, ease:easeIO
+    });
+  }
+
+  /* ---- 檯面 ---- */
+  /* 每張牌都先好好地飛到自己在檯面上的位置——包括收尾那張。
+     這一墩滿了才接著排收尾動作：贏的那張往贏家的方向推出去、整桌定格，
+     時間到才聚成一疊（贏的那張在最上面），交給下面的 sweep 收進墩堆。 */
+  const gathering = G.phase === "trickend" && G.trick.length;
+  const bi = gathering ? UD.trickBest(G) : -1;
+  const gdur = Math.min(400, Math.max(190, sp * .48));
+  const PUSH = 300;
+  const hold = Math.max(240, UD.trickGap() - fly - PUSH - gdur - 160);
+  G.trick.forEach(function(t, k){
+    const key = cardKey(t.card.id);
+    const flew = place(key, t.card, playSlot(t.p, k), {
+      slot:"play:" + t.p + ":" + k, dur:fly, arc:.34,
+      from: t.p === seat ? null : (function(){
+        const f = fanSlot(t.p, UD.handCount(t.p), UD.handCount(t.p) + 1);
+        f.s = .96; return f;
+      })()
+    });
+    if(!gathering || UD.REDUCED) return;
+    const c = S.cards.get(key);
+    if(!c || c.endAt === G.at) return;              /* 收尾動作一墩只排一次 */
+    c.endAt = G.at;
+    const lead = flew ? 0 : fly;                    /* 剛出的那張已經在飛，排在它後面就好 */
+    const heap = {x:0, y:.006 + (k === bi ? G.trick.length : k) * (THICK + .002), z:.03,
+      rx:-Math.PI/2, ry:ang(t.p) * .22 + (((k * 53) % 11) - 5) * .028, rz:0, flip:0, s:1};
+    if(k !== bi){
+      tween(c.t, heap, {queue:true, delay:lead + PUSH + hold, dur:gdur, ease:easeIO});
+      return;
+    }
+    const a = ang(t.p), p = polar(R_PLAY + .60, a);
+    tween(c.t, {x:p.x, y:.085, z:p.z, rx:-Math.PI/2, ry:Math.sin(a) * .5, rz:0, flip:0, s:1.06},
+      {queue:true, delay:lead, dur:PUSH, ease:easeIO});
+    tween(c.t, heap, {queue:true, delay:hold, dur:gdur, ease:easeIO});
+  });
+
+  /* ---- 收進來的墩 ---- */
+  for(let i = 0; i < n; i++){
+    const got = (started && G.won[i]) || 0;
+    for(let k = 0; k < got; k++)
+      place("p:" + i + ":" + k, null, pileSlot(i, k, n), {
+        slot:"pile:" + i + ":" + k, depth:THICK * n,
+        from: (k === got - 1 && swept) ? {x:0, y:.22, z:.03,
+          rx:-Math.PI/2, ry:0, rz:0, flip:Math.PI, s:1} : null,
+        dur:Math.min(520, Math.max(280, sp * .7)), arc:.18, ease:easeIO
+      });
+  }
+
+  /* ---- 不該在桌上的，送走 ---- */
+  for(const c of Array.from(S.cards.values())){
+    if(live.has(c.key)) continue;
+    let to = null;
+    if(fresh) to = {x:ds.x, y:.10, z:ds.z};                       /* 換局：整桌收回牌庫 */
+    else if(S.sweep && /^(gather|play)/.test(c.slot))            /* 收墩：跟著那一疊走，順路翻面 */
+      to = {x:S.sweep.x, y:S.sweep.y + .10, z:S.sweep.z, flip:Math.PI};
+    kill(c, to, to ? 340 : 0);
+  }
+
+  /* ---- 桌色跟著王牌走 ---- */
+  const fc = feltColor();
+  const want = new THREE.Color().setRGB(fc[0] * .92, fc[1] * .92, fc[2] * .92, THREE.LinearSRGBColorSpace);
+  if(!S.feltMat.color.equals(want)){
+    if(UD.REDUCED) S.feltMat.color.copy(want);
+    else { S.feltFrom = S.feltMat.color.clone(); S.feltTo = want; S.feltT0 = nowMs(); }
+  }
+  if(fresh && G.trumpCard) S.flash = nowMs();                     /* 翻王牌時桌上亮一下 */
+
+  S.dirty = 4;
+  placeOverlays();
+}
+
+/* ================= 每一格 ================= */
+function frame(t){
+  if(!S) return;
+  stepTweens(t);
+
+  /* 只有真的在動的補間才算「在動」：定格那一秒排在後面的還沒開始，畫面不用重畫 */
+  let moving = false;
+  for(const w of tweens) if(t >= w.t0){ moving = true; break; }
+
+  /* 滑到哪張牌，那張就抬起來 */
+  for(const c of S.cards.values()){
+    applyCard(c);
+    const wantLift = (c.key === S.hover) ? 1 : 0;
+    c.lift = (c.lift || 0) + (wantLift - (c.lift || 0)) * .2;
+    if(c.lift > .002){
+      c.holder.position.y += c.lift * .22;
+      c.holder.position.z += c.lift * .10;
+      if(Math.abs(wantLift - c.lift) > .01) moving = true;
+    }
+  }
+  for(let i = S.dead.length - 1; i >= 0; i--){
+    const c = S.dead[i];
+    if(!c.holder.parent) S.dead.splice(i, 1); else applyCard(c);
+  }
+
+  /* 桌色過場 */
+  if(S.feltTo){
+    const k = Math.min(1, (t - S.feltT0) / 700);
+    S.feltMat.color.lerpColors(S.feltFrom, S.feltTo, easeOut(k));
+    if(k >= 1) S.feltTo = null;
+    moving = true;
+  }
+  /* 翻王牌的那一下打光 */
+  if(S.flash){
+    const k = (t - S.flash) / 900;
+    S.lamp.intensity = S.lampBase * (k >= 1 ? 1 : 1 + Math.sin(Math.min(1, k) * Math.PI) * .55);
+    if(k >= 1) S.flash = 0;
+    moving = true;
+  }
+
+  if(moving) S.dirty = 3;
+  if(S.dirty > 0){
+    S.dirty--;
+    placeOverlays();
+    S.r.render(S.scene, S.camera);
+  }
+}
+
+/* ================= 疊在畫布上的 DOM ================= */
+const _v = () => new THREE.Vector3();
+function toScreen(x, y, z, w, h){
+  const v = _v().set(x, y, z).project(S.camera);
+  return {x:(v.x * .5 + .5) * w, y:(-v.y * .5 + .5) * h};
+}
+const CORNERS = [[-.5,-.7073,0],[.5,-.7073,0],[.5,.7073,0],[-.5,.7073,0]];
+function placeOverlays(){
+  const host = CANVAS.parentNode;
+  const w = host.clientWidth, h = host.clientHeight;
+  if(!w || !h || !UD.G) return;
+  S.scene.updateMatrixWorld();
+
+  document.querySelectorAll("#seats .seat").forEach(function(el){
+    const i = +el.dataset.seat;
+    const a = seatAnchor(i);
+    const bw = el.offsetWidth / 2 + 6, bh = el.offsetHeight / 2 + 6;
+    /* 直式螢幕上自己那塊釘在左下角：自己坐哪裡不需要空間提示，
+       投影出來反而會壓在手牌或狀態列上 */
+    const q = (S.portrait && i === S.me)
+      ? {x:bw, y:h - bh}
+      : toScreen(a.x, a.y, a.z, w, h);
+    /* 夾回畫面內：窄螢幕上兩側的座位牌本來會被切掉半塊 */
+    el.style.left = Math.round(Math.max(bw, Math.min(w - bw, q.x))) + "px";
+    el.style.top  = Math.round(Math.max(bh, Math.min(h - bh, q.y))) + "px";
+  });
+
+  /* 手牌的透明按鈕貼著投影後的牌面：焦點框會正好框在那張牌上 */
+  let top = null;
+  document.querySelectorAll("#hand .card[data-card]").forEach(function(el){
+    const c = S.cards.get(cardKey(el.dataset.card));
+    if(!c){ el.style.opacity = "0"; return; }
+    el.style.opacity = "";
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for(const p of CORNERS){
+      const v = _v().set(p[0], p[1], p[2]);
+      c.mesh.localToWorld(v);
+      const q = toScreen(v.x, v.y, v.z, w, h);
+      x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y);
+      x1 = Math.max(x1, q.x); y1 = Math.max(y1, q.y);
+    }
+    el.style.left   = Math.round((x0 + x1) / 2) + "px";
+    el.style.top    = Math.round((y0 + y1) / 2) + "px";
+    el.style.width  = Math.round(x1 - x0) + "px";
+    el.style.height = Math.round(y1 - y0) + "px";
+    top = top === null ? y0 : Math.min(top, y0);
+  });
+
+  /* 狀態列停在手牌上緣 */
+  const b = top === null ? h * .26 : Math.min(h * .46, Math.max(h * .13, h - top + 6));
+  document.body.style.setProperty("--status-b", Math.round(b) + "px");
+}
+
+/* ================= 版面與輸入 ================= */
+/* 取景框從「桌上真的有東西的地方」算出來，不是寫死的座標：
+   座位牌、手牌、牌庫、墩堆各出一組點，換算到鏡頭的平面上取外接矩形，
+   再反推距離。人數改變、螢幕轉向、手牌變多都自己跟著調。 */
+/* 每個點是 [x, y, z, core]。core 的一定要進畫面；
+   非 core 的（兩側的座位牌、對手的牌背）在窄螢幕上允許被切掉——
+   它們的資訊在夾回畫面內的名牌上，切掉不會讓人看不懂牌局。 */
+function fitPoints(){
+  const G = UD.G;
+  if(!G) return [[-4,0,-4,1],[4,0,-4,1],[-4,0,4,1],[4,0,4,1]];
+  const n = G.cfg.n, pts = [];
+  for(let i = 0; i < n; i++){
+    const a = ang(i), s1 = seatAnchor(i), f = polar(R_FAN, a), q = pileSlot(i, 0, n);
+    const soft = (i !== S.me && S.portrait) ? 0 : 1;
+    pts.push([s1.x, s1.y + .22, s1.z, 0]);   /* 名牌會夾回畫面，不必框它 */
+    pts.push([f.x, 0, f.z, soft]);
+    pts.push([q.x, .10, q.z, soft]);
+    const pl = playSlot(i, 0);
+    pts.push([pl.x, .02, pl.z, 1]);
+  }
+  const d = deckSpot();
+  pts.push([d.x, .18, d.z, 1]);
+  /* 手牌是離鏡頭最近的東西，四個角都要算進去 */
+  const hh = .7073 * HAND_S * 1.16, hx = S.handSpan / 2 + .5 * HAND_S + .12;
+  const uy = Math.cos(HAND_PITCH) * hh, uz = Math.sin(HAND_PITCH) * hh;
+  for(const sx of [-hx, hx]){
+    pts.push([sx, HAND_Y + uy, HAND_Z + uz, 1]);
+    pts.push([sx, HAND_Y - uy, HAND_Z - uz, 1]);
+  }
+  return pts;
+}
+/* 用真正的透視去框。難的不是距離，是「對中」：
+   手牌離鏡頭比對面那半張桌子近了快一半，透視放大得多，
+   用平行投影算中心的話框會整體偏向遠端，畫面上方就留下一條空白。
+   所以做法是投影完再把實際的投影範圍推回畫面中心，反覆收斂。 */
+function fitCamera(vx, vy, el, loose){
+  const ce = Math.cos(el), se = Math.sin(el);
+  const fy = -se, fz = -ce;                 /* 視線方向（x 為 0） */
+  const pts = fitPoints();
+
+  let u0 = 1e9, u1 = -1e9, v0 = 1e9, v1 = -1e9;
+  for(const q of pts){
+    const u = q[0], v = q[1] * ce - q[2] * se;
+    if(u < u0) u0 = u; if(u > u1) u1 = u;
+    if(v < v0) v0 = v; if(v > v1) v1 = v;
+  }
+  let cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
+  let d = Math.max((u1 - u0) / 2 / vx, (v1 - v0) / 2 / vy) * .8;
+
+  /* 目前取景下，所有點投影後的範圍（單位是視錐的斜率，直接跟 vx/vy 比） */
+  function span(dd){
+    const cx = cu, cy = cv * ce - fy * dd, cz = -cv * se - fz * dd;
+    let a0 = 1e9, a1 = -1e9, b0 = 1e9, b1 = -1e9;
+    for(const q of pts){
+      const dx = q[0] - cx, dy = q[1] - cy, dz = q[2] - cz;
+      const w = dy * fy + dz * fz;
+      if(w <= .25) return null;
+      const v = (dy * ce - dz * se) / w;
+      if(v < b0) b0 = v; if(v > b1) b1 = v;
+      if(q[3] || !loose){ const u = dx / w; if(u < a0) a0 = u; if(u > a1) a1 = u; }
+    }
+    if(a0 > a1){ a0 = a1 = 0; }
+    return {a0:a0, a1:a1, b0:b0, b1:b1};
+  }
+  const fits = dd => {
+    const r = span(dd);
+    return !!r && Math.max(-r.a0, r.a1) <= vx && Math.max(-r.b0, r.b1) <= vy;
+  };
+
+  for(let pass = 0; pass < 5; pass++){
+    for(let i = 0; i < 90 && !fits(d); i++) d *= 1.03;
+    for(let i = 0; i < 60 && fits(d * .985); i++) d *= .985;
+    const r = span(d);
+    if(!r) break;
+    const du = (r.a0 + r.a1) / 2, dv = (r.b0 + r.b1) / 2;
+    cu += du * d; cv += dv * d;
+    if(Math.abs(du) < 1e-4 && Math.abs(dv) < 1e-4) break;
+  }
+  for(let i = 0; i < 90 && !fits(d); i++) d *= 1.03;
+
+  return {lx:cu, ly:cv * ce, lz:-cv * se, d:d, se:se, ce:ce};
+}
+function resize(){
+  const host = CANVAS.parentNode;
+  const w = host.clientWidth, h = host.clientHeight;
+  if(!w || !h) return;
+  const asp = w / h, portrait = asp < 1.06;
+  S.portrait = portrait;
+  /* 直式：桌子壓成橢圓、手牌收窄、名牌抬高，讓內容的長寬比接近畫面的長寬比。
+     不這樣做的話一定有一邊留下大片空桌。 */
+  S.xs       = portrait ? Math.max(.62, Math.min(1, asp * 1.20)) : 1;
+  S.handSpan = portrait ? 2.30 : 3.15;
+  S.handDx   = portrait ? .44 : .56;
+  S.plateY   = portrait ? 1.18 : .46;
+  S.plateBack= portrait ? .85 : 0;
+  S.mePile   = portrait ? 1.95 : 2.52;
+  S.mePlate  = [-3.15, .50, 2.85];
+  S.table.scale.x = S.xs;
+  const fov = portrait ? 48 : 40;
+  const el = (portrait ? 50 : 42) * Math.PI / 180;
+  const m = 1 / 1.05;                              /* 四邊留一點餘白 */
+  const vy = Math.tan(fov * Math.PI / 360) * m, vx = vy * asp;
+  const f = fitCamera(vx, vy, el, portrait);
+  S.camera.fov = fov;
+  S.camera.aspect = asp;
+  S.camera.position.set(f.lx, f.ly + f.d * f.se, f.lz + f.d * f.ce);
+  S.camera.lookAt(f.lx, f.ly, f.lz);
+  S.camera.updateProjectionMatrix();
+  S.r.setSize(w, h, false);
+  S.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, w > 1400 ? 1.75 : 2));
+  S.lamp.shadow.mapSize.set(w > 900 ? 2048 : 1024, w > 900 ? 2048 : 1024);
+  S.dirty = 4;
+  placeOverlays();
+}
+window.addEventListener("resize", function(){ if(S) resize(); });
+
+function hitTest(ev){
+  const host = CANVAS.parentNode, r = host.getBoundingClientRect();
+  S.ptr.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+  S.ptr.y = -((ev.clientY - r.top) / r.height) * 2 + 1;
+  S.ray.setFromCamera(S.ptr, S.camera);
+  S.scene.updateMatrixWorld();
+  const list = [];
+  for(const c of S.cards.values()) if(c.slot.indexOf("hand:") === 0) list.push(c.mesh);
+  const hit = S.ray.intersectObjects(list, false)[0];
+  return hit ? hit.object : null;
+}
+/* 能不能出，交給既有那顆 DOM 按鈕判斷——規則只寫一次 */
+function btnFor(id){ return document.querySelector('#hand .card[data-card="' + id + '"]'); }
+
+CANVAS.addEventListener("pointermove", function(ev){
+  if(!S) return;
+  const m = hitTest(ev);
+  const b = m && btnFor(m.userData.cardId);
+  const key = (b && !b.disabled) ? cardKey(m.userData.cardId) : null;
+  if(key !== S.hover){ S.hover = key; S.dirty = 3; }
+  CANVAS.style.cursor = key ? "pointer" : "";
+});
+CANVAS.addEventListener("pointerleave", function(){
+  if(S && S.hover){ S.hover = null; S.dirty = 3; }
+});
+CANVAS.addEventListener("click", function(ev){
+  if(!S) return;
+  const m = hitTest(ev);
+  if(!m) return;
+  const b = btnFor(m.userData.cardId);
+  if(b && !b.disabled){ S.hover = null; b.click(); }
+});
+
+/* ================= 啟動與切換 ================= */
+async function fontsReady(){
+  try{
+    if(!document.fonts) return;
+    await Promise.all([
+      document.fonts.load('700 30px "Bodoni Moda"'),
+      document.fonts.load('700 17px "Bodoni Moda"')
+    ]);
+    await document.fonts.ready;
+  }catch(e){}
+}
+async function boot(){
+  if(booting) return booting;
+  booting = (async function(){
+    THREE = await import("https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js");
+    S = build();
+    S.dead = [];
+    S.backTex = buildBack();
+    S.backTex.anisotropy = S.maxAniso;
+    S.backMat = new THREE.MeshStandardMaterial({map:S.backTex, roughness:.78, metalness:.03});
+    S.edgeMat = new THREE.MeshStandardMaterial({color:0xE9E1CC, roughness:.96, metalness:0});
+    await fontsReady();
+    rebuildAtlas(UD.G ? UD.G.cfg.minRank : 7);
+    resize();
+    S.r.setAnimationLoop(frame);
+    UD.sync3d = sync;
+  })();
+  return booting;
+}
+
+const seg = $("dim");
+function note(txt){
+  let el = document.querySelector(".stage-note");
+  if(!txt){ if(el) el.remove(); return; }
+  if(!el){ el = document.createElement("div"); el.className = "stage-note"; CANVAS.parentNode.appendChild(el); }
+  el.textContent = txt;
+}
+function mark(on){
+  seg.querySelectorAll("button").forEach(function(b){
+    b.setAttribute("aria-pressed", (b.dataset.dim === "3") === on ? "true" : "false");
+  });
+}
+async function setDim(on){
+  if(on && !webglOK()){ note("這個裝置沒有 WebGL"); mark(false); return; }
+  mark(on);
+  try{ localStorage.setItem("ud.dim", on ? "3" : "2"); }catch(e){}
+  if(!on){
+    document.body.classList.remove("is3d");
+    CANVAS.hidden = true;
+    if(S) S.r.setAnimationLoop(null);
+    /* 立體模式塞進 inline 的座標要清掉，不然回到平面版會歪 */
+    document.querySelectorAll("#seats .seat, #hand .card").forEach(function(el){
+      el.style.left = el.style.top = el.style.width = el.style.height = el.style.opacity = "";
+    });
+    note("");
+    return;
+  }
+  document.body.classList.add("is3d");
+  CANVAS.hidden = false;
+  note("正在鋪桌…");
+  try{
+    await boot();
+  }catch(e){
+    note("立體牌桌載入失敗");
+    document.body.classList.remove("is3d");
+    CANVAS.hidden = true; mark(false);
+    return;
+  }
+  note("");
+  S.r.setAnimationLoop(frame);
+  S.round = -2; S.playedN = -1;
+  for(const c of Array.from(S.cards.values())) kill(c, null);
+  resize();
+  sync();
+}
+seg.addEventListener("click", function(e){
+  const b = e.target.closest("button[data-dim]");
+  if(b) setDim(b.dataset.dim === "3");
+});
+if(!webglOK()) seg.querySelector('[data-dim="3"]').disabled = true;
+else{
+  let saved = "2";
+  try{ saved = localStorage.getItem("ud.dim") || "2"; }catch(e){}
+  if(saved === "3") setDim(true);
+}
+
 </script>
 
 </body>
