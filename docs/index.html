@@ -367,6 +367,9 @@ body.is3d .av{width:16px;height:16px}
   border:1px dashed var(--hair);
 }
 .die.empty .num{color:var(--ink-3);font-size:12px;font-family:"Archivo",sans-serif;font-weight:400}
+/* 叫 0：不是一顆骰子，是一個數字 */
+.die.zero{background:none;box-shadow:none;border:1px solid var(--hair)}
+.die.zero .num{color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:500}
 /* 叫 7 以上是兩顆並排；第二顆晚一點落 */
 .dice{display:flex;gap:3px;flex:none}
 /* 放下骰子：翻滾後定住 */
@@ -3098,7 +3101,8 @@ const PIPS = {1:[5],2:[1,9],3:[1,5,9],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]}
 function dieHTML(v, seat){
   const a = ' data-die="' + seat + '"';
   if(v === null || v === undefined) return '<div class="die empty"' + a + '><span class="num">?</span></div>';
-  if(v === 0) return '<div class="die"' + a + ' aria-label="叫 0 墩"><span class="num">0</span></div>';
+  /* 叫 0 不畫骰子：桌上一顆都不放，座位牌上也只留一個 0——「這局我不要」本來就不是一個點數 */
+  if(v === 0) return '<div class="die zero"' + a + ' aria-label="叫 0 墩"><span class="num">0</span></div>';
   const pips = n => PIPS[n].map(i =>
     '<span class="pip" style="grid-row:' + Math.ceil(i/3) + ';grid-column:' + (((i-1)%3)+1) + '"></span>'
   ).join("");
@@ -3461,14 +3465,6 @@ function tallyScores(){
   document.querySelectorAll(".tot").forEach(function(el){ el.classList.add("up"); });
 }
 
-/* 這一局全桌一共叫了幾墩、比桌上多還是少。出牌時一直帶著：
-   這局是在搶還是在讓，決定每一張牌要不要拿 */
-function bidClimate(sep){
-  if(!G.bids || !G.bids.length || G.bids.some(b => b === null || b === undefined)) return "";
-  const sum = G.bids.reduce((a, b) => a + b, 0), d = sum - G.hs;
-  return (sep ? '<span class="sep"> · </span>' : '') + '叫 ' + sum + '/' + G.hs +
-    (d === 0 ? ' 剛好' : d < 0 ? ' 保守局' : ' 搶墩局');
-}
 function renderStatus(me){
   const el = $("status");
   if(NET.err){ setHTML(el, '<span class="msg" style="color:var(--bad)">' + NET.err + '</span>'); return; }
@@ -3489,12 +3485,8 @@ function renderStatus(me){
   if(G.phase === "bid"){
     let sum = 0, placed = 0;
     for(let i=0;i<G.cfg.n;i++) if(G.bids[i] !== null && G.bids[i] !== undefined){ sum += G.bids[i]; placed++; }
-    const left = G.hs - sum;
-    /* 叫到一半就報「剩幾墩沒人要」：最後一位看一眼就知道自己叫幾會剛好 */
-    const tally = '<span class="hint">已叫 ' + sum + ' / 共 ' + G.hs + ' 墩' +
-      (placed ? '<span class="sep"> · </span>' + (placed === G.cfg.n
-        ? (left < 0 ? '超叫 ' + (-left) + '，搶墩局' : left > 0 ? '欠叫 ' + left + '，保守局' : '剛好')
-        : (left < 0 ? '已經超 ' + (-left) : left > 0 ? '剩 ' + left : '已經剛好')) : '') + '</span>';
+    /* 「已叫幾／剩幾」這行拿掉了：計數環（立體）與最後一位的按鈕預告都在說同一件事，
+       再寫一行字只是把畫面弄雜 */
     if(G.turn === me){
       /* 我是最後一位：每顆數字下面直接標出叫了之後全桌會多要或少要幾墩 */
       const last = placed === G.cfg.n - 1;
@@ -3506,22 +3498,17 @@ function renderStatus(me){
             (d === 0 ? "剛好" : d < 0 ? "欠 " + (-d) : "超 " + d) + '</i></button>'
           : '<button class="bidbtn" data-bid="' + v + '">' + v + '</button>';
       }
-      setHTML(el, '<span class="msg">你要叫幾墩？</span>' + tally +
+      setHTML(el, '<span class="msg">你要叫幾墩？</span>' +
         '<span class="bidrow"><span class="pill">' + b + '</span></span>');
-    }else setHTML(el, '<span class="msg"><b>' + who + '</b> 正在放骰子…</span>' + tally);
+    }else setHTML(el, '<span class="msg"><b>' + who + '</b> 正在放骰子…</span>');
     return;
   }
 
   if(G.phase === "play"){
-    if(G.turn === me){
-      const hand = G.hands[me] || [];
-      const must = G.led !== null && G.led !== undefined && hand.some(c => c.s === G.led);
-      setHTML(el, '<span class="msg">輪到<b>你</b>出牌</span><span class="hint">' +
-        (G.led === null || G.led === undefined ? "你先出，這墩由你決定花色"
-          : must ? "必須跟出 " + pip(G.led) + " " + SUITS[G.led].name
-                 : "手上沒有 " + pip(G.led) + "，可出任意牌") + bidClimate(true) + '</span>');
-    }else setHTML(el, '<span class="msg"><b>' + who + '</b> 出牌中…</span><span class="hint">' +
-      (G.led === null || G.led === undefined ? bidClimate(false) : "跟牌花色 " + pip(G.led) + bidClimate(true)) + '</span>');
+    /* 出牌階段只留一句「輪到誰」。跟牌花色、這局在搶還是在讓，牌桌上本來就看得到：
+       不能出的牌會壓暗，叫了幾墩就放在誰面前——再多寫兩行提示反而把畫面弄雜 */
+    if(G.turn === me) setHTML(el, '<span class="msg">輪到<b>你</b>出牌</span>');
+    else setHTML(el, '<span class="msg"><b>' + who + '</b> 出牌中…</span>');
     return;
   }
 
@@ -4272,6 +4259,7 @@ const FELT_R = 4.46;
 /* 贏得的墩：不疊成塔，一墩一疊、每疊錯開約半張排成一列，一眼數得出來；
    一列的長度與疊數由那個座位分到多寬的空檔決定（見 pileGeom），排滿就往桌子中央再起一列 */
 const R_PILE = 2.42, PILE_S = .70, PILE_SMIN = .46, PILE_COLS = 6;
+const PILE_DY = .0026;               /* 一疊比一疊高這麼多：只為了讓深度測試分得出上下，看不出來 */
 
 /* ---- 每個座位坐在哪 ---- */
 /* 角度 0 是我，往右數過去是下一位——跟 2D 版座位由左到右的順序一致。
@@ -4384,7 +4372,10 @@ function pileSlot(i, k, per){
      同樣的角度扇形自然就窄了一點——不然兩個人的第二列會在中間撞在一起 */
   const a = G.a + (col - (G.cols - 1) / 2) * (G.step / R_PILE);
   const p = polar(R_PILE - row * G.rowgap, a);
-  return {x:p.x, y:Y0 + th/2, z:p.z,
+  /* 每一疊比前一疊再高一點點。相鄰兩疊本來就疊掉一半，全部躺在同一個高度的話
+     兩塊面完全共平面——深度測試分不出誰在上面，交界就會冒出一條一條的亮邊
+     （看起來像牌上劃了幾道白線）。差一點點就夠了，肉眼看不出來，後放的自然壓在先放的上面。 */
+  return {x:p.x, y:Y0 + th/2 + k * PILE_DY, z:p.z,
           rx:-Math.PI/2, ry:a + (((k * 53) % 13) - 6) * .010, rz:0, flip:Math.PI, s:G.s};
 }
 /* 手牌那個傾斜平面的兩個方向（世界座標）：沿牌面往上、以及牌面的法線（朝向鏡頭） */
@@ -4392,7 +4383,10 @@ const HP_C = Math.cos(HAND_PITCH), HP_S = Math.sin(HAND_PITCH);
 /* 扇形像真的握在手裡：所有的牌繞著牌中心下方 HAND_R 處的一個軸心轉，
    下緣聚在一起、上緣張開，左上角的點數排成一道弧。 */
 const HAND_R = 1.9;
-function handSlot(k, n){
+/* 每張沿法線多墊 HAND_LIFT：空隙留夠，上面那張的影子才落得到下面那張。
+   HAND_POP 是「能出的牌」再往前浮的量，必須明顯小於 HAND_LIFT（見 handSlot） */
+const HAND_LIFT = .042, HAND_POP = .016, HAND_RISE = .052;
+function handSlot(k, n, up){
   /* 相鄰兩張沿弧線錯開多少：牌少時寬一點好點，牌多時收到剩點數與一點花色露出來（牌寬 .72 的 33%～55%）。
      直式螢幕整把再收窄一點 */
   let dx = Math.max(.236, Math.min(.40, 2.6 / Math.max(n, 1))) * (S.handSpan / 3.15);
@@ -4403,11 +4397,30 @@ function handSlot(k, n){
      沿 y 往下會同時往牌面後方退，退的量比疊牌的墊高還大，順序就亂了。
      疊的順序照真的拿牌——右邊那張壓在左邊那張上面：每張沿法線多墊 .03，
      空隙留夠，上面那張的影子才落得到下面那張 */
-  const lift = k * .03;
+  /* up＝這張能出：往上推出扇形一截（沿牌面，不動前後順序），再往鏡頭方向浮一點點。
+     浮的量一定要小於相鄰兩張的間距，不然「能出的那張」會浮到後面那張的高度上——
+     兩張牌幾乎共平面，深度測試就分不出上下，牌面上會冒出一條一條的亮線。 */
+  const lift = k * HAND_LIFT + (up ? HAND_POP : 0);
+  const rise = up ? HAND_RISE : 0;
   return {x: px,
-          y: HAND_Y + drop * HP_C - lift * HP_S,
-          z: HAND_Z + drop * HP_S + lift * HP_C,
+          y: HAND_Y + (drop + rise) * HP_C - lift * HP_S,
+          z: HAND_Z + (drop + rise) * HP_S + lift * HP_C,
           rx: HAND_PITCH, ry: 0, rz: -th, flip:0, s:HAND_S};
+}
+
+/* 發牌時我的牌先落在自己面前的桌上，一張壓著一張、背面朝上——真的發牌就是這樣，
+   一張一張推到你面前，發完了才拿起來看。R_DEAL 取在檯面那一圈與手牌之間，
+   前面不擋出牌的位置、後面不壓到自己握著的牌。 */
+const R_DEAL = 2.46;
+const PICKUP_GAP = 300;              /* 最後一張發完到「拿起來」之間停這麼久：手伸過去的那一下 */
+const PICKUP_DUR = 520;
+const TRUMP_GAP = PICKUP_GAP + PICKUP_DUR + 160;   /* 牌拿起來扇好了，才翻王牌——真的牌桌就是這個順序 */
+function dealSlot(k, n){
+  const a = ang(S.me), p = polar(R_DEAL, a), sd = side(a);
+  const step = Math.min(.20, 1.7 / Math.max(1, n));      /* 張數多就疊緊一點，整疊寬度大致不變 */
+  const off = (k - (n - 1) / 2) * step;
+  return {x:p.x + sd.x * off, y:Y0 + THICK/2 + k * THICK, z:p.z + sd.z * off,
+          rx:-Math.PI/2, ry:a + (k - (n - 1) / 2) * .045, rz:0, flip:Math.PI, s:1};
 }
 
 /* ================= 場景 ================= */
@@ -5186,8 +5199,11 @@ function deckTop(stack){
    我的那顆跟著環一起收——狀態列與座位牌上都有我叫的數。
    環與骰子是 WebGL；中央讀數與判詞是 DOM，讀數投影到環心。 */
 const BID_R0 = .92, BID_R1 = 1.06, BID_Z = -.72, BID_STEP = 95;
+/* 我的骰子收在自己左前方那塊空桌上（牌庫與手牌之間）：正前方那條帶子被狀態列與手牌上緣佔滿了，
+   骰子放那裡會被字壓住。往左讓開一點還是「在我面前」，而且誰都不擋。 */
+const R_MARK_ME = 2.55, A_MARK_ME = .74;
 const BID_GOLD = 0xE3BF6A, BID_DARK = 0x4b3d23, BID_RED = 0xE27A5E, BID_COOL = 0x8C96C8, BID_COOL_BG = 0x3a3f5c;
-let bidDom = null, dieGeo = null, dieDecal = null, dieBody = null;
+let bidDom = null, dieGeo = null;
 const dieFaceMats = {};
 function bidEls(){
   if(bidDom) return bidDom;
@@ -5201,53 +5217,98 @@ function bidState(){
   return S.bid || (S.bid = {ri:-2, state:"idle", seg:[], outer:[], hubRing:null, dice:new Map(), dying:[],
                             sum:0, shown:0, hubAt:0, doneAt:0, goneAt:0, hold:1500});
 }
-/* 骰面只畫墨：1～6 用點、0 與 7 以上寫數字，跟座位牌上那顆 2D 骰子同一個規矩。底色是骰子本體 */
-function dieFaceMat(v){
-  if(dieFaceMats[v]) return dieFaceMats[v];
-  const cv = document.createElement("canvas"); cv.width = cv.height = 128;
+/* 一顆真的骰子。骰面是畫出來的：象牙白的胎、鑽出來的凹點——
+   點不是貼上去的黑圓，是一個有內影、底緣帶反光的坑，所以側光一照就看得出深度。
+   map 給顏色、bumpMap 給起伏，兩張都從同一份點位畫出來。 */
+const DIE_A = .34, DIE_R = .075;        /* 邊長與圓角：賭場骰是尖角，家用骰是圓角，這裡取圓角 */
+const PIPS3 = {1:[4], 2:[2,6], 3:[2,4,6], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,3,6,2,5,8]};
+function diePaint(v, bump){
+  const N = 256, cv = document.createElement("canvas");
+  cv.width = cv.height = N;
   const g = cv.getContext("2d");
-  g.fillStyle = "#1A1714";
-  if(v >= 1 && v <= 6){
-    const P = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[v];
-    for(const i of P){ g.beginPath(); g.arc(32 + (i % 3) * 32, 32 + Math.floor(i / 3) * 32, 10.5, 0, Math.PI * 2); g.fill(); }
-  }else{
-    g.font = '700 84px "Bodoni Moda",Georgia,serif'; g.textAlign = "center"; g.textBaseline = "middle";
-    g.fillText(String(v), 64, 70);
+  if(bump){ g.fillStyle = "#ffffff"; g.fillRect(0, 0, N, N); }
+  else{
+    /* 象牙胎：中間亮一點、四邊沉一點，再撒一層極細的雜點當紙紋 */
+    const bg = g.createRadialGradient(N * .42, N * .38, N * .06, N * .5, N * .5, N * .78);
+    bg.addColorStop(0, "#FBF5E4"); bg.addColorStop(.62, "#F0E7D0"); bg.addColorStop(1, "#DFD4B9");
+    g.fillStyle = bg; g.fillRect(0, 0, N, N);
+    g.globalAlpha = .05;
+    for(let i = 0; i < 900; i++){
+      g.fillStyle = (i & 1) ? "#8a7f66" : "#ffffff";
+      g.fillRect(Math.random() * N, Math.random() * N, 1.2, 1.2);
+    }
+    g.globalAlpha = 1;
+  }
+  /* 點位：3×3 格，格心在 .5/2.5/4.5 個格寬處。整組縮到面的 62%，圓角轉過去也不會被壓到 */
+  const span = N * .64, o = (N - span) / 2, cell = span / 3, rad = cell * .375;
+  for(const i of PIPS3[v]){
+    const cx = o + ((i % 3) + .5) * cell, cy = o + (Math.floor(i / 3) + .5) * cell;
+    if(bump){
+      /* 灰階＝高度。坑底最黑、坑口漸層回到白，bumpMap 讀出來就是一個圓凹 */
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, rad * 1.18);
+      gr.addColorStop(0, "#101010"); gr.addColorStop(.66, "#2a2a2a");
+      gr.addColorStop(.9, "#b4b4b4"); gr.addColorStop(1, "#ffffff");
+      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rad * 1.18, 0, Math.PI * 2); g.fill();
+      continue;
+    }
+    /* 坑口外一圈很淡的暗影，讓點看起來是陷下去的而不是印上去的 */
+    const halo = g.createRadialGradient(cx, cy, rad * .9, cx, cy, rad * 1.4);
+    halo.addColorStop(0, "rgba(90,78,58,.34)"); halo.addColorStop(1, "rgba(90,78,58,0)");
+    g.fillStyle = halo; g.beginPath(); g.arc(cx, cy, rad * 1.4, 0, Math.PI * 2); g.fill();
+    /* 坑本身：左上最深、右下被彈回來的光提亮一線 */
+    const pit = g.createRadialGradient(cx - rad * .34, cy - rad * .34, rad * .06, cx, cy, rad);
+    pit.addColorStop(0, "#171310"); pit.addColorStop(.55, "#221C17"); pit.addColorStop(1, "#3B3129");
+    g.fillStyle = pit; g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); g.fill();
+    g.save();
+    g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); g.clip();
+    g.strokeStyle = "rgba(255,240,210,.42)"; g.lineWidth = rad * .22;
+    g.beginPath(); g.arc(cx, cy, rad * .84, Math.PI * .12, Math.PI * .86); g.stroke();
+    g.restore();
   }
   const tex = new THREE.CanvasTexture(cv);
-  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = S.maxAniso;
-  return dieFaceMats[v] = new THREE.MeshStandardMaterial({map:tex, roughness:.5, metalness:0, alphaTest:.4,
-    polygonOffset:true, polygonOffsetFactor:-2});
+  if(!bump) tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = S.maxAniso;
+  return tex;
 }
-/* 骰子本體：圓角正方形擠出再加斜角，十二條邊都是圓的；點數是貼在六個面上的薄片 */
+function dieFaceMat(v){
+  if(dieFaceMats[v]) return dieFaceMats[v];
+  return dieFaceMats[v] = new THREE.MeshPhysicalMaterial({
+    map:diePaint(v, false), bumpMap:diePaint(v, true), bumpScale:1.6,
+    color:0xffffff, roughness:.34, metalness:0, clearcoat:.42, clearcoatRoughness:.20
+  });
+}
+/* 圓角立方體：BoxGeometry 本來就切好六個面（六組材質、每面一張完整 UV），
+   再把每個頂點推到「內縮方塊 + 半徑」的殼上就變圓角——十二條邊、八個角都是圓的。 */
+function roundedBox(a, r, seg){
+  const g = new THREE.BoxGeometry(a, a, a, seg, seg, seg);
+  const pos = g.attributes.position, nor = g.attributes.normal, inner = a / 2 - r;
+  const cl = x => Math.max(-inner, Math.min(inner, x));
+  for(let i = 0; i < pos.count; i++){
+    const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i);
+    const cx = cl(px), cy = cl(py), cz = cl(pz);
+    let dx = px - cx, dy = py - cy, dz = pz - cz;
+    const L = Math.hypot(dx, dy, dz) || 1;
+    dx /= L; dy /= L; dz /= L;
+    pos.setXYZ(i, cx + dx * r, cy + dy * r, cz + dz * r);
+    nor.setXYZ(i, dx, dy, dz);
+  }
+  pos.needsUpdate = true; nor.needsUpdate = true;
+  return g;
+}
+/* 六個面照真骰子排：對面相加是 7，而且是右手骰（1 朝上、2 朝前時 3 在右手邊）。
+   要讓哪一面朝上不是重排點數，是把整顆骰子轉過去——跟手上轉一顆真骰子一樣。 */
+const DIE_UP = {1:[0, 0], 2:[-Math.PI/2, 0], 3:[0, 0, Math.PI/2], 4:[0, 0, -Math.PI/2],
+                5:[Math.PI/2, 0], 6:[Math.PI, 0]};
 function dieMesh(v){
-  if(!dieGeo){
-    const a = .25, r = .05, bv = .045, x = -a/2, y = -a/2;     /* .25 加兩邊斜角 .045：一顆 .34 的骰子 */
-    const sh = new THREE.Shape();
-    sh.moveTo(x + r, y);
-    sh.lineTo(x + a - r, y); sh.quadraticCurveTo(x + a, y, x + a, y + r);
-    sh.lineTo(x + a, y + a - r); sh.quadraticCurveTo(x + a, y + a, x + a - r, y + a);
-    sh.lineTo(x + r, y + a); sh.quadraticCurveTo(x, y + a, x, y + a - r);
-    sh.lineTo(x, y + r); sh.quadraticCurveTo(x, y, x + r, y);
-    dieGeo = new THREE.ExtrudeGeometry(sh, {depth:a, bevelEnabled:true, bevelThickness:bv, bevelSize:bv, bevelSegments:3, curveSegments:4});
-    dieGeo.translate(0, 0, -a/2);
-    dieDecal = new THREE.PlaneGeometry(.235, .235);
-    dieBody = new THREE.MeshStandardMaterial({color:0xF5F0E1, roughness:.34, metalness:0});
-  }
+  if(!dieGeo) dieGeo = roundedBox(DIE_A, DIE_R, 8);
+  /* BoxGeometry 的六組依序是 +x −x +y −y +z −z */
+  const faces = [3, 4, 1, 6, 2, 5];
   const g = new THREE.Group();
-  const body = new THREE.Mesh(dieGeo, dieBody);
-  body.castShadow = true; body.receiveShadow = true;
-  g.add(body);
-  const opp = (v >= 1 && v <= 6) ? 7 - v : (v === 0 ? 6 : 1);
-  /* +y 那一面就是叫的數；其餘照一般骰子擺 */
-  const F = [[v, 0, 1, 0, -Math.PI/2, 0], [opp, 0, -1, 0, Math.PI/2, 0], [3, 1, 0, 0, 0, Math.PI/2],
-             [4, -1, 0, 0, 0, -Math.PI/2], [2, 0, 0, 1, 0, 0], [5, 0, 0, -1, 0, Math.PI]];
-  for(const f of F){
-    const m = new THREE.Mesh(dieDecal, dieFaceMat(f[0]));
-    m.position.set(f[1] * .1712, f[2] * .1712, f[3] * .1712);
-    m.rotation.set(f[4], f[5], 0);
-    g.add(m);
-  }
+  const m = new THREE.Mesh(dieGeo, faces.map(dieFaceMat));
+  const up = DIE_UP[v] || DIE_UP[1];
+  m.rotation.set(up[0], up[1], up[2] || 0);
+  m.castShadow = true; m.receiveShadow = true;
+  g.add(m);
   return g;
 }
 function bidRing(r0, r1, th0, len, segs, col, em, emI){
@@ -5283,17 +5344,24 @@ function bidLight(idx){
   if(idx < hs) tween(B.seg[idx].st, {lit:1}, {dur:240});
   else{ const o = B.outer[(idx - hs) % hs]; o.mesh.visible = true; tween(o.st, {sc:1}, {dur:380, ease:easeBack}); }
 }
-/* 叫完之後骰子留在哪：那個人手牌前面、往桌心一點，兩顆的話沿桌沿方向並排。
-   墩堆排在他與右手邊那位之間的空檔，不會撞到 */
+/* 叫完之後骰子收回誰面前：那個人手牌前面、往桌心讓一點，兩顆的話沿桌沿方向並排。
+   墩堆排在他與右手邊那位之間的空檔，不會撞到。
+   自己那份收得比別人近一些——手牌就浮在鏡頭前，退太外面會被自己的牌蓋掉。 */
 function bidMark(i, cnt){
-  const a = ang(i), p = polar(R_FAN - .85, a), sd = side(a), out = [];
+  const mine = i === S.me;
+  const a = ang(i) - (mine ? A_MARK_ME : 0);
+  const p = polar(mine ? R_MARK_ME : R_FAN - .85, a), sd = side(a), out = [];
   for(let j = 0; j < cnt; j++){ const off = (j - (cnt - 1) / 2) * .40; out.push({x:p.x + sd.x * off, z:p.z + sd.z * off}); }
   return out;
 }
-/* 叫 7 以上用兩顆：一顆 6 加一顆餘數，跟座位牌上那對骰子同一個規矩 */
-const bidSplit = v => v >= 7 ? [6, v - 6] : [v];
-/* 丟骰子：從他手牌前面拋出，翻滾著落進環裡、彈一下；兩顆的話第二顆慢一拍。
-   落定那一刻起 bidFrame 才開始亮格。每顆骰子是 d.parts 裡的一個狀態物件，補間都在它身上 */
+/* 叫 7 以上用兩顆：一顆 6 加一顆餘數，跟座位牌上那對骰子同一個規矩。
+   叫 0 一顆都不放——桌上沒有一顆骰子，本身就是「這局我不要」的意思 */
+const bidSplit = v => v >= 7 ? [6, v - 6] : v > 0 ? [v] : [];
+/* 丟骰子：從他手牌前面拋出，在空中翻滾，落進環裡彈兩下才停。
+   翻滾用一條隨機的斜軸（不是繞單軸打轉），所以每次拋出來都不一樣；
+   落定時 rx/rz 一定回到 0，該朝上的那一面才真的朝上。
+   落定那一刻起 bidFrame 才開始亮格。每顆骰子是 d.parts 裡的一個狀態物件，補間都在它身上。
+   叫 0 的人一顆都不丟——bidSplit 給空陣列，這裡直接記成「已落定」讓流程照走 */
 function bidThrow(i, v, n, delay, instant){
   const B = bidState();
   const a = ang(i), p = polarR(n >= 8 ? .70 : .63, a), sd = {x:Math.cos(a), z:-Math.sin(a)};
@@ -5301,22 +5369,32 @@ function bidThrow(i, v, n, delay, instant){
   const d = {seat:i, v, before:B.sum, lit:0, land:0, at:0, parts:[]};
   faces.forEach((f, k) => {
     const mesh = dieMesh(f); S.scene.add(mesh);
-    const off = two ? (k ? .2 : -.2) : 0;
-    d.parts.push({mesh, s:1, x:p.x + sd.x * off, y:.17, z:p.z + BID_Z + sd.z * off, rx:0, ry:a + (Math.random() - .5) * .6, rz:0});
+    const off = two ? (k ? .22 : -.22) : 0;
+    d.parts.push({mesh, s:1, x:p.x + sd.x * off, y:DIE_A/2, z:p.z + BID_Z + sd.z * off,
+                  rx:0, ry:a + (Math.random() - .5) * .9, rz:0});
   });
   B.sum += v;
   B.dice.set(i, d);
+  if(!d.parts.length){ d.land = nowMs(); return d; }                  /* 叫 0：沒有骰子，但流程當它已經落定 */
   if(instant || S.snap || UD.REDUCED){ d.land = nowMs() - BID_STEP * 12; return d; }   /* 不演：直接落定、格子一次亮完 */
   d.at = nowMs() + (delay || 0);   /* 環還沒刻好的話先等著：丟出那一刻才現身 */
   const from = i === S.me ? {x:.55 * S.xs, y:.85, z:2.65} : Object.assign(polar(R_FAN - .35, a), {y:.38});
   const dur = Math.min(620, Math.max(380, UD.SPEED * .9));
   d.parts.forEach((q, k) => {
     q.mesh.visible = false;
-    const to = {x:q.x, y:.17, z:q.z, rx:0, ry:q.ry, rz:0};
-    Object.assign(q, from, {x:from.x + sd.x * (two ? (k ? .12 : -.12) : 0),
-      rx:-Math.PI * 3, ry:q.ry - Math.PI * 2 * (k ? 1.5 : 1), rz:Math.PI * .75});
-    tween(q, to, {dur, delay:(delay || 0) + k * 70, ease:easeIO, bump:{y:1.05 + k * .1},
-      onEnd:() => { if(k === d.parts.length - 1) d.land = nowMs(); tween(q, {y:.17}, {dur:170, ease:t => t, bump:{y:.05}}); }});
+    const to = {x:q.x, y:q.y, z:q.z, rx:0, ry:q.ry, rz:0};
+    /* 空中翻幾圈：兩軸各給整數圈再加一點，落地才不會像被人擺上去的 */
+    const spin = 2 + Math.floor(Math.random() * 2);
+    const tilt = (Math.random() < .5 ? 1 : -1) * (1 + Math.floor(Math.random() * 2));
+    Object.assign(q, from, {x:from.x + sd.x * (two ? (k ? .14 : -.14) : 0),
+      rx:-Math.PI * 2 * spin, ry:q.ry - Math.PI * 2 * (k ? 1.5 : 1), rz:Math.PI * 2 * tilt});
+    tween(q, to, {dur, delay:(delay || 0) + k * 90, ease:easeIO, bump:{y:1.05 + k * .1},
+      onEnd:() => {
+        if(k === d.parts.length - 1) d.land = nowMs();
+        /* 落地彈兩下：第一下高、帶一點側傾，第二下只剩一點點，然後就不動了 */
+        tween(q, {y:q.y, rz:0, ry:q.ry + .22}, {dur:190, ease:t => t, bump:{y:.085, rz:.20}});
+        tween(q, {y:q.y, rz:0}, {dur:130, ease:t => t, bump:{y:.024, rz:.05}, queue:true});
+      }});
   });
   return d;
 }
@@ -5349,17 +5427,20 @@ function bidVerdict(){
     else { s.st.rd = 1; tween(s.st, {rd:0}, {dur:900}); }
   }
   if(kind === "exact"){ B.hubRing.st.fl = 1; tween(B.hubRing.st, {fl:0}, {dur:700}); }
-  /* 骰子這時就滑開：對手的到各自手牌前面留整局，我的縮掉——環心留給判詞 */
+  /* 骰子這時就各自收回主人面前，整局都放在那裡——誰叫幾，低頭看一眼就知道，
+     我自己那顆也收回來（收得比別人近一點，才不會被自己的手牌蓋住）。環心留給判詞。
+     搶墩局先抖一下再收：抖與收是同一顆骰子上的兩段，用 queue 接起來，
+     不然後放的那段會把前一段整個換掉（tween 對同一個目標只留最新一段），骰子就會留在原地 */
+  const shake = kind === "over";
+  if(shake) for(const x of B.dice.values()) for(const q of x.parts)
+    tween(q, {rz:0, y:q.y}, {dur:120, ease:t => t, bump:{rz:.09, y:.02}});
   let k = 0;
   for(const d of B.dice.values()){
-    if(d.seat === S.me){ for(const q of d.parts) tween(q, {s:.001, y:.3}, {dur:320, delay:260, ease:easeIO}); continue; }
     const m = bidMark(d.seat, d.parts.length);
-    d.parts.forEach((q, j) => tween(q, {x:m[j].x, y:.17, z:m[j].z, ry:q.ry + (Math.random() - .5) * 1.2},
-      {dur:560, delay:120 + k * 60 + j * 40, ease:easeIO, bump:{y:.25}}));
+    d.parts.forEach((q, j) => tween(q, {x:m[j].x, y:DIE_A/2, z:m[j].z, rx:0, rz:0, ry:q.ry + (Math.random() - .5) * 1.2},
+      {dur:560, delay:shake ? 0 : 120 + k * 60 + j * 40, queue:shake, ease:easeIO, bump:{y:.25}}));
     k++;
   }
-  /* 搶墩局：骰子滑開前先抖一下 */
-  if(kind === "over") for(const x of B.dice.values()) for(const q of x.parts) tween(q, {rz:0}, {dur:110, ease:t => t, bump:{rz:.07}});
   B.hold = UD.REDUCED ? 900 : Math.max(1400, Math.min(2600, UD.SPEED * 3.4));
 }
 /* 收場：判詞讀完，環一格一格縮回桌布 */
@@ -5399,11 +5480,10 @@ function bidSync(G, fresh, lastDeal){
   const all = G.bids.every(v => v !== null && v !== undefined);
   if(B.state === "idle"){
     if(all){
-      /* 叫墩早就結束了（叫完才切進立體、或重排）：不演，對手的骰子直接放到記號位 */
+      /* 叫墩早就結束了（叫完才切進立體、或重排）：不演，每個人的骰子直接放到各自的記號位 */
       for(let i = 0; i < n; i++){
-        if(i === S.me) continue;
         const d = bidThrow(i, G.bids[i], n, 0, true), m = bidMark(i, d.parts.length);
-        d.parts.forEach((q, j) => { q.x = m[j].x; q.z = m[j].z; });
+        d.parts.forEach((q, j) => { q.x = m[j].x; q.y = DIE_A/2; q.z = m[j].z; });
         d.lit = d.v;
       }
       B.state = "gone";
@@ -5542,6 +5622,12 @@ function sync(){
     if(c.slot === o.slot) return c;
     c.slot = o.slot;
     if(UD.REDUCED || S.snap) jump(c.t, spec);   /* 重排不是牌局裡發生的事，不演給人看 */
+    else if(o.via){
+      /* 先飛到中繼站停著，等整輪發完再一起接第二段（queue：接在前一段後面，不打斷它） */
+      tween(c.t, o.via.spec, {dur:o.via.dur, delay:o.delay || 0, arc:o.via.arc || 0, ease:o.via.ease});
+      tween(c.t, spec, {dur:o.dur || fly, delay:o.via.gap || 0, queue:true,
+                        arc:o.arc || 0, ease:o.ease, eases:o.eases, bump:o.bump});
+    }
     else tween(c.t, spec, {dur:o.dur || fly, delay:o.delay || 0, arc:o.arc || 0, ease:o.ease, eases:o.eases, bump:o.bump});
     return c;
   }
@@ -5554,15 +5640,17 @@ function sync(){
     place("dk:" + k, null, {x:ds.x, y:Y0 + THICK/2 + k * THICK, z:ds.z,
       rx:-Math.PI/2, ry:ds.ry, rz:0, flip:Math.PI, s:1}, {slot:"deck:" + k});
   /* ---- 我的手牌 ---- */
+  /* 發牌照真的牌桌：一張一張推到我面前，背面朝上疊在桌上；整輪發完了才一起拿起來翻正、扇開。
+     兩段是同一顆 t 上前後接著的補間（place 的 via），中間停 PICKUP_GAP 那一下就是「發完了」的停頓。 */
   const hand = (seat >= 0 && G.hands[seat]) || [];
   const myTurn = G.phase === "play" && G.turn === seat;
+  const dealEnd = fresh ? base + dealAt(seat, Math.max(0, hand.length - 1)) : 0;
   hand.forEach(function(card, k){
     /* 這張能不能出，問的是既有那顆 DOM 按鈕——規則只寫一次，
        點擊、鍵盤、螢幕閱讀器與這裡的明暗都以它為準 */
     const b = btnFor(card.id);
     const ok = !!(b && !b.disabled);
-    const spec = handSlot(k, hand.length);
-    if(ok){ spec.y += .055; spec.z += .045; }        /* 能出的往前浮起一點 */
+    const spec = handSlot(k, hand.length, ok);       /* 能出的推出來一截 */
     const dl = fresh ? base + dealAt(seat, k) : 0;
     lastDeal = Math.max(lastDeal, dl);
     const c = place(cardKey(card.id), card, spec, {
@@ -5570,8 +5658,11 @@ function sync(){
       own:true,
       from: fresh ? deckTop(stack) : null,
       delay: dl,
-      dur: fresh ? 470 : fly, arc: fresh ? .36 : 0,
-      eases: fresh ? {flip:easeFlip} : null          /* 從牌庫飛過來的路上翻正 */
+      dur: fresh ? PICKUP_DUR : fly, ease: fresh ? easeIO : null,
+      eases: fresh ? {flip:easeFlip} : null,         /* 拿起來的路上才翻正 */
+      /* 第一段：從牌庫滑到我面前的桌上，背面朝上。第二段等最後一張發完才動 */
+      via: fresh ? {spec:dealSlot(k, hand.length), dur:380, arc:.26, ease:easeOut,
+                    gap:Math.max(0, dealEnd - dl) + PICKUP_GAP + k * 26} : null
     });
     if(c) shade(c, ok || !myTurn ? 1 : .38);      /* 只有「輪到你、但這張不能出」才壓暗；別人的回合整把牌保持乾淨 */
   });
@@ -5599,7 +5690,7 @@ function sync(){
     place("tc", G.trumpCard, Object.assign({flip:0}, top), {
       slot:"trump:" + G.ri,
       from:Object.assign({flip:Math.PI}, top),
-      dur:760, delay:fresh ? lastDeal + 420 : 0, ease:easeIO,
+      dur:760, delay:fresh ? lastDeal + TRUMP_GAP : 0, ease:easeIO,
       eases:{flip:easeFlip}, bump:{y:.66}
     });
   }
@@ -5682,7 +5773,7 @@ function sync(){
   fade(S.feltMat.color, [fc[0] * .92, fc[1] * .92, fc[2] * .92]);
   fade(S.feltMat.sheenColor, [fc[0] * 1.6, fc[1] * 1.6, fc[2] * 1.6]);   /* 絨的回光帶著布的染色 */
   placeChairs();
-  if(fresh && G.trumpCard) S.flash = nowMs() + (UD.REDUCED ? 0 : lastDeal + 420 + 360);   /* 翻到一半時燈亮一下 */
+  if(fresh && G.trumpCard) S.flash = nowMs() + (UD.REDUCED ? 0 : lastDeal + TRUMP_GAP + 360);   /* 翻到一半時燈亮一下 */
 
   /* ---- 叫墩：中央的計數環與骰子 ---- */
   bidSync(G, fresh, lastDeal);
@@ -5817,6 +5908,32 @@ function toScreen(x, y, z, w, h){
   return {x:(v.x * .5 + .5) * w, y:(-v.y * .5 + .5) * h};
 }
 const CORNERS = [[-.5,-.7073,0],[.5,-.7073,0],[.5,.7073,0],[-.5,.7073,0]];
+/* 手牌上緣在畫面上的高度。刻意用「牌該在的位置」算，不是用牌現在的位置——
+   發牌時十一張牌是一張一張從牌庫飛過來的，跟著飛的話狀態列會被牌推著跳一路，
+   一張牌落定就跳一次。位置一算好就不再變，狀態列從發牌到打完都停在同一條線上。
+   （能出的牌會往前浮 .055，這裡一律當它浮著算，才不會輪到我時又跳一次） */
+function handTop(w, h){
+  const G = UD.G;
+  if(!G) return null;
+  const hand = (S.me >= 0 && G.hands[S.me]) || [];
+  if(!hand.length) return null;
+  const tmp = fitTmp || (fitTmp = new THREE.Object3D());
+  tmp.rotation.order = "YXZ";
+  let top = null;
+  for(let k = 0; k < hand.length; k++){
+    const sp = handSlot(k, hand.length, true);        /* 一律當它推出來了算，輪到我時才不會再跳一次 */
+    tmp.position.set(sp.x, sp.y, sp.z);
+    tmp.rotation.set(sp.rx, sp.ry, sp.rz);
+    tmp.scale.setScalar(sp.s);
+    tmp.updateMatrixWorld(true);
+    for(const p of CORNERS){
+      const v = _v().set(p[0], p[1], p[2]).applyMatrix4(tmp.matrixWorld);
+      const q = toScreen(v.x, v.y, v.z, w, h);
+      top = top === null ? q.y : Math.min(top, q.y);
+    }
+  }
+  return top;
+}
 function placeOverlays(){
   const host = CANVAS.parentNode;
   const w = host.clientWidth, h = host.clientHeight;
@@ -5860,7 +5977,6 @@ function placeOverlays(){
   }
 
   /* 手牌的透明按鈕貼著投影後的牌面：焦點框會正好框在那張牌上 */
-  let top = null;
   document.querySelectorAll("#hand .card[data-card]").forEach(function(el){
     const c = S.cards.get(cardKey(el.dataset.card));
     if(!c){ el.style.opacity = "0"; return; }
@@ -5877,8 +5993,8 @@ function placeOverlays(){
     el.style.top    = Math.round((y0 + y1) / 2) + "px";
     el.style.width  = Math.round(x1 - x0) + "px";
     el.style.height = Math.round(y1 - y0) + "px";
-    top = top === null ? y0 : Math.min(top, y0);
   });
+  const top = handTop(w, h);
 
   /* 狀態列停在手牌上緣。書房視角把桌子壓得扁，手牌上緣離中央的計數環很近：
      狀態列頂端不能蓋到環中間的數字，往下讓，但最多讓到蓋住手牌上緣 24px（牌的點數在更下面） */

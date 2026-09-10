@@ -280,6 +280,9 @@ input{font:inherit}
   border:1px dashed var(--hair);
 }
 .die.empty .num{color:var(--ink-3);font-size:12px;font-family:"Archivo",sans-serif;font-weight:400}
+/* 叫 0：不是一顆骰子，是一個數字 */
+.die.zero{background:none;box-shadow:none;border:1px solid var(--hair)}
+.die.zero .num{color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:500}
 /* 放下骰子：翻滾後定住 */
 /* 叫 7 以上是兩顆並排；第二顆晚一點落 */
 .dice{display:flex;gap:3px;flex:none}
@@ -2299,7 +2302,8 @@ const PIPS = {1:[5],2:[1,9],3:[1,5,9],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]}
 function dieHTML(v, seat){
   const a = ' data-die="' + seat + '"';
   if(v === null || v === undefined) return '<div class="die empty"' + a + '><span class="num">?</span></div>';
-  if(v === 0) return '<div class="die"' + a + ' aria-label="叫 0 墩"><span class="num">0</span></div>';
+  /* 叫 0 不畫骰子：「這局我不要」本來就不是一個點數 */
+  if(v === 0) return '<div class="die zero"' + a + ' aria-label="叫 0 墩"><span class="num">0</span></div>';
   const pips = n => PIPS[n].map(i =>
     '<span class="pip" style="grid-row:' + Math.ceil(i/3) + ';grid-column:' + (((i-1)%3)+1) + '"></span>'
   ).join("");
@@ -2660,14 +2664,6 @@ function tallyScores(){
   document.querySelectorAll(".tot").forEach(function(el){ el.classList.add("up"); });
 }
 
-/* 這一局全桌一共叫了幾墩、比桌上多還是少。出牌時一直帶著：
-   這局是在搶還是在讓，決定每一張牌要不要拿 */
-function bidClimate(sep){
-  if(!G.bids || !G.bids.length || G.bids.some(b => b === null || b === undefined)) return "";
-  const sum = G.bids.reduce((a, b) => a + b, 0), d = sum - G.hs;
-  return (sep ? '<span class="sep"> · </span>' : '') + '叫 ' + sum + '/' + G.hs +
-    (d === 0 ? ' 剛好' : d < 0 ? ' 保守局' : ' 搶墩局');
-}
 function renderStatus(me){
   const el = $("status");
   if(NET.err){ setHTML(el, '<span class="msg" style="color:var(--bad)">' + NET.err + '</span>'); return; }
@@ -2688,12 +2684,7 @@ function renderStatus(me){
   if(G.phase === "bid"){
     let sum = 0, placed = 0;
     for(let i=0;i<G.cfg.n;i++) if(G.bids[i] !== null && G.bids[i] !== undefined){ sum += G.bids[i]; placed++; }
-    const left = G.hs - sum;
-    /* 叫到一半就報「剩幾墩沒人要」：最後一位看一眼就知道自己叫幾會剛好 */
-    const tally = '<span class="hint">已叫 ' + sum + ' / 共 ' + G.hs + ' 墩' +
-      (placed ? '<span class="sep"> · </span>' + (placed === G.cfg.n
-        ? (left < 0 ? '超叫 ' + (-left) + '，搶墩局' : left > 0 ? '欠叫 ' + left + '，保守局' : '剛好')
-        : (left < 0 ? '已經超 ' + (-left) : left > 0 ? '剩 ' + left : '已經剛好')) : '') + '</span>';
+    /* 「已叫幾／剩幾」這行拿掉了：最後一位的按鈕預告已經在說同一件事，再寫一行字只是把畫面弄雜 */
     if(G.turn === me){
       /* 我是最後一位：每顆數字下面直接標出叫了之後全桌會多要或少要幾墩 */
       const last = placed === G.cfg.n - 1;
@@ -2705,22 +2696,16 @@ function renderStatus(me){
             (d === 0 ? "剛好" : d < 0 ? "欠 " + (-d) : "超 " + d) + '</i></button>'
           : '<button class="bidbtn" data-bid="' + v + '">' + v + '</button>';
       }
-      setHTML(el, '<span class="msg">你要叫幾墩？</span>' + tally +
+      setHTML(el, '<span class="msg">你要叫幾墩？</span>' +
         '<span class="bidrow"><span class="pill">' + b + '</span></span>');
-    }else setHTML(el, '<span class="msg"><b>' + who + '</b> 正在放骰子…</span>' + tally);
+    }else setHTML(el, '<span class="msg"><b>' + who + '</b> 正在放骰子…</span>');
     return;
   }
 
   if(G.phase === "play"){
-    if(G.turn === me){
-      const hand = G.hands[me] || [];
-      const must = G.led !== null && G.led !== undefined && hand.some(c => c.s === G.led);
-      setHTML(el, '<span class="msg">輪到<b>你</b>出牌</span><span class="hint">' +
-        (G.led === null || G.led === undefined ? "你先出，這墩由你決定花色"
-          : must ? "必須跟出 " + pip(G.led) + " " + SUITS[G.led].name
-                 : "手上沒有 " + pip(G.led) + "，可出任意牌") + bidClimate(true) + '</span>');
-    }else setHTML(el, '<span class="msg"><b>' + who + '</b> 出牌中…</span><span class="hint">' +
-      (G.led === null || G.led === undefined ? bidClimate(false) : "跟牌花色 " + pip(G.led) + bidClimate(true)) + '</span>');
+    /* 出牌階段只留一句「輪到誰」：跟牌花色與這局在搶還是在讓，牌桌上本來就看得到 */
+    if(G.turn === me) setHTML(el, '<span class="msg">輪到<b>你</b>出牌</span>');
+    else setHTML(el, '<span class="msg"><b>' + who + '</b> 出牌中…</span>');
     return;
   }
 
