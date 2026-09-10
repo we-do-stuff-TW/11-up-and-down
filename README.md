@@ -8,6 +8,7 @@
 - **人數**：2～10 人。牌不夠時階梯頂點自動下修——預設 64 張的話，6 人到 10 張、8 人到 7 張、10 人到 6 張，
   設定畫面會先告訴你這副牌能走到哪。
 - **牌組**：預設兩副 7–A 共 64 張。4 人要走完 1→11→1 至少需要 45 張。
+- **登入**：用 Google 帳號。名字與頭像自動帶入座位牌，換裝置還是同一個人，每場的戰績留著。
 - **牌桌**：右上角可切「平面／立體」，選擇記在 localStorage。
 - **音效**：右上角「音效」可關；關掉的狀態（和音量）也記在 localStorage。
 - **分數的圖示**：座位牌下方一排「叫中的軌跡」，每局一格——綠＝叫中、紅＝沒中、框起來的是這一局。
@@ -16,6 +17,7 @@
 ## 結構
 
 ```
+docs/login.html                登入頁（Google）
 docs/index.html                前端（單檔，無建置流程）
 docs/cards/                    J／Q／K 十二張人像（CC0 英式宮廷牌，已裁切重新配色；來源見裡面的 README）
 supabase/functions/game/       牌局伺服器：發牌、驗證出牌、AI
@@ -136,6 +138,32 @@ J／Q／K 的人像是 `docs/cards/` 的英式雙頭人像，啟動時抓成文�
 給幾個檔就輪流用，有錄音的那顆走錄音、其餘照舊合成，不用一次換完。
 反過來要把合成的結果導出去，`SFX.bounce("play", {mine:true}, 1.2)` 會離線算成一段 AudioBuffer。
 
+## 登入
+
+身分是 Google 帳號（Supabase Auth）。`docs/login.html` 是唯一的入口，`docs/index.html`
+在 `<head>` 就擋一次——**刻意不等 supabase-js 載完**，不然使用者會先看到一整張空牌桌閃一下。
+那一關只同步讀 localStorage 裡的 session 鍵決定要不要轉走；真正的驗證在 `authBoot()`
+與 edge function 那邊。從 Google 轉回來時網址上帶著 `?code=`，這種情況不能踢。
+
+呼叫 `functions/v1/game` 時 `Authorization` 帶的是**使用者自己的 access token**，不是 anon key——
+anon key 誰都有，那不叫身分。伺服器用 `auth.getUser(jwt)` 換出 `auth.users.id`，
+座位、房主、戰績全部認它。
+
+舊的「localStorage 隨機 token」只剩一個用途：那台裝置以前匿名玩過的話，第一次登入時
+把原本那一列 `players` 認領過去（`resolvePid`），桌上的座位與房主身分才不會斷。認領完
+`token_hash` 就清空，同一個 token 不會被第二個帳號拿去。
+
+**要開通得做三件事**（程式已經寫好，開了就會動）：
+
+1. Google Cloud Console → 建一組 OAuth 2.0 用戶端 ID（網頁應用程式），
+   已授權的重新導向 URI 填 `https://psuchtzacdppdpltpglg.supabase.co/auth/v1/callback`
+2. Supabase → Authentication → Sign In / Providers → Google → 開啟，貼上 Client ID 與 Secret
+3. Supabase → Authentication → URL Configuration →
+   Site URL 填 `https://we-do-stuff-tw.github.io/11-up-and-down/`，
+   Redirect URLs 加 `https://we-do-stuff-tw.github.io/11-up-and-down/**`（本機開發再加 `http://localhost:*/**`）
+
+沒開通的話登入頁那顆按鈕會說「Google 登入還沒開通」，不會靜靜失敗。
+
 ## 手牌為什麼藏得住
 
 發牌在 edge function 裡發生，手牌寫進 `hands` 表。那張表 RLS 開著、**一條 policy 都沒有**，
@@ -143,5 +171,6 @@ J／Q／K 的人像是 `docs/cards/` 的英式雙頭人像，啟動時抓成文�
 收到自己那份。`rooms` 表是公開狀態（檯面上的牌、叫墩、分數），本來就該所有人看得到，
 但同樣沒有寫入 policy：牌局只能透過 edge function 推進。
 
-身分不用 Supabase Auth，是一個存在 localStorage 的隨機 token，伺服器只留 sha256。
-所以有連結就能玩，不用註冊。
+`results`（戰績）是唯一有 select policy 的表，比對的是 `auth.uid()`——本人讀得到自己那份，
+拿別人的 id 也查不到別人的。寫入一樣只有 edge function（service_role）做得到：
+一場 21 局打完時寫，`(code, user_id)` 是唯一索引，重送不會變成兩筆。

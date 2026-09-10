@@ -4,8 +4,10 @@
 // 那台裝置就必然握有全部人的手牌。搬到這裡之後，每個人的回應裡只會有自己那份，
 // 別人的牌從頭到尾沒離開過資料庫。這是自己架唯一真正買到的東西。
 //
-// 認證不用 Supabase Auth：一個存在 localStorage 的隨機 token 就是身分，
-// 伺服器只留它的 sha256。省掉後台開匿名登入，也讓「有連結就能玩」成立。
+// 身分＝Google 帳號（Supabase Auth）。Authorization 帶的是使用者自己的 access token，
+// 不是 anon key——anon key 誰都有，那不叫身分。座位、房主、戰績都認 auth.users.id。
+// 舊的「localStorage 隨機 token」只剩一個用途：那台裝置第一次登入時把原本那一列認領過去，
+// 座位與房主身分才不會斷（見 resolvePid）。
 
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
@@ -17,7 +19,7 @@ const CORS = {
 
 /* ════════════ 牌與規則 ════════════ */
 type Card = { s: number; r: number; id: string };
-type Seat = { name: string; kind: "open" | "human" | "ai"; pid: string | null };
+type Seat = { name: string; kind: "open" | "human" | "ai"; pid: string | null; av?: string | null };
 
 const PEAK_CAP = 11;
 const AFK_MS = 30_000;
@@ -240,6 +242,75 @@ async function sha256(s: string): Promise<string> {
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/* ════════════ 身分 ════════════ */
+type Profile = { name: string; avatar: string | null; email: string | null };
+
+/** auth.users.id → players.pid。第一次登入時認領這台裝置原本的匿名玩家。 */
+async function resolvePid(
+  sb: SupabaseClient, uid: string, legacyToken: string | undefined, prof: Profile, fresh: boolean,
+): Promise<string | null> {
+  const got = await sb.from("players").select("pid").eq("user_id", uid).maybeSingle();
+  let pid = got.data?.pid as string | undefined;
+
+  // 這台裝置以前匿名玩過：把那一列接過來，桌上的座位、房主身分都留著。
+  // 條件是那一列還沒被任何帳號認領過——同一個 token 不能被第二個人拿去。
+  if (!pid && legacyToken && legacyToken.length >= 16) {
+    const th = await sha256(legacyToken);
+    const { data: claimed } = await sb.from("players")
+      .update({ user_id: uid, token_hash: null })
+      .eq("token_hash", th).is("user_id", null)
+      .select("pid").maybeSingle();
+    if (claimed) pid = claimed.pid;
+  }
+
+  if (!pid) {
+    const { data, error } = await sb.from("players")
+      .insert({ user_id: uid, name: prof.name, avatar: prof.avatar, email: prof.email })
+      .select("pid").single();
+    if (error || !data) return null;
+    return data.pid;
+  }
+
+  // 名字／頭像在 Google 那邊改了就跟著改。但 state／tick 每幾秒就一次，
+  // 沒必要每次都寫——只有開頁與入座這種「人剛做了什麼」的時候才更新。
+  if (fresh) {
+    await sb.from("players")
+      .update({ name: prof.name, avatar: prof.avatar, email: prof.email })
+      .eq("pid", pid);
+  }
+  return pid;
+}
+
+/* ════════════ 戰績 ════════════ */
+/** 一場打完，每個有帳號的座位留一列。同一場重複呼叫只會留下第一次寫進去的那份。 */
+async function saveResults(sb: SupabaseClient, R: Room) {
+  const pids = R.seats.filter((s) => s.kind === "human" && s.pid).map((s) => s.pid as string);
+  if (!pids.length) return;
+  const { data: ps } = await sb.from("players").select("pid,user_id").in("pid", pids);
+  const uidOf = new Map((ps ?? []).map((p: { pid: string; user_id: string | null }) => [p.pid, p.user_id]));
+
+  const log = R.log as { cells: { hit: boolean }[] }[];
+  const names = R.seats.map((s, i) => (s.kind === "human" ? s.name : `AI ${i + 1}`));
+  const rows = [];
+  for (let i = 0; i < R.cfg.n; i++) {
+    const s = R.seats[i];
+    const uid = s.kind === "human" && s.pid ? uidOf.get(s.pid) : null;
+    if (!uid) continue;
+    let hits = 0;
+    for (const row of log) if (row?.cells?.[i]?.hit) hits++;
+    rows.push({
+      user_id: uid, code: R.code, players: R.cfg.n, seat: i,
+      score: R.score[i] ?? 0,
+      rank: 1 + R.score.filter((v) => v > (R.score[i] ?? 0)).length,   // 同分同名次
+      hits, rounds: log.length,
+      opponents: names.filter((_, k) => k !== i),
+    });
+  }
+  if (rows.length) {
+    await sb.from("results").upsert(rows, { onConflict: "code,user_id", ignoreDuplicates: true });
+  }
+}
+
 /* ════════════ 進入點 ════════════ */
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -257,23 +328,25 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { action, token } = body as { action?: string; token?: string };
     if (!action) return json({ error: "no action" }, 400);
-    if (!token || typeof token !== "string" || token.length < 16)
-      return json({ error: "bad token" }, 400);
 
-    // token → pid（第一次見到就開一個玩家）
-    const th = await sha256(token);
-    let pid: string;
-    {
-      const { data } = await sb.from("players").select("pid").eq("token_hash", th).maybeSingle();
-      if (data) pid = data.pid;
-      else {
-        const { data: ins, error } = await sb.from("players")
-          .insert({ token_hash: th }).select("pid").single();
-        if (error) return json({ error: error.message }, 500);
-        pid = ins.pid;
-      }
-    }
-    if (action === "hello") return json({ ok: true, pid });
+    // Authorization 必須是使用者自己的 access token。anon key 也是一個合法 JWT，
+    // 但它沒有 user，getUser 會直接空手回來——所以這一關同時擋掉「只帶 anon key」。
+    const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const { data: au } = await sb.auth.getUser(jwt);
+    const user = au?.user;
+    if (!user) return json({ error: "請先登入", signin: true }, 401);
+
+    const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+    const prof: Profile = {
+      name: String(meta.full_name ?? meta.name ?? (user.email ?? "").split("@")[0] ?? "玩家").slice(0, 40),
+      avatar: (String(meta.avatar_url ?? meta.picture ?? "").slice(0, 500) || null),
+      email: user.email ?? null,
+    };
+    const fresh = action === "hello" || action === "create" || action === "sit";
+    const pid = await resolvePid(sb, user.id, token, prof, fresh);
+    if (!pid) return json({ error: "身分建立失敗，請重新整理" }, 500);
+
+    if (action === "hello") return json({ ok: true, pid, profile: prof });
 
     /* ---- create ---- */
     if (action === "create") {
@@ -285,7 +358,7 @@ Deno.serve(async (req) => {
       const ladder = ladderFor(maxHand(deckSizeOf(cfg.decks, cfg.minRank), cfg.n));
       const seats: Seat[] = Array.from({ length: cfg.n }, (_, i) =>
         i === 0
-          ? { name, kind: "human" as const, pid }
+          ? { name, kind: "human" as const, pid, av: prof.avatar }
           : { name: `座位 ${i + 1}`, kind: "open" as const, pid: null });
       for (let t = 0; t < 6; t++) {
         const code = randCode();
@@ -329,8 +402,8 @@ Deno.serve(async (req) => {
         const name = String((body as { name?: string }).name || "玩家").slice(0, 10);
         if (R.seats[i].kind === "human" && R.seats[i].pid !== pid)
           return json({ error: "這個位子有人了" }, 409);
-        for (const s of R.seats) if (s.pid === pid) { s.pid = null; s.kind = "open"; s.name = "座位"; }
-        R.seats[i] = { name, kind: "human", pid };
+        for (const s of R.seats) if (s.pid === pid) { s.pid = null; s.kind = "open"; s.name = "座位"; s.av = null; }
+        R.seats[i] = { name, kind: "human", pid, av: prof.avatar };
         return await ok(await persist(sb, R, false));
       }
 
@@ -338,7 +411,7 @@ Deno.serve(async (req) => {
         if (R.phase !== "lobby") return json({ error: "已經開始了" }, 409);
         if (!canDirect(R, pid)) return json({ error: "只有房主能開始" }, 403);
         R.seats = R.seats.map((s, i) =>
-          s.kind === "human" ? s : { name: `AI ${i + 1}`, kind: "ai" as const, pid: null });
+          s.kind === "human" ? s : { name: `AI ${i + 1}`, kind: "ai" as const, pid: null, av: null });
         await deal(sb, R);
         return await ok(await persist(sb, R));
       }
@@ -363,8 +436,13 @@ Deno.serve(async (req) => {
         if (R.phase !== "roundend" && R.phase !== "over")
           return json({ error: "這局還沒結束" }, 409);
         if (seatOf(R, pid) < 0) return json({ error: "你不在座位上" }, 403);
-        if (R.ri + 1 >= R.ladder.length) { R.phase = "over"; return await ok(await persist(sb, R)); }
+        if (R.ri + 1 >= R.ladder.length) {
+          R.phase = "over";
+          await saveResults(sb, R);
+          return await ok(await persist(sb, R));
+        }
         await deal(sb, R);
+        if (R.phase === "over") await saveResults(sb, R);
         return await ok(await persist(sb, R));
       }
 
@@ -400,7 +478,7 @@ Deno.serve(async (req) => {
       }
 
       case "leave": {
-        for (const s of R.seats) if (s.pid === pid) { s.pid = null; s.kind = "open"; s.name = "座位"; }
+        for (const s of R.seats) if (s.pid === pid) { s.pid = null; s.kind = "open"; s.name = "座位"; s.av = null; }
         return await ok(await persist(sb, R, false));
       }
     }

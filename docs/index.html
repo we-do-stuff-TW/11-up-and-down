@@ -7,7 +7,7 @@
 <meta name="description" content="叫墩撲克。1→11→1 共 21 局，手牌由伺服器發，誰都偷看不到。">
 <meta name="theme-color" content="#16332c">
 <meta property="og:title" content="11 Up &amp; Down">
-<meta property="og:description" content="叫墩撲克。有連結就能一起玩，不用註冊。">
+<meta property="og:description" content="叫墩撲克。用 Google 登入，跟朋友同桌打 21 局。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Libre+Baskerville:wght@700&family=Barlow+Semi+Condensed:wght@700&family=Cormorant+Garamond:wght@700&family=Shippori+Mincho+B1:wght@800&display=swap">
@@ -19,6 +19,24 @@ html,body{margin:0;padding:0}
 img{max-width:100%}
 [hidden]{display:none!important}
 </style>
+<script>
+/* 門禁。刻意寫在 head，而且不等 supabase-js：
+   等那支 CDN 載完再判斷，使用者已經先看過一整張空牌桌閃一下了。
+   Supabase 的 session 就放在 localStorage 這個鍵底下，同步讀得到，夠判斷「有沒有登入過」；
+   真正的驗證還是在下面 authBoot() 與伺服器那邊，這裡只負責不要閃。 */
+(function(){
+  var REF = "psuchtzacdppdpltpglg";
+  /* 剛從 Google 轉回來：網址上帶著 code，session 還沒寫進 localStorage，這時候不能踢 */
+  var returning = /[?&](code|error|error_description)=/.test(location.search) ||
+                  /(^|[#&])(access_token|error)=/.test(location.hash);
+  var has = true;
+  try{ has = !!localStorage.getItem("sb-" + REF + "-auth-token"); }
+  catch(e){ has = true; }   /* 讀不到 localStorage（無痕、擋 cookie）就別在這裡踢，交給 authBoot */
+  if(has || returning) return;
+  location.replace("login.html?next=" +
+    encodeURIComponent(location.pathname + location.search + location.hash));
+})();
+</script>
 </head>
 <body>
 <style>
@@ -190,6 +208,38 @@ input{font:inherit}
   color:oklch(.22 .04 84);font-weight:600;
 }
 .btn.primary:hover{background:var(--brass-2);border-color:var(--brass-2);color:oklch(.20 .04 84)}
+/* 帳號：頂列最右邊那顆。只有一張臉，名字在裡面的面板 */
+.btn.me{
+  display:flex;align-items:center;gap:7px;
+  padding:4px 12px 4px 5px;max-width:150px;
+}
+.btn.me .av{width:24px;height:24px}
+.btn.me span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn.me.bare{padding:7px 13px}
+
+/* 你是誰 */
+.mecard{display:flex;align-items:center;gap:13px;margin-bottom:20px}
+.mecard .av{width:46px;height:46px;box-shadow:0 0 0 1px var(--hair),0 2px 8px rgba(0,0,0,.3)}
+.mecard .who{min-width:0}
+.mecard .n{font-size:15px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mecard .e{font-size:12px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 戰績。用線分隔，不用面 */
+.recap{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:4px 0 16px}
+.recap .k{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.recap .v{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
+.recap .v .sub{font-size:13px;color:var(--ink-3)}
+.hist{list-style:none;margin:0;padding:0;border-top:1px solid var(--hair-2);max-height:38vh;overflow:auto}
+.hist li{
+  display:grid;grid-template-columns:auto auto 1fr auto;gap:12px;align-items:baseline;
+  padding:10px 0;border-bottom:1px solid var(--hair-2);
+  font-size:12.5px;color:var(--ink-3);
+}
+.hist .when{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--ink-3);white-space:nowrap}
+.hist .rank{font-weight:600;color:var(--ink-2);white-space:nowrap}
+.hist .rank.win{color:var(--brass)}
+.hist .vs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist .pts{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
 .seg{display:flex;gap:2px;padding:2px;border:1px solid var(--hair);border-radius:99px}
 .seg button{
   padding:4px 11px;border-radius:99px;font-size:12px;color:var(--ink-3);
@@ -251,6 +301,14 @@ input{font:inherit}
   border:1px solid var(--hair);border-radius:99px;padding:1px 6px;
 }
 .seat-name .tag.off{color:var(--bad);border-color:oklch(.735 .135 32 / .34)}
+/* Google 頭像。載不出來（沒設 referrer、帳號沒大頭貼）就自己消失，名字照樣讀得到 */
+.av{
+  width:19px;height:19px;flex:none;border-radius:99px;
+  object-fit:cover;background:var(--glass);
+  box-shadow:0 0 0 1px var(--hair);
+}
+.av[hidden]{display:none!important}
+body.is3d .av{width:16px;height:16px}
 .seat-score{
   margin-left:auto;
   font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:500;
@@ -949,6 +1007,10 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
       <button class="btn" id="btnRules">規則</button>
       <button class="btn" id="btnRoom">和朋友玩</button>
       <button class="btn" id="btnSetup">新局</button>
+      <button class="btn me bare" id="btnMe" aria-label="你的帳號">
+        <img class="av" id="meAvS" alt="" referrerpolicy="no-referrer" hidden>
+        <span id="meNameS">帳號</span>
+      </button>
     </div>
   </header>
 
@@ -1009,6 +1071,25 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
     <p class="sub" id="camNote"></p>
     <div class="sheet-actions">
       <button class="btn" id="prefClose">關閉</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="meOv" hidden>
+  <div class="sheet">
+    <h2>你的帳號</h2>
+    <p class="sub">登入用的是 Google 帳號；桌上顯示的名字可以另外取。</p>
+    <div class="mecard">
+      <img class="av" id="meAv" alt="" referrerpolicy="no-referrer" hidden>
+      <div class="who"><div class="n" id="meName">—</div><div class="e" id="meEmail"></div></div>
+    </div>
+    <div class="field"><label>桌上顯示的名字</label>
+      <input class="nameinput" id="inNameMe" maxlength="10" placeholder="最多 10 個字"></div>
+    <div class="field"><label>戰績</label></div>
+    <div id="histBody"></div>
+    <div class="sheet-actions">
+      <button class="btn" id="btnSignOut">登出</button>
+      <button class="btn primary" id="meClose">關閉</button>
     </div>
   </div>
 </div>
@@ -1869,8 +1950,8 @@ SFX.frame = function(G, me, best, o){
 
 /* ---------------- 介面的聲音 ----------------
    用事件委派，不去改任何一個 onclick——那些 handler 是別人的地盤。 */
-var OPENERS = {btnRules:1, btnRoom:1, btnSetup:1, btnFinal:1, btnLobby:1, endAgain:1, setupStart:1};
-var CLOSERS = {rulesClose:1, setupCancel:1, endClose:1, scoreClose:1};
+var OPENERS = {btnRules:1, btnRoom:1, btnSetup:1, btnFinal:1, btnLobby:1, endAgain:1, setupStart:1, btnMe:1};
+var CLOSERS = {rulesClose:1, setupCancel:1, endClose:1, scoreClose:1, meClose:1};
 document.addEventListener("click", function(e){
   var el = e.target.closest ? e.target.closest("button, .opt, .bidbtn, [data-net]") : null;
   if(!el) return;
@@ -2193,7 +2274,10 @@ const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const API = SB_URL + "/functions/v1/game";
 
 const MY = {
-  /* 這個 token 就是你的身分。只存在你的瀏覽器裡，伺服器只留它的雜湊。 */
+  /* 身分是 Google 帳號（下面 authBoot 填 uid／av／email）。
+     這個舊 token 只剩一個用途：這台裝置以前匿名玩過的話，第一次登入時讓伺服器把
+     原本那一列玩家認領過去，桌上的座位與房主身分才不會斷。認領完伺服器就把它作廢。 */
+  uid:null, av:null, email:"", gname:"",
   token:(function(){
     let v = null;
     try{ v = localStorage.getItem("ud.token"); }catch(e){}
@@ -2321,14 +2405,20 @@ async function api(action, args){
   if(NET.busy) return null;
   NET.busy = true;
   try{
+    /* Authorization 帶的是「你」，不是 anon key——anon key 誰都有，那不叫身分 */
+    const jwt = await accessToken();
+    if(!jwt){ gotoLogin(); return null; }
     const res = await fetch(API, {
       method:"POST",
-      headers:{"Content-Type":"application/json", apikey:SB_KEY, Authorization:"Bearer " + SB_KEY},
+      headers:{"Content-Type":"application/json", apikey:SB_KEY, Authorization:"Bearer " + jwt},
       body:JSON.stringify(Object.assign(
         {action:action, token:MY.token, name:MY.name || "玩家"}, args || {}))
     });
-    const d = await res.json();
+    const d = await res.json().catch(function(){ return {}; });
     if(d.pid) MY.pid = d.pid;
+    /* 401 有兩個來源：我們自己回的（帶 signin），以及 token 過期時 Supabase 平台
+       在函式跑起來之前就擋掉的（回的 body 不是我們寫的）。兩者都是「這張身分不算數」。 */
+    if(d.signin || res.status === 401){ gotoLogin(true); return null; }
     if(d.error){
       if(action !== "tick" && action !== "state"){ NET.err = d.error; render(); }
       return null;
@@ -2353,7 +2443,7 @@ function applyRow(row, hand){
 
   const g = {
     cfg:row.cfg, ladder:row.ladder,
-    seats:(row.seats||[]).map(s => ({name:s.name, kind:s.kind, cid:s.pid})),
+    seats:(row.seats||[]).map(s => ({name:s.name, kind:s.kind, cid:s.pid, av:s.av || null})),
     phase:row.phase, ri:row.ri, hs:row.hs, starter:row.starter,
     trump:row.trump, trumpCard:row.trump_card,
     leader:row.leader, turn:row.turn, led:row.led, played:row.played,
@@ -2391,9 +2481,95 @@ function unsubscribe(){
 }
 (function(){
   if(window.supabase && window.supabase.createClient){
-    NET.sb = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:false}});
+    /* 同一個 client 同時做兩件事：realtime 訂房間、以及保管登入的 session。
+       開兩個 client 會有兩份 GoTrue 搶同一個 storage key，PKCE 那組 verifier 就會互相蓋掉。 */
+    NET.sb = window.supabase.createClient(SB_URL, SB_KEY, {
+      auth:{persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, flowType:"pkce"}
+    });
   }else NET.state = "none";
 })();
+
+/* ================= 身分 ================= */
+/* 名字是別人給的字（Google 的顯示名稱，或對手自己打的），頭像是外部網址。
+   兩者都會被串進 HTML，所以進畫面前一律逸出——屬性值也要，所以引號一起。 */
+const esc = v => String(v == null ? "" : v)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+function loginHref(){
+  return "login.html?next=" +
+    encodeURIComponent(location.pathname + location.search + location.hash);
+}
+let bouncing = false;
+function gotoLogin(stale){
+  if(bouncing) return;
+  bouncing = true;
+  const jump = function(){ location.replace(loginHref()); };
+  /* 伺服器不認這張 session：不先清掉的話，登入頁看到 localStorage 還有東西
+     又會把人送回牌桌，兩頁互相踢。 */
+  if(stale && NET.sb){
+    try{ NET.sb.auth.signOut({scope:"local"}).then(jump, jump); }catch(e){ jump(); }
+  }else jump();
+}
+/* 每次呼叫伺服器都拿一次：過期的話 getSession 會自己換一張新的 */
+async function accessToken(){
+  if(!NET.sb) return null;
+  try{
+    const r = await NET.sb.auth.getSession();
+    return (r && r.data && r.data.session && r.data.session.access_token) || null;
+  }catch(e){ return null; }
+}
+/* Google 給的名字太長，桌上放不下；使用者自己取過名字就不覆蓋 */
+function adoptUser(u){
+  if(!u) return;
+  const m = u.user_metadata || {};
+  MY.uid = u.id;
+  MY.email = u.email || "";
+  MY.av = m.avatar_url || m.picture || null;
+  MY.gname = m.full_name || m.name || (MY.email.split("@")[0] || "");
+  let saved = "";
+  try{ saved = localStorage.getItem("ud.name") || ""; }catch(e){}
+  if(!saved && MY.gname){
+    /* 座位牌放得下 10 個字。整個名字塞不下就只取名，不要從中間切斷（Francis Sun → Francis） */
+    MY.name = MY.gname.length <= 10 ? MY.gname : MY.gname.split(/\s+/)[0].slice(0, 10);
+    try{ localStorage.setItem("ud.name", MY.name); }catch(e){}
+  }
+  paintMeChip();
+  /* 單人局在驗身分之前就開好了，那時候還不知道你長什麼樣 */
+  if(MODE === "solo" && G && G.seats[0]){ G.seats[0].av = MY.av; render(); }
+}
+async function authBoot(){
+  if(!NET.sb){
+    /* 連線元件沒載進來就沒辦法驗身分。這時候不要把人踢回登入頁（那邊也要同一支），
+       讓牌桌以單人模式照常運作，連線面板本來就會說明。 */
+    return;
+  }
+  let session = null;
+  try{ session = (await NET.sb.auth.getSession()).data.session; }catch(e){}
+  if(!session){ gotoLogin(); return; }
+  adoptUser(session.user);
+
+  /* Google 轉回來時網址上會掛著 ?code=… 這類殘骸，session 收好了就擦掉 */
+  try{
+    const u = new URL(location.href);
+    let dirty = false;
+    ["code", "error", "error_description", "error_code", "state"].forEach(function(k){
+      if(u.searchParams.has(k)){ u.searchParams.delete(k); dirty = true; }
+    });
+    if(/access_token|refresh_token/.test(u.hash)){ u.hash = ""; dirty = true; }
+    if(dirty) history.replaceState(null, "", u.pathname + (u.search || "") + (u.hash || ""));
+  }catch(e){}
+
+  NET.sb.auth.onAuthStateChange(function(ev, sess){
+    if(ev === "SIGNED_OUT" || !sess){ gotoLogin(); return; }
+    adoptUser(sess.user);
+  });
+
+  /* 讓伺服器認識這個帳號（第一次登入會在這裡把舊的匿名身分認領過去） */
+  const d = await api("hello", {});
+  if(d && d.pid) MY.pid = d.pid;
+  render();
+}
 
 async function createRoom(cfg){
   const d = await api("create", {cfg:cfg});
@@ -2933,9 +3109,9 @@ function dieHTML(v, seat){
 }
 function seatLabel(i){
   const s = G.seats[i];
-  if(MODE === "solo") return i === 0 ? "你" : s.name;
-  if(s.cid && s.cid === MY.pid) return (s.name || "你") + "（你）";
-  return s.name || ("座位 " + (i+1));
+  if(MODE === "solo") return i === 0 ? "你" : esc(s.name);
+  if(s.cid && s.cid === MY.pid) return esc(s.name || "你") + "（你）";
+  return esc(s.name) || ("座位 " + (i+1));
 }
 function seatTag(i){
   const s = G.seats[i];
@@ -2955,6 +3131,8 @@ function seatHTML(i){
   return '<div class="seat ' + (act ? "is-active" : "") + (i === mySeat() ? " is-me" : "") +
     '" data-seat="' + i + '">' +
     '<div class="seat-top"><span class="seat-name">' +
+      (s.av ? '<img class="av" src="' + esc(s.av) + '" alt="" referrerpolicy="no-referrer" ' +
+              'onerror="this.hidden=true">' : "") +
       (MODE === "net" ? '<span class="dot ' + (online ? "on" : "") + '"></span>' : "") +
       seatLabel(i) + seatTag(i) + '</span>' +
       '<span class="seat-score" data-score="' + (G.score[i]||0) + '" data-from="' + prev + '">' +
@@ -3433,6 +3611,84 @@ function renderLedger(){
   $("ledgerOf").textContent = G.cfg.decks + " 副 · " + G.deckSize + " 張 · " + G.cfg.n + " 人";
 }
 
+/* 改名字要讓同桌的人看到。伺服器只在大廳收座位變更，牌局進行中就先留在本機。
+   每敲一個字送一次太吵，等手停下來再送。 */
+let nameTimer = 0;
+function pushName(){
+  if(MODE !== "net" || !NET.code || !G || G.phase !== "lobby") return;
+  const i = mySeat();
+  if(i < 0) return;
+  clearTimeout(nameTimer);
+  nameTimer = setTimeout(function(){ api("sit", {code:NET.code, seat:i}).then(paintNet); }, 600);
+}
+
+/* ================= 帳號 ================= */
+function paintMeChip(){
+  const av = $("meAvS"), nm = $("meNameS"), btn = $("btnMe");
+  if(!btn) return;
+  if(MY.av){ av.src = MY.av; av.hidden = false; btn.classList.remove("bare"); }
+  else { av.hidden = true; btn.classList.add("bare"); }
+  nm.textContent = MY.name || MY.gname || "帳號";
+  btn.setAttribute("aria-label", "你的帳號：" + (MY.gname || MY.email || ""));
+}
+function openMe(){
+  const av = $("meAv");
+  if(MY.av){ av.src = MY.av; av.hidden = false; } else av.hidden = true;
+  $("meName").textContent = MY.gname || "—";
+  $("meEmail").textContent = MY.email || "";
+  $("inNameMe").value = MY.name || "";
+  $("meOv").hidden = false;
+  loadHistory();
+}
+/* 戰績。這是唯一一張「本人讀得到自己那份」的表——rooms／hands 都沒有讀取 policy，
+   results 有一條 select policy，比對的是 auth.uid()，所以拿別人的 id 也查不到別人的。 */
+let histOnce = null;
+async function loadHistory(force){
+  const box = $("histBody");
+  if(!box) return;
+  if(!NET.sb){ box.innerHTML = '<div class="fair">連線元件沒載入成功，看不到戰績。</div>'; return; }
+  if(histOnce && !force) return;
+  box.innerHTML = '<div class="fair">讀取中…</div>';
+  let rows = null, err = null;
+  try{
+    const r = await NET.sb.from("results").select("*")
+      .order("finished_at", {ascending:false}).limit(30);
+    rows = r.data; err = r.error;
+  }catch(e){ err = e; }
+  histOnce = true;
+  if(err){
+    box.innerHTML = '<div class="fair">戰績還沒開通——資料表 <b>results</b> 建好之後這裡就會有東西。</div>';
+    return;
+  }
+  if(!rows || !rows.length){
+    box.innerHTML = '<div class="fair">還沒有打完的紀錄。<b>和朋友玩</b>開一桌，打完 21 局就會記在這裡。<br>' +
+      '（單人對 AI 的牌局不算——那不上伺服器。）</div>';
+    return;
+  }
+  const games = rows.length;
+  const wins = rows.filter(r => r.rank === 1).length;
+  let hits = 0, rounds = 0;
+  rows.forEach(function(r){ hits += r.hits || 0; rounds += r.rounds || 0; });
+  const pct = rounds ? Math.round(hits * 100 / rounds) : 0;
+  const fmt = function(t){
+    const d = new Date(t);
+    return isNaN(d) ? "—" : (d.getMonth()+1) + "/" + d.getDate();
+  };
+  box.innerHTML =
+    '<div class="recap">' +
+      '<div><div class="k">場數</div><div class="v">' + games + '</div></div>' +
+      '<div><div class="k">拿第一</div><div class="v">' + wins + '<span class="sub"> / ' + games + '</span></div></div>' +
+      '<div><div class="k">叫中率</div><div class="v">' + pct + '<span class="sub">%</span></div></div>' +
+    '</div>' +
+    '<ul class="hist">' + rows.map(function(r){
+      const vs = (r.opponents || []).map(esc).join("、");
+      return '<li><span class="when">' + fmt(r.finished_at) + '</span>' +
+        '<span class="rank' + (r.rank === 1 ? " win" : "") + '">第 ' + r.rank + ' / ' + r.players + '</span>' +
+        '<span class="vs">' + (vs || "—") + '</span>' +
+        '<span class="pts">' + (r.score > 0 ? "+" : "") + r.score + '</span></li>';
+    }).join("") + '</ul>';
+}
+
 /* ================= 連線面板 ================= */
 let netView = "menu", joinCode = "";
 function openNet(){ netView = (MODE === "net") ? "lobby" : "menu"; paintNet(); $("netOv").hidden = false; }
@@ -3459,7 +3715,7 @@ function paintNet(){
     body.innerHTML = nameField +
       '<div class="mode-row"><button class="btn primary" data-net="create">開一間新房</button>' +
       '<button class="btn" data-net="tojoin">用房號加入</button></div>' +
-      '<div class="fair"><b>發牌在伺服器上發生。</b>你的手牌只會送到你自己的裝置，別人的牌從頭到尾沒離開過資料庫——房主也看不到。<br><br>任何人有連結就能玩，不用註冊帳號。</div>';
+      '<div class="fair"><b>發牌在伺服器上發生。</b>你的手牌只會送到你自己的裝置，別人的牌從頭到尾沒離開過資料庫——房主也看不到。<br><br>大家各自用 Google 登入，換裝置回來還是同一個位子。</div>';
     acts.innerHTML = '<button class="btn" data-net="close">取消</button>';
     return;
   }
@@ -3479,9 +3735,10 @@ function paintNet(){
   for(let i=0;i<G.cfg.n;i++){
     const s = G.seats[i], isMe = s.cid && s.cid === MY.pid, taken = s.kind === "human" && s.cid;
     slots += '<div class="slot ' + (isMe ? "mine" : "") + '"><span class="n">' + (i+1) + '</span>' +
+      (taken && s.av ? '<img class="av" src="' + esc(s.av) + '" alt="" referrerpolicy="no-referrer" onerror="this.hidden=true">' : "") +
       (taken ? '<span class="dot ' + (live[s.cid] ? "on" : "") + '"></span>' : "") +
       '<span class="who ' + (taken ? "" : "open") + '">' +
-      (taken ? s.name + (isMe ? "（你）" : "") : "空位 · AI 代打") + '</span>' +
+      (taken ? esc(s.name) + (isMe ? "（你）" : "") : "空位 · AI 代打") + '</span>' +
       (G.host === s.cid ? '<span class="badge host">房主</span>' : "") +
       (taken ? "" : '<button class="btn" data-seat="' + i + '">坐這</button>') + '</div>';
   }
@@ -3500,10 +3757,12 @@ function paintNet(){
 
 /* ================= 事件 ================= */
 document.addEventListener("input", function(e){
-  if(e.target.id === "inName"){
+  /* 名字有兩個入口（連線面板、帳號面板），走同一條路 */
+  if(e.target.classList && e.target.classList.contains("nameinput")){
     MY.name = e.target.value.slice(0,10);
     try{ localStorage.setItem("ud.name", MY.name); }catch(err){}
-    if(MODE === "net") writeMe({});
+    paintMeChip();
+    pushName();
   }
   if(e.target.id === "inCode"){
     joinCode = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0,4);
@@ -3587,12 +3846,22 @@ $("rulesClose").onclick = function(){ $("rulesOv").hidden = true; };
 $("btnRoom").onclick = openNet;
 $("btnSetup").onclick = function(){ openSetup(); };
 $("setupCancel").onclick = function(){ $("setupOv").hidden = true; };
+$("btnMe").onclick = openMe;
+$("meClose").onclick = function(){ $("meOv").hidden = true; };
+$("btnSignOut").onclick = async function(){
+  const b = $("btnSignOut");
+  b.disabled = true; b.textContent = "登出中…";
+  try{ if(NET.code) await api("leave", {code:NET.code}); }catch(e){}
+  try{ if(NET.sb) await NET.sb.auth.signOut(); }catch(e){}
+  try{ localStorage.removeItem("ud.name"); }catch(e){}
+  gotoLogin();
+};
 $("btnPref").onclick = function(){ openPref(); };
 $("prefClose").onclick = function(){ $("prefOv").hidden = true; };
 $("endClose").onclick = function(){ $("endOv").hidden = true; };
 $("endAgain").onclick = function(){ $("endOv").hidden = true; openSetup(); };
 document.addEventListener("keydown", function(e){
-  if(e.key === "Escape"){ $("rulesOv").hidden = true; $("setupOv").hidden = true; $("prefOv").hidden = true; $("netOv").hidden = true; setScore(false); }
+  if(e.key === "Escape"){ $("rulesOv").hidden = true; $("setupOv").hidden = true; $("prefOv").hidden = true; $("netOv").hidden = true; $("meOv").hidden = true; setScore(false); }
 });
 
 /* ================= 單人設定 ================= */
@@ -3656,7 +3925,7 @@ $("setupStart").onclick = function(){
 };
 function startSolo(){
   G = newGame({n:draft.n, decks:draft.decks, minRank:draft.minRank});
-  G.seats[0] = {name:"你", kind:"human", cid:"me"};
+  G.seats[0] = {name:"你", kind:"human", cid:"me", av:MY.av};
   for(let i=1;i<G.cfg.n;i++) G.seats[i] = {name:String.fromCharCode(65+i), kind:"ai", cid:null};
   G.host = "me";
   SEEN.round = -1; SEEN.phase = ""; SEEN.flip = -1; SEEN.bids = {}; SEEN.keys = {}; SEEN.scores = []; SEEN.won = 0;
@@ -3688,6 +3957,8 @@ const UD = window.UD = {
 applyBackText();
 loadDeckFonts(DECK).then(applyBackText);
 startSolo();
+paintMeChip();
+authBoot();
 })();
 </script>
 
