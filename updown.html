@@ -180,6 +180,12 @@ input{font:inherit}
 .seg button:hover{color:var(--ink-2)}
 .seg button[aria-pressed="true"]{background:var(--glass);color:var(--ink)}
 
+/* 音效開關：關掉的時候把字劃掉——一眼看得出是關著的，不用另外找圖示 */
+#btnSfx[aria-pressed="false"]{
+  color:var(--ink-3);border-color:var(--hair-2);
+  text-decoration:line-through;text-decoration-thickness:1px;
+}
+
 /* ================= 版面 ================= */
 .main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) clamp(306px,25vw,374px);min-height:0}
 @media (max-width:960px){ .main{grid-template-columns:minmax(0,1fr)} }
@@ -348,6 +354,16 @@ input{font:inherit}
 }
 .play.is-taking .who{color:var(--good)}
 .play.is-taking .card{box-shadow:0 0 0 1.5px var(--good), var(--sh-1)}
+/* 一墩打完先定格：贏的那張往贏家的方向推出去、其餘的暗下來，停兩秒才收墩，
+   讓所有人都看清楚是誰贏的。推的方向 --px/--py 由 JS 量出贏家座位在哪邊。
+   --kx/--ky/--ks 是收墩動畫的起點，接在推出去的位置上，不然收的瞬間會彈回原位。 */
+.trick .play{transition:transform .3s var(--e-out), opacity .3s var(--e-out)}
+.trick.is-won .play{--ko:.6;opacity:var(--ko)}
+.trick.is-won .play.is-taking{
+  --ko:1;--kx:var(--px,0);--ky:var(--py,-18px);--ks:1.08;
+  opacity:1;z-index:3;transform:translate(var(--kx),var(--ky)) scale(var(--ks));
+}
+.trick.is-won .play.is-taking .card{box-shadow:0 0 0 2px var(--good), var(--sh-2)}
 .trick-empty{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);opacity:.7}
 
 /* 別人出牌：從那個座位的方向帶進來 */
@@ -371,12 +387,12 @@ input{font:inherit}
             collect-fade var(--cdur,.6s) linear both;
 }
 @keyframes collect{
-  0%  {transform:none;animation-timing-function:var(--e-out)}
+  0%  {transform:translate(var(--kx,0),var(--ky,0)) scale(var(--ks,1));animation-timing-function:var(--e-out)}
   30% {transform:translate(var(--sx,0),var(--sy,0)) rotate(var(--sr,0deg)) scale(1.03);animation-timing-function:linear}
   44% {transform:translate(var(--sx,0),var(--sy,0)) rotate(var(--sr,0deg)) scale(1);animation-timing-function:var(--e-in)}
   100%{transform:translate(var(--cx,0),var(--cy,-40px)) rotate(var(--sr,0deg)) scale(.42)}
 }
-@keyframes collect-fade{0%,84%{opacity:1}100%{opacity:0}}
+@keyframes collect-fade{0%,84%{opacity:var(--ko,1)}100%{opacity:0}}
 
 /* ================= 牌 ================= */
 .card{
@@ -569,7 +585,7 @@ table.score tr.now .sz span{color:var(--brass)}
 }
 @keyframes ov{from{opacity:0}to{opacity:1}}
 .sheet{
-  width:min(560px,100%);max-height:88vh;overflow:auto;
+  width:min(608px,100%);max-height:88vh;overflow:auto;   /* 人數那一排 2～10 共十顆要排得下 */
   padding:26px 28px 24px;border-radius:22px;
   background:linear-gradient(170deg, oklch(.26 .028 168) 0%, oklch(.205 .026 168) 100%);
   border:1px solid var(--glass-edge);
@@ -724,10 +740,11 @@ table.score tr.now .sz span{color:var(--brass)}
     <div class="meta" id="meta"></div>
     <div class="tools">
       <div class="seg" id="speed">
-        <button data-sp="900" aria-pressed="false">慢</button>
-        <button data-sp="520" aria-pressed="true">中</button>
-        <button data-sp="200" aria-pressed="false">快</button>
+        <button data-sp="slow" aria-pressed="false">慢</button>
+        <button data-sp="mid" aria-pressed="true">中</button>
+        <button data-sp="fast" aria-pressed="false">快</button>
       </div>
+      <button class="btn" id="btnSfx" aria-pressed="true">音效</button>
       <button class="btn" id="btnScore">計分</button>
       <button class="btn" id="btnRules">規則</button>
       <button class="btn" id="btnRoom" hidden>和朋友玩</button>
@@ -859,8 +876,908 @@ table.score tr.now .sz span{color:var(--brass)}
 </div>
 
 <script>
+/* ============================================================
+   11 Up & Down — 音效層
+   ------------------------------------------------------------
+   牌桌是深夜的、暖的、近的：一盞頂燈、一塊絨布、一圈胡桃木。
+   聲音照同一套世界觀做——近距離收音的 Foley，一間小房間的殘響，
+   偶爾一顆溫暖的琴音，不出現遊戲機的「叮咚」。
+
+   這一層跟 3D 一樣是「加上去的」：引擎與連線層都不知道它存在。
+   唯一的接縫是 render() 最後那行 SFX.frame(G, me, best)——
+   把當下的牌局狀態遞過來，音效層自己跟上一次比對，差在哪就發什麼聲。
+   所以 2D、3D、單人、連線都是同一份，不需要各接一次。
+
+   聲音怎麼組成：每一個 Foley 都是三層疊的（電影音效的老規矩）——
+     · 起音（transient）：接觸的那一下，1-3ms，寬頻
+     · 本體（body）：材質在響，紙牌是 700-1500Hz 那塊「啪」
+     · 尾巴（tail）：桌面吸收掉的低頻，加一點房間的殘響
+   少了低頻那層，牌就像掉在真空裡；少了殘響，就像貼在耳朵上。
+
+   沒有任何音檔。全部是 Web Audio 即時合成，所以：
+     · 不多一個 byte，不多一次 request
+     · 每一次都不一樣（音高、時值、濾波隨機扰動），連發不會變機關槍
+   要換成錄音的話看檔案最下面 SFX.load()。
+   ============================================================ */
 (function(){
 "use strict";
+
+var AC = window.AudioContext || window.webkitAudioContext;
+if(!AC){ window.SFX = {frame:function(){}, on:function(){}, enabled:false}; return; }
+
+/* ---------------- 使用者偏好 ---------------- */
+var PREF = {on:true, vol:0.8};
+try{
+  var raw = localStorage.getItem("ud.sfx");
+  if(raw !== null) PREF.on = raw !== "0";
+  var v = parseFloat(localStorage.getItem("ud.sfxvol"));
+  if(v >= 0 && v <= 1) PREF.vol = v;
+}catch(e){}
+function savePref(){
+  try{
+    localStorage.setItem("ud.sfx", PREF.on ? "1" : "0");
+    localStorage.setItem("ud.sfxvol", String(PREF.vol));
+  }catch(e){}
+}
+
+/* ---------------- 音訊圖 ----------------
+   voices ──┬─────────────────────────────┐
+            └─ send ─> convolver ─> wet ──┴─> bus ─> 膠水壓縮 ─> 限幅 ─> 音量 ─> 出
+   殘響只收 voice 的 send，不收 bus，所以不會回授。
+   兩顆 DynamicsCompressor：前面那顆把整體黏起來（電影混音的 glue），
+   後面那顆只做保險，發牌那種一秒幾十下的密集聲不會爆掉。 */
+var ctx = null, bus = null, wet = null, send = null, master = null, ready = false, offline = false;
+var noiseBuf = null, pinkBuf = null;
+
+function boot(inject){
+  if(ctx) return ctx;
+  ctx = inject || new AC({latencyHint:"interactive"});
+  offline = !!inject;
+
+  master = ctx.createGain();
+  master.gain.value = PREF.on ? PREF.vol : 0;
+
+  var limit = ctx.createDynamicsCompressor();
+  limit.threshold.value = -1.5; limit.knee.value = 0; limit.ratio.value = 20;
+  limit.attack.value = 0.001;   limit.release.value = 0.05;
+
+  var glue = ctx.createDynamicsCompressor();
+  glue.threshold.value = -17; glue.knee.value = 14; glue.ratio.value = 2.6;
+  glue.attack.value = 0.004;  glue.release.value = 0.19;
+
+  /* 40Hz 以下小喇叭放不出來，留著只會佔掉限幅器的餘裕 */
+  var rumble = ctx.createBiquadFilter();
+  rumble.type = "highpass"; rumble.frequency.value = 38; rumble.Q.value = 0.6;
+
+  bus = ctx.createGain(); bus.gain.value = 1;
+  bus.connect(rumble); rumble.connect(glue); glue.connect(limit);
+  limit.connect(master); master.connect(ctx.destination);
+
+  var verb = ctx.createConvolver();
+  verb.buffer = makeRoom(1.15, 0.52);
+  wet = ctx.createGain(); wet.gain.value = 0.95;
+  send = ctx.createGain(); send.gain.value = 1;
+  send.connect(verb); verb.connect(wet); wet.connect(bus);
+
+  noiseBuf = makeNoise(2.2, false);
+  pinkBuf  = makeNoise(2.2, true);
+  ready = true;
+  return ctx;
+}
+
+/* 白噪音與粉紅噪音各存一份，所有 Foley 都從裡面隨機取一段。
+   紙、布這類材質用粉紅噪音比較像——白噪音的高頻太平，聽起來像嘶聲不像纖維。 */
+function makeNoise(sec, pink){
+  var sr = ctx.sampleRate, n = Math.floor(sec * sr);
+  var b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+  if(!pink){ for(var i=0;i<n;i++) d[i] = Math.random()*2 - 1; return b; }
+  /* Voss-McCartney 的簡化版：幾個一階低通疊起來就有 -3dB/oct */
+  var b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  for(var j=0;j<n;j++){
+    var w = Math.random()*2 - 1;
+    b0 = 0.99886*b0 + w*0.0555179;
+    b1 = 0.99332*b1 + w*0.0750759;
+    b2 = 0.96900*b2 + w*0.1538520;
+    b3 = 0.86650*b3 + w*0.3104856;
+    b4 = 0.55000*b4 + w*0.5329522;
+    b5 = -0.7616*b5 - w*0.0168980;
+    d[j] = (b0+b1+b2+b3+b4+b5+b6 + w*0.5362) * 0.11;
+    b6 = w*0.115926;
+  }
+  return b;
+}
+
+/* 房間：不是音樂廳，是一間鋪了地毯、擺著一張圓桌的小房間。
+   早期反射七下（牆、天花板、桌面），之後才是擴散的尾巴；
+   尾巴一邊衰減一邊變暗——高頻先被布和地毯吃掉，低頻留最久。
+   左右兩聲道用不同的亂數與略微不同的反射時間，聲音才會有寬度。 */
+function makeRoom(sec, rt60){
+  var sr = ctx.sampleRate, n = Math.floor(sec * sr);
+  var buf = ctx.createBuffer(2, n, sr);
+  var tau = rt60 / Math.log(1000);
+  var peak = 0;
+  for(var ch=0; ch<2; ch++){
+    var d = buf.getChannelData(ch), lp = 0;
+    for(var i=0;i<n;i++){
+      var t = i / sr;
+      /* 擴散不是一開始就滿的，前 14ms 慢慢長出來 */
+      var build = t < 0.014 ? (t / 0.014) : 1;
+      var env = Math.exp(-t / tau) * build;
+      var x = (Math.random()*2 - 1) * env;
+      var cut = 8500 * Math.pow(0.075, t / sec);          /* 尾巴越後面越暗 */
+      var a = 1 - Math.exp(-2 * Math.PI * cut / sr);
+      lp += a * (x - lp);
+      d[i] = lp;
+    }
+    var taps = [[0.0061,0.44],[0.0089,-0.36],[0.0134,0.31],[0.0187,-0.25],
+                [0.0248,0.20],[0.0331,-0.16],[0.0417,0.12]];
+    for(var k=0;k<taps.length;k++){
+      var idx = Math.floor((taps[k][0] * (ch ? 1.037 : 1)) * sr);
+      if(idx < n) d[idx] += taps[k][1] * (ch ? -0.92 : 1);
+    }
+    for(var m=0;m<n;m++) if(Math.abs(d[m]) > peak) peak = Math.abs(d[m]);
+  }
+  if(peak > 0){
+    var g = 0.5 / peak;
+    for(var c2=0;c2<2;c2++){
+      var dd = buf.getChannelData(c2);
+      for(var q=0;q<n;q++) dd[q] *= g;
+    }
+  }
+  return buf;
+}
+
+/* ---------------- 解鎖 ----------------
+   瀏覽器規定：沒有使用者動作之前不准出聲。所以整個引擎在第一次
+   點擊／觸控／按鍵之前是睡著的——順帶解決「一進頁面就自己發牌吵一輪」。 */
+var unlocked = false, LASTG = null;
+function unlock(){
+  if(unlocked) return;
+  unlocked = true;
+  boot();
+  if(ctx.state === "suspended") ctx.resume();
+  /* 有些 iOS 版本要真的播過一次才算數 */
+  var s = ctx.createBufferSource();
+  s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+  s.connect(ctx.destination); s.start(0);
+  /* 頁面剛開的那一局，牌是在拿到出聲許可之前就發完的，那一手註定是安靜的。
+     如果這時還停在第一局的叫牌階段，就補一聲很輕的洗牌——
+     牌庫本來就在桌上，荷官順手理一下，房間從這裡醒過來。 */
+  setTimeout(function(){
+    var g = LASTG;
+    if(g && g.ri === 0 && g.phase === "bid" && !g.played && (!g.trick || !g.trick.length))
+      SFX.shuffle(0.05, 0.55);
+  }, 40);
+}
+["pointerdown","touchstart","keydown","mousedown"].forEach(function(ev){
+  document.addEventListener(ev, unlock, {capture:true, passive:true});
+});
+
+function live(){
+  if(!PREF.on || !unlocked || !ready) return false;
+  if(!offline && ctx.state === "suspended") ctx.resume();
+  return true;
+}
+var now = function(){ return ctx.currentTime; };
+var rnd = function(a, b){ return a + Math.random() * (b - a); };
+
+/* 同一個聲音短時間內連發會疊成一坨。每個 key 記上一次的時間，
+   太近就直接丟掉——這是混音台上的 gate，不是省效能。 */
+var lastAt = {};
+function gate(key, ms){
+  var t = ctx.currentTime * 1000;
+  if(lastAt[key] && t - lastAt[key] < ms) return false;
+  lastAt[key] = t;
+  return true;
+}
+
+/* ---------------- 基本單元 ---------------- */
+
+/* 一顆噪音粒子：材質的聲音都由這個疊出來。
+   f0 → f1 是帶通中心的滑動——磨擦、滑動、鬆手的差別幾乎全在這條線上。 */
+function grain(t, o){
+  var src = ctx.createBufferSource();
+  src.buffer = o.pink === false ? noiseBuf : pinkBuf;
+  src.playbackRate.value = o.rate || 1;
+  var off = Math.random() * 1.6;
+
+  var bp = ctx.createBiquadFilter();
+  bp.type = o.type || "bandpass";
+  bp.Q.value = o.q || 1;
+  bp.frequency.setValueAtTime(Math.max(30, o.f0), t);
+  if(o.f1 && o.f1 !== o.f0)
+    bp.frequency.exponentialRampToValueAtTime(Math.max(30, o.f1), t + (o.sweep || o.dur));
+
+  var hp = null;
+  if(o.hp){ hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = o.hp; hp.Q.value = 0.7; }
+  var lpf = null;
+  if(o.lp){ lpf = ctx.createBiquadFilter(); lpf.type = "lowpass"; lpf.frequency.value = o.lp; lpf.Q.value = 0.7; }
+
+  var g = ctx.createGain();
+  var a = o.a === undefined ? 0.002 : o.a;
+  var pk = Math.max(0.00012, o.gain);
+  g.gain.setValueAtTime(0.00012, t);
+  g.gain.exponentialRampToValueAtTime(pk, t + a);
+  if(o.hold) g.gain.setValueAtTime(pk, t + a + o.hold);
+  g.gain.exponentialRampToValueAtTime(0.00012, t + a + (o.hold || 0) + o.dur);
+
+  var head = src, node = src;
+  if(hp){ node.connect(hp); node = hp; }
+  if(lpf){ node.connect(lpf); node = lpf; }
+  node.connect(bp); bp.connect(g);
+  out(g, o.pan, o.verb);
+  src.start(t, off, a + (o.hold || 0) + o.dur + 0.06);
+  src.stop(t + a + (o.hold || 0) + o.dur + 0.08);
+  return head;
+}
+
+/* 桌面被敲到的那一下低頻。牌與骰子都靠它才「落在東西上」而不是浮著。
+   絨布會把它吃掉大半，所以衰減很快、頻率往下滑一點點（桌板在讓） */
+function thump(t, o){
+  var osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(o.f, t);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(24, o.f * (o.bend || 0.72)), t + o.dur);
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(0.00012, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.00012, t + o.dur);
+  osc.connect(g);
+  out(g, o.pan, o.verb === undefined ? 0.05 : o.verb);
+  osc.start(t); osc.stop(t + o.dur + 0.03);
+}
+
+/* 溫暖的琴音：兩個算子的 FM（比例 1:1），調變指數快速衰減——
+   起音有一點「咬」，之後就剩乾淨的正弦。這是電鋼琴的做法，
+   比加法合成的鐘聲更適合這張桌子：不亮、不刺、放得進背景。 */
+function rhodes(t, o){
+  var f = o.f, dur = o.dur || 1.1;
+  var car = ctx.createOscillator(); car.type = "sine"; car.frequency.value = f;
+  var mod = ctx.createOscillator(); mod.type = "sine"; mod.frequency.value = f * (o.ratio || 1);
+  var mg = ctx.createGain();
+  mg.gain.setValueAtTime(f * (o.index || 2.6), t);
+  mg.gain.exponentialRampToValueAtTime(f * 0.02, t + (o.bark || 0.11));
+  mod.connect(mg); mg.connect(car.frequency);
+
+  var lp = ctx.createBiquadFilter();
+  lp.type = "lowpass"; lp.frequency.value = o.lp || 6500; lp.Q.value = 0.6;
+
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(0.00012, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.00012, t + dur);
+
+  car.connect(lp); lp.connect(g);
+  out(g, o.pan, o.verb === undefined ? 0.3 : o.verb);
+  car.start(t); mod.start(t);
+  car.stop(t + dur + 0.05); mod.stop(t + dur + 0.05);
+
+  /* 琴槌敲到的那一點雜訊，量很小，但少了它音就是「憑空出現」的 */
+  if(o.mallet !== false)
+    grain(t, {f0:f * 5.5, f1:f * 3, q:1.4, dur:0.026, gain:o.gain * 0.26, pan:o.pan, verb:0.12, pink:false});
+}
+
+/* 出口：每個聲音自己的定位與殘響送出量。
+   遠處的座位送多一點殘響、乾聲小一點——距離感是這樣來的，不是只有音量。 */
+function out(node, pan, verb){
+  var p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if(p){ p.pan.value = Math.max(-1, Math.min(1, pan || 0)); node.connect(p); node = p; }
+  node.connect(bus);
+  if(verb > 0){
+    var s = ctx.createGain(); s.gain.value = verb;
+    node.connect(s); s.connect(send);
+  }
+}
+
+/* ---------------- 牌 ----------------
+   一張牌落在絨布上，近距離收音會聽到三段：
+     0-3ms   角先碰到，寬頻的一下「喀」
+     3-45ms  牌身彈一下，700-1600Hz 那塊「啪」——認得出是紙牌就靠這段
+     20-90ms 桌板回應的低頻，絨布吃掉大半
+   落在已經有牌的地方會軟一點、低頻多一點（下面那疊在墊著）。 */
+function cardLand(t, o){
+  o = o || {};
+  var g = (o.gain === undefined ? 1 : o.gain) * 0.85;
+  var pan = o.pan || 0, verb = o.verb === undefined ? 0.19 : o.verb;
+  var soft = o.soft || 0;                       /* 0 = 落在桌上，1 = 落在牌堆上 */
+  var k = rnd(0.92, 1.09);                      /* 每一張都不一樣 */
+
+  /* 一、角先碰到：寬頻的一下 */
+  grain(t, {f0:3100*k*(1-soft*0.3), f1:1500*k, q:0.8, a:0.0008, dur:0.021,
+            gain:0.55*g*(1-soft*0.35), pan:pan, verb:verb*0.7, hp:600, pink:false});
+  /* 二、牌身在響：認得出是紙牌全靠這一段，帶要寬（Q 低），不然只剩「咚」跟「嘶」 */
+  grain(t + 0.0015, {f0:1450*k, f1:780*k, q:0.85, a:0.0016, dur:0.055 + soft*0.02,
+            gain:1.15*g, pan:pan, verb:verb});
+  /* 三、「啪」的那一下脆：紙被彈開的高一點的共振 */
+  grain(t + 0.003, {f0:2550*k, f1:1700*k, q:1.9, a:0.0012, dur:0.033,
+            gain:0.5*g*(1-soft*0.3), pan:pan, verb:verb*0.8, pink:false});
+  /* 四、紙的纖維 */
+  grain(t + 0.004, {f0:5600*k, f1:3400*k, q:0.9, a:0.001, dur:0.03,
+            gain:0.14*g*(1-soft*0.5), pan:pan, verb:verb*0.5, pink:false});
+  /* 五、桌板讓了一下。正弦波的能量很集中，一大就把上面四層全蓋掉——
+     真的牌落在鋪絨的桌上，低頻只是「有」，不是主角 */
+  thump(t + 0.002, {f:(126 - soft*22)*k, dur:0.055 + soft*0.03,
+            gain:0.13*g*(1+soft*0.6), pan:pan*0.5, verb:verb*0.4});
+}
+
+/* 一張牌從牌堆頂端被推出去：先是「唰」的摩擦，最後鬆手那一下。
+   帶通從高滑到低，就是紙離開紙的那個下滑音。 */
+function cardSlide(t, o){
+  o = o || {};
+  var g = (o.gain === undefined ? 1 : o.gain), pan = o.pan || 0;
+  var len = o.len || 0.075, k = rnd(0.9, 1.12);
+  grain(t, {f0:3400*k, f1:1250*k, q:0.85, a:0.008, hold:len*0.35, dur:len,
+            gain:0.3*g, pan:pan, verb:0.1, sweep:len*1.1});
+  grain(t, {f0:7200*k, f1:5200*k, q:0.7, a:0.012, dur:len*0.8,
+            gain:0.07*g, pan:pan, verb:0.06, pink:false});
+}
+
+/* 發牌時甩出去的那一張：滑出去 + 在空中 + 落地。 */
+function cardDeal(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain;
+  cardSlide(t, {gain:0.85*g, pan:(o.pan||0)*0.5, len:rnd(0.055, 0.08)});
+  cardLand(t + rnd(0.055, 0.085), {gain:0.72*g, pan:o.pan, verb:0.2, soft:o.soft || 0.35});
+}
+
+/* 牌在空中飛的那段。很輕，但沒有它，牌就是憑空出現在檯面上。 */
+function whoosh(t, o){
+  o = o || {};
+  var d = o.dur || 0.28;
+  grain(t, {f0:520, f1:2100, q:0.55, a:d*0.55, dur:d*0.5,
+            gain:0.075*(o.gain===undefined?1:o.gain), pan:o.pan||0, verb:0.12, sweep:d});
+}
+
+/* 洗牌：三段。
+   一、橋牌式交錯——三四十下牌緣彈開，密度先快後慢
+   二、合攏時的一陣悶響
+   三、在桌上頓齊，兩下。 */
+function riffle(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, span = o.span || 0.34, n = o.n || 34;
+  for(var i=0;i<n;i++){
+    var u = i / (n - 1);
+    /* 密度曲線：中段最密（真的洗牌就是這樣，兩端慢） */
+    var at = t + span * (u - Math.sin(2 * Math.PI * u) / (2 * Math.PI) * 0.55);
+    var amp = (0.5 + 0.5 * Math.sin(Math.PI * u)) * rnd(0.55, 1);
+    grain(at + rnd(-0.004, 0.004), {
+      f0:rnd(2400, 5200), f1:rnd(1200, 2200), q:rnd(1.2, 2.6),
+      a:0.0006, dur:rnd(0.008, 0.018), gain:0.19 * g * amp,
+      pan:rnd(-0.16, 0.16), verb:0.1, hp:900
+    });
+  }
+  /* 合攏 */
+  grain(t + span * 0.98, {f0:1500, f1:600, q:0.9, a:0.006, dur:0.1, gain:0.2*g, pan:0, verb:0.16});
+  thump(t + span * 1.0, {f:104, dur:0.09, gain:0.14*g, pan:0, verb:0.1});
+  /* 頓齊 */
+  cardLand(t + span + 0.13, {gain:0.5*g, soft:0.85, verb:0.2, pan:-0.05});
+  cardLand(t + span + 0.23, {gain:0.42*g, soft:0.9, verb:0.2, pan:0.06});
+}
+
+/* 收墩：一疊牌被拖過絨布。摩擦聲比單張長很多、也低很多，
+   再加一點不規則的起伏（布不是平的）。 */
+function sweep(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, d = o.dur || 0.3;
+  grain(t, {f0:1700, f1:520, q:0.65, a:d*0.3, hold:d*0.2, dur:d*0.7,
+            gain:0.2*g, pan:o.pan||0, verb:0.2, sweep:d});
+  grain(t + 0.02, {f0:340, f1:180, q:0.8, a:d*0.35, dur:d*0.6,
+            gain:0.1*g, pan:(o.pan||0)*0.6, verb:0.16, sweep:d});
+  cardLand(t + d * 0.92, {gain:0.55*g, soft:0.95, pan:o.pan||0, verb:0.24});
+}
+
+/* 一疊牌被放下（收進墩堆、收桌）。比單張重、低頻多、脆的部分少。 */
+function pack(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, pan = o.pan || 0;
+  grain(t, {f0:1250, f1:520, q:1.1, a:0.0016, dur:0.072, gain:0.5*g, pan:pan, verb:0.2});
+  grain(t + 0.006, {f0:2900, f1:1600, q:0.8, a:0.001, dur:0.03, gain:0.13*g, pan:pan, verb:0.12, pink:false});
+  thump(t + 0.002, {f:88, dur:0.12, gain:0.2*g, pan:pan*0.5, verb:0.14, bend:0.6});
+}
+
+/* ---------------- 骰子 ----------------
+   一顆塑膠骰子丟在絨布上：彈幾下，間隔越來越短，最後停住。
+   骰子本身有共振（角、面、內部空腔），所以每一下不是單純的噪音，
+   是三條高 Q 的帶通在響；絨布把它們壓得很短。 */
+function dieRoll(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, pan = o.pan || 0;
+  var verb = o.verb === undefined ? 0.18 : o.verb;
+  var k = rnd(0.93, 1.08);
+  var res = [1180 * k, 2460 * k, 4050 * k];
+  var gap = rnd(0.1, 0.13), at = t, amp = 1;
+  var bounces = 3 + Math.floor(Math.random() * 3);
+  for(var i=0;i<bounces;i++){
+    for(var r=0;r<res.length;r++){
+      grain(at, {
+        f0:res[r] * rnd(0.97, 1.03), q:rnd(5, 9), a:0.0008,
+        dur:(0.052 - r * 0.012) * rnd(0.8, 1.2),
+        gain:(0.66 - r * 0.16) * g * amp, pan:pan + rnd(-0.05, 0.05),
+        verb:verb, hp:500, pink:false
+      });
+    }
+    thump(at + 0.001, {f:132 * k, dur:0.04, gain:0.12 * g * amp, pan:pan*0.5, verb:verb*0.5});
+    at += gap; gap *= rnd(0.6, 0.74); amp *= rnd(0.55, 0.72);
+  }
+  /* 停住之前在布上蹭的那一小下 */
+  grain(at, {f0:2200, f1:900, q:1.2, a:0.004, dur:0.05, gain:0.08*g, pan:pan, verb:verb});
+}
+
+/* ---------------- 音階 ----------------
+   全部落在 F 大調九和弦的世界裡：暖、鬆、不宣告勝負，
+   像有人在隔壁房間彈了一下。 */
+function nf(semis){ return 440 * Math.pow(2, semis / 12); }
+var N = {
+  F2:nf(-28), Bb2:nf(-23), C3:nf(-21), D3:nf(-19), F3:nf(-16), G3:nf(-14),
+  A3:nf(-12), C4:nf(-9), D4:nf(-7), E4:nf(-5), F4:nf(-4), G4:nf(-2),
+  A4:nf(0), C5:nf(3), D5:nf(5), E5:nf(7), F5:nf(8), A5:nf(12), C6:nf(15)
+};
+
+/* ---------------- 事件 ---------------- */
+var SFX = {};
+
+/* 洗牌。發生在上一局打完到下一局開始的那段空檔——
+   畫面上那時什麼都沒動，正是荷官收牌、洗牌的時間。
+   開局第一次沒有空檔可用，就墊在發牌前面。 */
+SFX.shuffle = function(delay, gain){
+  if(!live()) return 0;
+  riffle(now() + (delay || 0.02), {gain:gain === undefined ? 0.9 : gain});
+  return 0.62;
+};
+
+/* 一張一張發。count 是這一局實際會發出去的張數，span 是視覺上發完要多久，
+   pre 是幾秒之後才開始（立體版換局時牌要先飛回牌庫，發牌是等它們回去才開始的）。
+   聲音跟著畫面走：平面只演我自己那幾張，立體繞整桌一圈，兩邊時間不一樣。 */
+SFX.deal = function(count, span, pre){
+  if(!live()) return 0;
+  var t0 = now() + 0.02 + (pre || 0);
+  var n = Math.max(1, Math.min(72, count));
+  var step = span / Math.max(1, n);
+  for(var i=0;i<n;i++){
+    cardDeal(t0 + i * step + rnd(-0.008, 0.008), {
+      gain:0.5 * (1 - Math.min(0.4, n / 220)), pan:rnd(-0.34, 0.34),
+      soft:i < n / 2 ? 0.2 : 0.5
+    });
+  }
+  return (pre || 0) + span;      /* 發完是什麼時候（秒） */
+};
+
+/* 換局時桌上的牌飛回牌庫（只有立體版演得出來）：一陣拖過絨布的聲音，
+   末尾是整副牌頓在牌庫上。 */
+SFX.gather = function(count, span){
+  if(!live()) return 0;
+  var t = now() + 0.02;
+  sweep(t, {dur:Math.max(0.18, span * 0.7), gain:0.6, pan:0});
+  var n = Math.max(1, Math.min(40, count)), step = span / n;
+  for(var i=0;i<n;i++)
+    cardLand(t + i * step + rnd(-0.01, 0.01), {gain:0.18, soft:0.9,
+             pan:rnd(-0.25, 0.25), verb:0.22});
+  pack(t + span, {gain:0.5, pan:0});
+  return span;
+};
+
+/* 翻王牌：抬起來、在半空翻正、放回牌庫頂端。 */
+SFX.flip = function(delay){
+  if(!live()) return;
+  var t = now() + (delay || 0);
+  cardSlide(t, {gain:0.55, len:0.06, pan:0.1});
+  grain(t + 0.16, {f0:2600, f1:4200, q:0.6, a:0.09, dur:0.08, gain:0.075, pan:0.1, verb:0.18, sweep:0.2});
+  cardLand(t + 0.42, {gain:0.72, soft:0.6, pan:0.1, verb:0.24});
+  /* 王牌定了，桌子換色——給一顆很輕的低音當註腳 */
+  rhodes(t + 0.44, {f:N.F3, dur:1.2, gain:0.045, pan:0, verb:0.45, index:1.9, lp:2600});
+};
+
+/* 有人放骰子 */
+SFX.bid = function(pan){ if(live()) dieRoll(now() + 0.01, {pan:pan || 0, gain:0.85}); };
+
+/* 出牌：飛過去，然後落在檯面上。fly 是飛行時間（毫秒），跟畫面同一個數字。 */
+SFX.play = function(o){
+  if(!live()) return;
+  o = o || {};
+  var t = now() + 0.01, fly = (o.fly || 340) / 1000;
+  whoosh(t, {dur:fly, gain:o.mine ? 1 : 0.7, pan:(o.pan || 0) * 0.7});
+  if(o.mine) cardSlide(t, {gain:0.5, len:0.05, pan:0});       /* 從手上抽出來 */
+  cardLand(t + fly * 0.93, {
+    gain:o.mine ? 0.95 : 0.8 * (1 - 0.22 * (o.far || 0)),
+    pan:o.pan || 0, soft:Math.min(0.7, (o.stack || 0) * 0.2),
+    verb:0.16 + 0.12 * (o.far || 0)
+  });
+};
+
+/* 這一墩定了：贏的那張往贏家推出去一小段 */
+SFX.push = function(pan){
+  if(!live()) return;
+  var t = now() + 0.01;
+  grain(t, {f0:1500, f1:700, q:0.8, a:0.02, dur:0.09, gain:0.46, pan:pan||0, verb:0.22, sweep:0.12});
+  thump(t + 0.03, {f:112, dur:0.07, gain:0.07, pan:(pan||0)*0.5, verb:0.1});
+};
+
+/* 收墩：整疊拖向贏家；是我贏的就多一顆暖音 */
+SFX.collect = function(o){
+  if(!live()) return;
+  o = o || {};
+  var t = now() + 0.01, d = (o.dur || 300) / 1000;
+  sweep(t, {dur:d, gain:0.9, pan:(o.pan || 0) * 0.8});
+  if(o.mine){
+    pack(t + d + 0.04, {gain:0.7, pan:o.pan || 0.5});
+    rhodes(t + d + 0.05, {f:N.C5, dur:0.85, gain:0.075, pan:0.12, verb:0.4, index:2.2});
+    rhodes(t + d + 0.055, {f:N.F4, dur:1.0, gain:0.06, pan:-0.06, verb:0.4, index:2.0, mallet:false});
+  }
+};
+
+/* 輪到你了。連線的時候這顆最重要——人不會一直盯著螢幕。
+   兩個音往上走五度，音量壓得很低，殘響給多，像從房間另一頭傳來。
+   音高刻意放在 A4／E5：手機和筆電的喇叭在 300Hz 以下幾乎不出聲，
+   原本寫在 A3／E4 的時候，在桌機上很好聽，在手機上等於沒有這顆。 */
+SFX.turn = function(){
+  if(!live() || !gate("turn", 1200)) return;
+  var t = now() + 0.01;
+  rhodes(t,        {f:N.A4, dur:0.9,  gain:0.062, pan:-0.1, verb:0.5, index:2.0, lp:4200});
+  rhodes(t + 0.1,  {f:N.E5, dur:1.15, gain:0.07,  pan:0.1,  verb:0.55, index:2.2, lp:4800});
+  rhodes(t,        {f:N.A3, dur:1.0,  gain:0.05,  pan:0,    verb:0.45, index:1.6, lp:2200, mallet:false});
+};
+
+/* 一局結束：叫中就是一串上行的九和弦，沒叫中就往下掉一個小三度。
+   沒叫中的那顆不是「錯誤音」——是低了一點、暗了一點，就這樣。 */
+SFX.round = function(hit){
+  if(!live()) return;
+  var t = now() + 0.02;
+  sweep(t, {dur:0.34, gain:0.5, pan:0});
+  if(hit){
+    var arp = [[N.F4, -0.18], [N.A4, 0.0], [N.C5, 0.14], [N.E5, -0.08]];
+    for(var i=0;i<arp.length;i++)
+      rhodes(t + 0.3 + i * 0.075, {
+        f:arp[i][0], dur:1.4 - i * 0.12, gain:0.115 - i * 0.012,
+        pan:arp[i][1], verb:0.42, index:2.4
+      });
+    rhodes(t + 0.3, {f:N.F2, dur:1.7, gain:0.07, pan:0, verb:0.3, index:1.2, lp:900, mallet:false});
+  }else{
+    rhodes(t + 0.3,  {f:N.F4, dur:1.0, gain:0.08,  pan:-0.06, verb:0.4,  index:1.7, lp:2200});
+    rhodes(t + 0.39, {f:N.D4, dur:1.5, gain:0.075, pan:0.06,  verb:0.42, index:1.5, lp:1900});
+    rhodes(t + 0.39, {f:N.D3, dur:1.6, gain:0.055, pan:0,     verb:0.35, index:1.2, lp:900, mallet:false});
+  }
+};
+
+/* 收桌 */
+SFX.over = function(win){
+  if(!live()) return;
+  var t = now() + 0.03;
+  sweep(t, {dur:0.42, gain:0.85});
+  pack(t + 0.46, {gain:0.95, pan:-0.1});
+  var base = t + 0.6;
+  var chord = win ? [[N.F3,0,0],[N.C4,0.085,-0.14],[N.A4,0.17,0.12],[N.E5,0.255,-0.08],[N.A5,0.34,0.16],[N.C6,0.43,0]]
+                  : [[N.F3,0,0],[N.C4,0.09,-0.12],[N.G4,0.18,0.1],[N.D5,0.27,-0.06]];
+  for(var i=0;i<chord.length;i++)
+    rhodes(base + chord[i][1], {
+      f:chord[i][0], dur:2.6 - i * 0.18, gain:(win ? 0.125 : 0.1) - i * 0.011,
+      pan:chord[i][2], verb:0.55, index:2.3
+    });
+  rhodes(base, {f:N.Bb2, dur:3.0, gain:0.075, pan:0, verb:0.35, index:1.1, lp:800, mallet:false});
+};
+
+/* 有人入座／加入房間 */
+SFX.join = function(){
+  if(!live() || !gate("join", 400)) return;
+  var t = now() + 0.01;
+  rhodes(t,       {f:N.C4, dur:0.7, gain:0.06, pan:-0.08, verb:0.45, index:2.0, lp:3600});
+  rhodes(t + 0.09,{f:N.G4, dur:0.9, gain:0.065, pan:0.08, verb:0.5, index:2.2, lp:4000});
+};
+
+/* 不能出的牌、伺服器回絕：一顆悶掉的低音，不刺耳 */
+SFX.no = function(){
+  if(!live() || !gate("no", 260)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:700, f1:380, q:1.4, a:0.001, dur:0.05, gain:0.5, pan:0, verb:0.12, pink:false});
+  /* 悶歸悶，還是得在手機喇叭上聽得到：中頻補一小顆短的，不然這顆等於不存在 */
+  grain(t, {f0:1250, f1:820, q:2.2, a:0.001, dur:0.028, gain:0.34, pan:0, verb:0.1, pink:false});
+  rhodes(t, {f:N.F3, dur:0.4, gain:0.11, pan:0, verb:0.2, index:1.1, lp:760, mallet:false});
+  rhodes(t + 0.06, {f:N.F4, dur:0.3, gain:0.055, pan:0, verb:0.18, index:1.0, lp:1100, mallet:false});
+};
+
+/* ---------------- 介面 ----------------
+   桌沿是胡桃木，按鈕的聲音就照木頭做：短、低、乾。 */
+SFX.tap = function(){
+  if(!live() || !gate("tap", 45)) return;
+  var t = now() + 0.005, k = rnd(0.94, 1.07);
+  grain(t, {f0:1150*k, f1:680*k, q:1.6, a:0.001, dur:0.028, gain:0.85, pan:0, verb:0.12, pink:false});
+  grain(t, {f0:2400*k, f1:1600*k, q:2.4, a:0.0008, dur:0.014, gain:0.3, pan:0, verb:0.1, pink:false});
+  thump(t, {f:196*k, dur:0.034, gain:0.13, pan:0, verb:0.08});
+};
+SFX.open = function(){
+  if(!live() || !gate("ov", 120)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:430, f1:2400, q:0.6, a:0.11, dur:0.1, gain:0.26, pan:0, verb:0.28, sweep:0.2});
+  rhodes(t + 0.05, {f:N.C5, dur:0.5, gain:0.06, pan:0, verb:0.4, index:1.4, lp:3000, mallet:false});
+};
+SFX.close = function(){
+  if(!live() || !gate("ov", 120)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:2000, f1:430, q:0.6, a:0.02, dur:0.15, gain:0.19, pan:0, verb:0.22, sweep:0.17, pink:false});
+  thump(t + 0.1, {f:150, dur:0.08, gain:0.055, pan:0, verb:0.1});
+};
+/* 平面／立體：整個房間換一次 */
+SFX.toggle = function(){
+  if(!live() || !gate("tg", 200)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:240, f1:1500, q:0.5, a:0.13, dur:0.22, gain:0.1, pan:0, verb:0.35, sweep:0.28});
+  thump(t + 0.02, {f:62, dur:0.4, gain:0.11, pan:0, verb:0.2, bend:1.45});
+  rhodes(t + 0.14, {f:N.F4, dur:0.8, gain:0.045, pan:0, verb:0.45, index:2.0, lp:3600, mallet:false});
+};
+
+/* ---------------- 開關 ---------------- */
+SFX.enabled = function(){ return PREF.on; };
+SFX.set = function(on){
+  PREF.on = !!on; savePref();
+  if(!ctx){ if(PREF.on) unlock(); return; }
+  unlock();
+  master.gain.cancelScheduledValues(ctx.currentTime);
+  master.gain.setTargetAtTime(PREF.on ? PREF.vol : 0, ctx.currentTime, 0.02);
+  if(PREF.on) setTimeout(function(){ SFX.tap(); }, 40);
+};
+SFX.volume = function(v){
+  if(v === undefined) return PREF.vol;
+  PREF.vol = Math.max(0, Math.min(1, v)); savePref();
+  if(ctx && PREF.on) master.gain.setTargetAtTime(PREF.vol, ctx.currentTime, 0.02);
+};
+
+/* ---------------- 牌局狀態差分 ----------------
+   render() 每畫一次就把 G 遞進來一次（連線模式每 420ms 一次）。
+   這裡跟上一次比對，只有「真的變了」才發聲。
+   照的是引擎的狀態，不是 DOM，所以平面與立體共用這一份。 */
+var M = {ri:-1, phase:"", played:-1, tn:-1, flip:-1, bids:{}, log:0, myTurn:false, n:0, seats:"",
+         shuffleAt:0};
+
+/* 座位在耳朵裡的位置：自己在正前方（不偏），對面也在正中間但遠。
+   越遠的乾聲越小、殘響越多——這是距離，不是音量。 */
+function seatAudio(i, me, n){
+  if(i < 0 || me < 0 || !n) return {pan:0, far:0.4};
+  var k = ((i - me) % n + n) % n;
+  var a = k * Math.PI * 2 / n;
+  return {pan:Math.sin(a) * 0.6, far:(1 - Math.cos(a)) / 2};
+}
+
+SFX.frame = function(G, me, best, o){
+  if(!G) return;
+  LASTG = G;
+  o = o || {};
+  /* 這裡從頁面一載入就開始跑，不等音訊解鎖——每一顆聲音自己會檢查 live()。
+     這樣做的理由：使用者第一次點擊之前，牌局已經發過牌、可能也叫過幾輪了。
+     如果等到解鎖才開始比對，第一次點擊會突然補放一整串早就過去的事。
+     狀態一路跟著走、聲音才等許可，接上的那一刻就只會聽到「接下來」發生的事。 */
+  var n = G.cfg ? G.cfg.n : 0;
+  var is3d = document.body.classList.contains("is3d");
+  var sp = o.speed || 1200;
+
+  /* 換人數／重開一桌：把記憶清掉，別把新桌子的第一手當成舊桌子的變化 */
+  if(n !== M.n){ M.n = n; M.ri = -1; M.phase = ""; M.played = -1; M.tn = -1; M.flip = -1; M.bids = {}; M.log = G.log ? G.log.length : 0; }
+
+  /* ---- 新的一局：洗牌 + 發牌 + 翻王牌 ---- */
+  if(G.ri !== M.ri){
+    var firstDeal = M.ri < 0;
+    M.ri = G.ri; M.bids = {}; M.played = -1; M.tn = -1;
+    /* 上一局的洗牌還沒放到就換局了（有人按「馬上開始」）：取消它，別蓋到新局的發牌 */
+    if(M.shuffleAt){ clearTimeout(M.shuffleAt); M.shuffleAt = 0; }
+    if(G.ri >= 0 && G.phase !== "lobby" && G.hs > 0){
+      /* 發牌要多久：跟著畫面。平面只演我手上那幾張，立體繞整桌一圈；
+         立體版換局時桌上的牌要先飛回牌庫，發牌是等它們回去才開始的 */
+      var cards, span, pre = 0;
+      if(is3d){
+        var step = Math.min(95, Math.max(38, sp * 0.11)) / 1000;
+        var back = G.ri > 0 && G.ladder ? n * (G.ladder[G.ri - 1] || 0) : 0;
+        if(back){ pre = 0.42 + back * 0.014; SFX.gather(back, pre); }
+        cards = n * G.hs; span = Math.max(0.2, (cards - 1) * step);
+      }else{
+        cards = G.hs; span = Math.max(0.12, (G.hs - 1) * 0.034);
+      }
+      /* 第一局沒有「上一局的空檔」可以洗牌，只好墊在發牌前面 */
+      if(firstDeal || G.ri === 0) pre += SFX.shuffle(0.02);
+      var after = SFX.deal(cards, span, pre);
+      if(G.trumpCard){
+        M.flip = G.ri;
+        SFX.flip(is3d ? after + 0.42 : Math.max(0.05, pre));
+      }
+    }
+  }
+  /* 王牌是後來才出現的（連線模式先收到 lobby 再收到牌） */
+  if(G.trumpCard && M.flip !== G.ri && G.ri >= 0){ M.flip = G.ri; SFX.flip(0.05); }
+
+  /* ---- 骰子 ---- */
+  if(G.bids) for(var i=0;i<n;i++){
+    var v = G.bids[i];
+    if(v === null || v === undefined) continue;
+    if(M.bids[i] === v) continue;
+    M.bids[i] = v;
+    /* 最後一個人叫完，phase 同一輪就變成 play 了——不能拿「還在叫牌階段」當條件，
+       否則整局只有最後那顆骰子是無聲的 */
+    SFX.bid(seatAudio(i, me, n).pan);
+  }
+
+  /* ---- 出牌 ---- */
+  var tn = G.trick ? G.trick.length : 0;
+  if(tn > M.tn && tn > 0 && M.tn >= 0){
+    for(var j = Math.max(0, M.tn); j < tn; j++){
+      var t = G.trick[j], sa = seatAudio(t.p, me, n);
+      SFX.play({
+        mine:t.p === me, pan:sa.pan, far:sa.far, stack:j,
+        fly:t.p === me ? Math.min(460, Math.max(240, sp * 0.62))
+                       : (is3d ? Math.min(480, Math.max(230, sp * 0.62)) : 340)
+      });
+    }
+  }
+  if(tn !== M.tn) M.tn = tn;
+
+  /* ---- 一墩打完：定格、收墩 ---- */
+  if(G.phase !== M.phase){
+    var was = M.phase;
+    M.phase = G.phase;
+    if(G.phase === "trickend" && best >= 0 && G.trick && G.trick[best]){
+      var w = G.trick[best].p, b = o.beats || {land:400, push:0, hold:900, sweep:260};
+      var wa = seatAudio(w, me, n);
+      setTimeout(function(){ SFX.push(wa.pan); }, b.land);
+      setTimeout(function(){ SFX.collect({mine:w === me, pan:wa.pan, dur:b.sweep}); },
+                 b.land + b.push + b.hold);
+      M.tn = -1;                                  /* 下一墩從頭數 */
+    }
+    if(G.phase === "roundend" && G.log && G.log.length){
+      var row = G.log[G.log.length - 1];
+      var cell = me >= 0 && row.cells ? row.cells[me] : null;
+      var lag = (o.beats ? o.beats.sweep : 460) + 120;
+      setTimeout(function(){ SFX.round(cell ? cell.hit : true); }, lag);
+      /* 這一局的分算完了，桌上安靜下來——荷官在收牌、洗牌，下一局才開始。
+         這段空檔（roundGap，至少 2.2 秒）本來完全沒有聲音 */
+      if(G.ri + 1 < G.ladder.length)
+        M.shuffleAt = setTimeout(function(){ M.shuffleAt = 0; SFX.shuffle(0.02, 0.8); }, lag + 1000);
+      M.log = G.log.length;
+    }
+    if(G.phase === "over") setTimeout(function(){
+      var top = Math.max.apply(null, G.score), mine = me >= 0 ? G.score[me] : -Infinity;
+      SFX.over(mine === top);
+    }, 320);
+    if(was === "lobby" && G.phase === "bid") { /* 開局：發牌聲已經在上面發過了 */ }
+  }
+
+  /* ---- 輪到我 ---- */
+  var mine = me >= 0 && G.turn === me && (G.phase === "bid" || G.phase === "play");
+  if(mine && !M.myTurn) SFX.turn();
+  M.myTurn = mine;
+
+  /* ---- 有人入座 ---- */
+  if(G.seats){
+    var key = G.seats.map(function(s){ return s.cid || ""; }).join("|");
+    if(M.seats && key !== M.seats && G.phase === "lobby") SFX.join();
+    M.seats = key;
+  }
+};
+
+/* ---------------- 介面的聲音 ----------------
+   用事件委派，不去改任何一個 onclick——那些 handler 是別人的地盤。 */
+var OPENERS = {btnRules:1, btnRoom:1, btnSetup:1, btnFinal:1, btnLobby:1, endAgain:1, setupStart:1};
+var CLOSERS = {rulesClose:1, setupCancel:1, endClose:1, scoreClose:1};
+document.addEventListener("click", function(e){
+  var el = e.target.closest ? e.target.closest("button, .opt, .bidbtn, [data-net]") : null;
+  if(!el) return;
+  if(el.closest("[data-nosfx]")) return;      /* 想自己管聲音的地方掛這個屬性 */
+  if(el.id && OPENERS[el.id]) return SFX.open();
+  if(el.id && CLOSERS[el.id]) return SFX.close();
+  if(el.id === "btnSfx") return;                             /* 開關自己會出聲 */
+  if(el.id === "btnScore")
+    return setTimeout(function(){
+      document.body.classList.contains("score-open") ? SFX.open() : SFX.close();
+    }, 0);
+  if(el.closest("#dim")) return SFX.toggle();
+  if(el.dataset && el.dataset.net) return el.dataset.net === "close" ? SFX.close() : SFX.tap();
+  if(el.hasAttribute && el.hasAttribute("data-card")){
+    if(el.disabled) return SFX.no();
+    return;                                                   /* 出牌的聲音由 frame() 負責 */
+  }
+  SFX.tap();
+}, true);
+
+/* ---------------- 換成錄音 ----------------
+   哪天要把某幾顆換成真的錄音（例如買了商用音效庫），在頁面載入後呼叫：
+     SFX.load({ play:["sfx/card_a.wav","sfx/card_b.wav"], bid:["sfx/die.wav"] })
+   給幾個檔就會輪流用（round-robin），避免同一個檔連放聽起來很假。
+   有錄音的那顆就走錄音，其餘照舊合成，不用一次換完。 */
+var SAMP = {};
+SFX.load = function(map){
+  boot();
+  Object.keys(map).forEach(function(k){
+    var urls = [].concat(map[k]);
+    Promise.all(urls.map(function(u){
+      return fetch(u).then(function(r){ return r.arrayBuffer(); })
+                     .then(function(a){ return ctx.decodeAudioData(a); });
+    })).then(function(bufs){
+      SAMP[k] = {bufs:bufs, i:0};
+      var orig = SFX[k];
+      SFX[k] = function(o){
+        if(!live()) return;
+        o = o || {};
+        var s = SAMP[k];
+        var src = ctx.createBufferSource();
+        src.buffer = s.bufs[s.i++ % s.bufs.length];
+        src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.06;   /* 每次一點點不一樣 */
+        var g = ctx.createGain();
+        g.gain.value = (o.gain === undefined ? 1 : o.gain) * 0.9;
+        src.connect(g);
+        out(g, o.pan || 0, o.verb === undefined ? 0.12 : o.verb);
+        src.start(now() + 0.005);
+      };
+      SFX[k].synth = orig;
+    }).catch(function(){});
+  });
+};
+
+/* 把某一顆離線算成一段音訊。用途有兩個：
+     · 開發時量它到底長什麼樣（峰值、時值、頻譜重心）
+     · 想把合成的結果導成 wav 交給別人接手，也是從這裡出去
+   SFX.bounce("play", {mine:true}, 1.2).then(buf => ...) */
+SFX.bounce = function(name, arg, sec){
+  var OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if(!OC || typeof SFX[name] !== "function") return Promise.reject(new Error("no " + name));
+  var keep = [ctx, bus, wet, send, master, ready, noiseBuf, pinkBuf, unlocked, offline, PREF.on];
+  ctx = null; ready = false; unlocked = true; PREF.on = true; lastAt = {};
+  var oc = new OC(2, Math.ceil((sec || 2) * 44100), 44100);
+  boot(oc);
+  master.gain.value = 0.8;
+  try{ (SFX[name].synth || SFX[name]).apply(null, [].concat(arg === undefined ? [] : arg)); }catch(e){}
+  return oc.startRendering().then(function(b){
+    ctx = keep[0]; bus = keep[1]; wet = keep[2]; send = keep[3]; master = keep[4];
+    ready = keep[5]; noiseBuf = keep[6]; pinkBuf = keep[7]; unlocked = keep[8];
+    offline = keep[9]; PREF.on = keep[10]; lastAt = {};
+    return b;
+  });
+};
+
+/* 頂列那顆開關。按鈕的行為歸這一層自己管，
+   不去動 classic script 裡那一片 onclick 綁定。 */
+(function(){
+  var b = document.getElementById("btnSfx");
+  if(!b) return;
+  var paint = function(){
+    b.setAttribute("aria-pressed", PREF.on ? "true" : "false");
+    b.setAttribute("aria-label", PREF.on ? "音效開著，點一下關掉" : "音效關著，點一下打開");
+  };
+  paint();
+  b.addEventListener("click", function(){ SFX.set(!PREF.on); paint(); });
+})();
+
+/* console 裡想單獨試某一顆：SFX.demo("round", true) */
+SFX.demo = function(name, a){ unlock(); if(typeof SFX[name] === "function") SFX[name](a); };
+
+window.SFX = SFX;
+})();
+</script>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= 節奏：想調就調這裡 ================= */
+/* 這一區是給人改的，單位全部是毫秒。改完存檔、重新整理就生效。
+   懶得改檔也行：
+     · 網址加 ?hold=4000 → 三個速度檔的定格都變 4 秒；?pace=1400 → 基準節奏
+     · 開 console 直接改，例如 TUNE.trickHold.slow = 5000，下一墩就照新的走，
+       不用重新整理。調到滿意再把數字寫回這裡。 */
+const TUNE = {
+  /* 一墩打完分四段：最後一張牌落定 → 贏的那張推出去 → 完全定格 → 收墩飛向贏家 */
+  trickHold: {slow:2600, mid:1400, fast:700},   /* 定格多久。三檔各一個，最常動的就是這個 */
+  trickPush: 300,                               /* 推出去的那一下花多久 */
+  trickSweep: 460,                              /* 收墩飛走花多久 */
+
+  /* 一局打完到下一局自動開始之間的停頓 */
+  roundGap: 2200,
+
+  /* 慢／中／快三顆按鈕的基準節奏，越大越慢。
+     叫牌、出牌、發牌、牌飛的速度全都跟著它走——整場覺得太快就把 slow 開大 */
+  speeds: {slow:900, mid:520, fast:200}
+};
+window.TUNE = TUNE;                             /* 讓 console 改得到 */
+try{
+  const q = new URLSearchParams(location.search);
+  const hold = +q.get("hold"), pace = +q.get("pace");
+  if(hold > 0) for(const k in TUNE.trickHold) TUNE.trickHold[k] = hold;
+  if(pace > 0) for(const k in TUNE.speeds) TUNE.speeds[k] = pace;
+}catch(e){}
 
 /* ================= 牌 ================= */
 const SUITS = [
@@ -1047,7 +1964,7 @@ const MY = {
   name:(function(){ try{ return localStorage.getItem("ud.name") || ""; }catch(e){ return ""; } })()
 };
 const NET = {db:null, state:"pending", code:null, unsubGame:null, unsubPlayers:null, players:[], beat:null, err:""};
-let G = null, MODE = "solo", SPEED = 520, applying = false, actSeq = 0;
+let G = null, MODE = "solo", SPEED_KEY = "mid", SPEED = TUNE.speeds.mid, applying = false, actSeq = 0;
 
 /* 一次性動畫的記憶：只在「真的發生了」的那一次補 class */
 const SEEN = {round:-1, phase:"", bids:{}, keys:{}, scores:[], flip:-1, won:0};
@@ -1055,7 +1972,22 @@ const SEEN = {round:-1, phase:"", bids:{}, keys:{}, scores:[], flip:-1, won:0};
 /* 我剛按下的那張牌在畫面上的位置——出牌動畫要從那裡起飛 */
 let PLAY_FROM = null;
 /* 一局打完到下一局自動開始之間的停頓 */
-const roundGap = () => Math.max(2200, SPEED * 4);
+const roundGap = () => Math.max(TUNE.roundGap, SPEED * 4);
+/* 一墩打完的四段節奏。2D 與 3D 共用這一份，改 TUNE 兩邊一起變 */
+function trickBeats(){
+  const hold = TUNE.trickHold[SPEED_KEY];
+  return {
+    land: Math.max(380, Math.round(SPEED * .7)),                  /* 等最後一張牌落定 */
+    push: Math.max(0, TUNE.trickPush),                            /* 贏的那張推出去 */
+    hold: Math.max(0, hold === undefined ? TUNE.trickHold.mid : hold),   /* 完全不動 */
+    sweep: Math.max(60, TUNE.trickSweep)                          /* 收墩飛向贏家 */
+  };
+}
+/* 一墩打完到下一墩開始之間的總停頓 */
+const trickGap = () => {
+  const b = trickBeats();
+  return b.land + b.push + b.hold + b.sweep + 60;
+};
 
 const mySeat = () => {
   if(!G) return -1;
@@ -1107,7 +2039,7 @@ setInterval(function(){
     applyBid(G, G.turn, aiBid(G, G.turn)); changed = true;
   }else if(G.phase === "play" && seatPlayable(G.turn) && now - G.at > d*.8){
     applyPlay(G, G.turn, aiCard(G, G.turn).id); changed = true;
-  }else if(G.phase === "trickend" && now - G.at > d*1.7){
+  }else if(G.phase === "trickend" && now - G.at > trickGap()){
     resolveTrick(G); changed = true;
   }else if(G.phase === "roundend" && now - G.at > roundGap()){
     nextRound(); return;
@@ -1492,7 +2424,7 @@ function render(){
       (G.phase === "lobby" ? "尚未開始" : G.phase === "bid" ? "等所有人放好骰子" : "等待出牌") + '</span>');
   /* 收墩動畫的 class 掛在容器上，只換 innerHTML 不會清掉它——不在收墩階段就一定要拿掉，
      否則之後每張出的牌一出現就被套上「飛走」動畫，看起來像瞬間消失 */
-  if(G.phase !== "trickend") $("trick").classList.remove("is-collecting");
+  if(G.phase !== "trickend") $("trick").classList.remove("is-collecting", "is-won");
 
   renderStatus(me);
   const handChanged = renderHand(me);
@@ -1514,8 +2446,13 @@ function render(){
     if(G.phase === "trickend") scheduleCollect();
     if(was === "roundend" || G.phase === "roundend") tallyScores();
     if(G.phase === "over") showFinal();
-  }
+  /* 定格中又重畫了：牌是剛換上去的 DOM，身上的 --px/--py 沒了，重新量一次補回去。
+     連線模式每 420ms 敲一次伺服器，敲一次就重畫一次，不補的話會看到那張牌跳一下 */
+  }else if(G.phase === "trickend" && $("trick").classList.contains("is-won")) pushWinner();
   SEEN.scores = G.score.slice();
+  /* 音效層：把當下的牌局狀態遞過去，它自己跟上一次比對，差在哪就發什麼聲。
+     載入失敗或使用者關掉就什麼都不會發生。 */
+  if(window.SFX) SFX.frame(G, me, bi, {speed:SPEED, beats:trickBeats()});
 }
 
 /* 我贏到的墩：背朝上疊在右手邊，一墩一疊 */
@@ -1614,25 +2551,66 @@ function tossCards(){
     el.classList.add("is-new");
   });
 }
-/* 收墩：檯面上的牌先聚成一疊，整疊再飛向贏家——是我贏的就飛進右手邊的墩堆 */
+/* 定格：贏的那張往贏家的座位方向推出去、其餘的暗下來，停在那裡讓大家看清楚是誰贏的。
+   推了多遠記在 PUSH_BY，收墩量位移的時候要把這一段扣回來。 */
+const PUSH_BY = {x:0, y:0};
+function pushWinner(){
+  const trick = $("trick");
+  if(!trick || !G.trick.length) return;
+  if(trick.classList.contains("is-collecting")) return;    /* 已經在收了，別再量 */
+  /* 飛進場的動畫是 fill:both，不拿掉的話它會一直把 transform 釘在原位 */
+  trick.querySelectorAll(".play").forEach(function(p){
+    p.classList.remove("is-new", "from-hand");
+  });
+  const el = trick.querySelector(".play.is-taking");
+  const seat = document.querySelector('.seat[data-seat="' + G.trick[trickBest(G)].p + '"]');
+  PUSH_BY.x = 0; PUSH_BY.y = 0;
+  if(el && seat){
+    const a = seat.getBoundingClientRect(), b = el.getBoundingClientRect();
+    const dx = a.left + a.width/2 - b.left - b.width/2;
+    const dy = a.top + a.height/2 - b.top - b.height/2;
+    /* 推出去一小段就好，長度跟著牌的高度走：窄螢幕的小牌才不會推到蓋住座位那一行 */
+    const len = Math.hypot(dx, dy) || 1;
+    const out = Math.min(len * .22, Math.max(12, Math.round(b.height * .18)));
+    PUSH_BY.x = Math.round(dx / len * out);
+    PUSH_BY.y = Math.round(dy / len * out);
+    el.style.setProperty("--px", PUSH_BY.x + "px");
+    el.style.setProperty("--py", PUSH_BY.y + "px");
+  }
+  trick.classList.add("is-won");
+}
+/* 定格夠久了才收墩——檯面上的牌先聚成一疊，整疊再飛向贏家，是我贏的就飛進右手邊的墩堆 */
 function scheduleCollect(){
-  const total = Math.max(320, SPEED*1.7 - 60);
-  const dur = Math.min(760, Math.max(300, Math.round(total * .72)));
-  const wait = Math.max(80, total - dur);
+  const b = trickBeats();
+  const dur = b.sweep;                         /* 收墩飛多久 */
+  const land = b.land;                         /* 等最後一張牌落定 */
+  const wait = land + b.push + b.hold;         /* 定格到什麼時候才開始收 */
   const at = G.at;
+  const still = function(){
+    if(!G || G.phase !== "trickend" || G.at !== at || !G.trick.length) return null;
+    const el = $("trick");
+    return el && el.querySelector(".play") ? el : null;
+  };
+
+  /* 一、贏的那張往贏家的方向推出去，然後整桌定格 */
+  setTimeout(function(){ if(still()) pushWinner(); }, land);
+
+  /* 二、時間到才收墩 */
   setTimeout(function(){
-    if(!G || G.phase !== "trickend" || G.at !== at) return;
-    const trick = $("trick");
-    if(!trick || !G.trick.length) return;
+    const trick = still();
+    if(!trick) return;
     const w = G.trick[trickBest(G)].p;
     const pile = $("tricks").querySelector(".pile");
     const target = (w === mySeat() && pile && !$("tricks").hidden)
       ? pile : document.querySelector('.seat[data-seat="' + w + '"]');
-    /* 疊起來的位置：這一墩所有牌面的正中間 */
+    /* 疊起來的位置：這一墩所有牌面的正中間。
+       量的是牌現在真正在的位置，所以贏的那張已經推出去了也算得對 */
     const plays = [].slice.call(trick.querySelectorAll(".play"));
     const mid = plays.map(function(el){
       const b = (el.querySelector(".card") || el).getBoundingClientRect();
-      return {x:b.left + b.width/2, y:b.top + b.height/2};
+      /* 收墩的位移是從「沒有推出去的位置」算起的，所以要把推的那一段扣回來 */
+      const o = el.classList.contains("is-taking") ? PUSH_BY : {x:0, y:0};
+      return {x:b.left + b.width/2 - o.x, y:b.top + b.height/2 - o.y};
     });
     if(!mid.length) return;
     const gx = mid.reduce((a, m) => a + m.x, 0) / mid.length;
@@ -1885,7 +2863,8 @@ document.addEventListener("click", function(e){
   if(e.target.id === "btnLobby"){ openNet(); return; }
   const sp = e.target.closest("#speed button");
   if(sp){
-    SPEED = +sp.dataset.sp;
+    SPEED_KEY = sp.dataset.sp;
+    SPEED = TUNE.speeds[SPEED_KEY] || TUNE.speeds.mid;
     document.querySelectorAll("#speed button").forEach(function(b){
       b.setAttribute("aria-pressed", b === sp ? "true" : "false");
     });
@@ -1971,7 +2950,7 @@ function optRow(host, items, current, onPick){
   };
 }
 function paintSetup(){
-  optRow($("optPlayers"), [3,4,5,6].map(v => ({v:v, t:v + " 人"})), draft.n, v => draft.n = +v);
+  optRow($("optPlayers"), [2,3,4,5,6,7,8,9,10].map(v => ({v:v, t:v + " 人"})), draft.n, v => draft.n = +v);
   optRow($("optDecks"), [{v:1,t:"單副"},{v:2,t:"雙副"}], draft.decks, v => draft.decks = +v);
   optRow($("optMin"), [9,7,6,5,4,3,2].map(v => ({v:v, t:v + " 以上"})), draft.minRank, v => draft.minRank = +v);
   const size = deckSizeOf(draft.decks, draft.minRank);

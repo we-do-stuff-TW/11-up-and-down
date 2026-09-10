@@ -278,7 +278,7 @@ Deno.serve(async (req) => {
     /* ---- create ---- */
     if (action === "create") {
       const cfg = (body as { cfg?: Room["cfg"] }).cfg ?? { n: 4, decks: 2, minRank: 7 };
-      cfg.n = Math.max(3, Math.min(6, cfg.n | 0));
+      cfg.n = Math.max(2, Math.min(10, cfg.n | 0));
       cfg.decks = cfg.decks === 1 ? 1 : 2;
       cfg.minRank = Math.max(2, Math.min(9, cfg.minRank | 0));
       const name = String((body as { name?: string }).name || "房主").slice(0, 10);
@@ -372,6 +372,10 @@ Deno.serve(async (req) => {
       case "tick": {
         const raw = (body as { speed?: number }).speed ?? 520;
         const sp = Math.max(200, Math.min(1200, raw));
+        // 一墩打完要定格多久由客端說（它才知道玩家把 TUNE 調成什麼），但夾在合理範圍內：
+        // 太短看不清楚是誰贏的，太長會被一個亂送的 client 把整桌卡住
+        const rawGap = (body as { gap?: number }).gap ?? 0;
+        const gap = Math.max(2000, sp * 1.9, Math.min(12000, rawGap));
         const since = Date.now() - (R.step_at || 0);
         let moved = false;
         if (R.phase === "bid" && aiSeat(R, R.turn) && since > sp * 0.8) {
@@ -381,7 +385,8 @@ Deno.serve(async (req) => {
           const h = await readHand(sb, code, R.ri, R.turn);
           const need = (R.bids[R.turn] as number) - R.won[R.turn];
           moved = await applyPlay(sb, R, R.turn, aiCard(h, R.trick, R.led, R.trump, need).id);
-        } else if (R.phase === "trickend" && since > sp * 1.9) {
+        } else if (R.phase === "trickend" && since > gap) {
+          // 贏的那張推出來停在檯面上，定格夠久了才收
           resolveTrick(R); moved = true;
         }
         if (!moved) {

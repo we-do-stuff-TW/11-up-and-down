@@ -10,7 +10,7 @@
 <meta property="og:description" content="叫墩撲克。有連結就能一起玩，不用註冊。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Libre+Baskerville:wght@700&family=Barlow+Semi+Condensed:wght@700&family=Cormorant+Garamond:wght@700&family=Shippori+Mincho+B1:wght@800&display=swap">
 <style>
 /* artifact 平台本來會補這幾條，自架就得自己來。
    [hidden] 那條特別重要：.overlay 設了 display:flex，會蓋掉瀏覽器預設的
@@ -60,8 +60,8 @@ img{max-width:100%}
   --glass-lip:  oklch(1 0 0 / .34);
 
   /* 實體物件 */
-  --card:      #F7F3E7;
-  --card-2:    #E8E0CB;
+  --card:      #F8F5EC;
+  --card-2:    #ECE5D2;
   --card-ink:  #1A1714;
   --card-red:  #A32B25;
   --card-line: rgba(26,23,20,.20);
@@ -197,6 +197,12 @@ input{font:inherit}
 .seg button:hover{color:var(--ink-2)}
 .seg button[aria-pressed="true"]{background:var(--glass);color:var(--ink)}
 
+/* 音效開關：關掉的時候把字劃掉——一眼看得出是關著的，不用另外找圖示 */
+#btnSfx[aria-pressed="false"]{
+  color:var(--ink-3);border-color:var(--hair-2);
+  text-decoration:line-through;text-decoration-thickness:1px;
+}
+
 /* ================= 版面 ================= */
 .main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) clamp(306px,25vw,374px);min-height:0}
 @media (max-width:960px){ .main{grid-template-columns:minmax(0,1fr)} }
@@ -259,6 +265,17 @@ input{font:inherit}
 .won.hit b{color:var(--good)}
 .won.over b{color:var(--bad)}
 
+/* 叫中的軌跡：每局一格。綠＝叫中、紅＝沒中（矮一半，像扣掉的）、框起來的是這一局。
+   跟表頭的局數階梯、計分表格子裡的小點是同一套記號 */
+.trail{display:flex;flex-wrap:wrap;gap:2px;align-items:center;max-width:132px;min-height:6px}
+.trail i{display:block;width:4px;height:4px;border-radius:1px;background:var(--ink-3);opacity:.20}
+.trail i.hit{background:var(--good);opacity:.95}
+.trail i.miss{background:var(--bad);opacity:.62;height:2px}
+.trail i.now{background:none;box-shadow:inset 0 0 0 1px var(--brass);opacity:.9}
+.trail.dense{gap:1px}
+.trail.dense i{width:3px;height:3px}
+.trail.dense i.miss{height:2px}
+
 /* 手上還剩幾張：細條，不寫數字 */
 .spread{display:flex;gap:2px;margin-left:auto;align-items:flex-end;height:16px}
 .spread i{
@@ -291,8 +308,11 @@ input{font:inherit}
   border:1px dashed var(--hair);
 }
 .die.empty .num{color:var(--ink-3);font-size:12px;font-family:"Archivo",sans-serif;font-weight:400}
+/* 叫 7 以上是兩顆並排；第二顆晚一點落 */
+.dice{display:flex;gap:3px;flex:none}
 /* 放下骰子：翻滾後定住 */
-.die.is-cast{animation:cast .42s var(--e-out) both}
+.die.is-cast,.dice.is-cast .die{animation:cast .42s var(--e-out) both}
+.dice.is-cast .die + .die{animation-delay:.09s}
 @keyframes cast{
   0%  {transform:translateY(-16px) rotate(-52deg) scale(.72);opacity:0}
   55% {transform:translateY(2px)  rotate(9deg)   scale(1.06);opacity:1}
@@ -309,16 +329,24 @@ input{font:inherit}
 .deck{position:relative;width:var(--cw);height:var(--ch);perspective:1000px}
 /* 牌背：牌庫與墩堆共用同一張背面 */
 .back{
-  position:absolute;inset:0;border-radius:6px;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255,255,255,.16) 0 14%, transparent 15%),
-    repeating-linear-gradient(45deg,  rgba(255,255,255,.10) 0 .8px, transparent .8px 5px),
-    repeating-linear-gradient(-45deg, rgba(255,255,255,.10) 0 .8px, transparent .8px 5px),
-    linear-gradient(158deg, #35395E 0%, #1E2140 100%);
-  box-shadow:
-    inset 0 0 0 3px var(--card),
-    inset 0 0 0 4px rgba(26,23,20,.22),
-    0 2px 6px rgba(0,0,0,.4);
+  position:absolute;inset:0;border-radius:calc(var(--cw) * .058);
+  /* 底圖是各牌面 back.art() 產生的 SVG（deckCSS() 依 html[data-deck] 給 --back-img）。外部字型進不了
+     data-URI SVG，所以「11」與「UP & DOWN」用偽元素疊上去，顏色、字型、大小、位置都是牌面給的變數；
+     3D 貼圖那邊用 canvas 畫同一組字 */
+  background:var(--back-img) center / 100% 100% no-repeat, var(--bk-bg, #2A2E52);
+  box-shadow:0 2px 6px rgba(0,0,0,.4);
+  color:var(--bk-nc, #EFE9D8);
+}
+.back::before{
+  content:"11";position:absolute;left:0;right:0;top:calc(var(--cw) * var(--bk-ny, .533));
+  text-align:center;font-family:var(--bk-nf, "Bodoni Moda",Georgia,serif);font-weight:var(--bk-nw, 700);
+  font-size:calc(var(--cw) * var(--bk-ns, .30));line-height:1;letter-spacing:var(--bk-nls, -.04em);
+}
+.back::after{
+  content:"UP & DOWN";position:absolute;left:0;right:0;top:calc(var(--cw) * var(--bk-wy, .877));
+  text-align:center;font-family:"Archivo",sans-serif;font-weight:600;line-height:1;
+  font-size:calc(var(--cw) * var(--bk-ws, .052));letter-spacing:.2em;color:var(--bk-wc, var(--brass));white-space:nowrap;
+  display:var(--bk-wd, block);
 }
 /* 疊在王牌底下的那幾張：偏移與濃淡由 JS 依深度給，張數＝副數 */
 .deck .trumpcard{position:absolute;inset:0;rotate:6.5deg;transform-origin:50% 62%}
@@ -408,7 +436,7 @@ input{font:inherit}
 /* ================= 牌 ================= */
 .card{
   position:relative;width:var(--cw);height:var(--ch);flex:none;
-  display:block;padding:0;border-radius:6px;
+  display:block;padding:0;border-radius:calc(var(--cw) * .058);   /* 真牌的圓角約是牌寬的 5–6% */
   color:var(--card-ink);
   /* 紙面：左上斜光 ＋ 象牙底 */
   background:
@@ -421,7 +449,7 @@ input{font:inherit}
 .card::after{
   content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='90' height='90' filter='url(%23n)'/%3E%3C/svg%3E");
-  opacity:.16;mix-blend-mode:multiply;
+  opacity:.14;mix-blend-mode:multiply;
 }
 .card .cf{display:block;width:100%;height:100%;position:relative;z-index:1}
 .card .cf text{
@@ -429,7 +457,6 @@ input{font:inherit}
   fill:currentColor;letter-spacing:-.02em;
 }
 .card .cf use{fill:currentColor}
-.card .cf .ornament{fill:none}
 .card.red{color:var(--card-red)}
 .card.trump-mark{
   box-shadow:inset 0 0 0 2px var(--brass), var(--sh-1), inset 0 0 0 3px rgba(255,255,255,.5);
@@ -473,11 +500,19 @@ input{font:inherit}
 }
 .bidbtn{
   min-width:36px;padding:6px 10px;border-radius:99px;
+  display:flex;flex-direction:column;align-items:center;
   font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:500;
   font-variant-numeric:tabular-nums;color:var(--ink-2);
   transition:background-color .16s, color .16s, transform .16s var(--e-out);
 }
 .bidbtn:hover{background:var(--brass);color:oklch(.22 .04 84);font-weight:600;transform:translateY(-1px)}
+/* 最後一位叫墩的人看得到後果：每顆數字下面標「欠／剛好／超」，不必心算 */
+.bidbtn.fc{min-width:44px;padding:5px 8px 4px}
+.bidbtn.fc b{font-weight:500;line-height:1.2}
+.bidbtn.fc i{font-style:normal;font-size:9.5px;line-height:1.3;letter-spacing:.04em;color:var(--ink-3)}
+.bidbtn.ex i{color:var(--brass)} .bidbtn.un i{color:oklch(.70 .06 275)} .bidbtn.ov i{color:var(--bad)}
+.bidbtn.ex{box-shadow:inset 0 0 0 1px var(--brass-soft)}
+.bidbtn:hover i{color:inherit}
 
 /* 下一局自己會開始：用一條走完的線代替倒數字 */
 .autonext{flex:none;display:block;width:120px;height:2px;border-radius:2px;background:var(--hair-2);overflow:hidden}
@@ -508,7 +543,7 @@ input{font:inherit}
 /* 上緣留白給疊高之後往上長的位移 */
 /* 上緣留白給疊高之後往上長的位移，數得出來比省空間重要 */
 .tricks .pile{position:relative;width:var(--cw);height:var(--ch);margin-top:var(--lift,58px)}
-.tricks .pile.empty{border:1px dashed var(--hair);border-radius:6px}
+.tricks .pile.empty{border:1px dashed var(--hair);border-radius:calc(var(--cw) * .058)}
 /* 一墩是一小疊：pack 決定這一墩擺在哪，裡面每張牌再錯開一點點做出厚度 */
 .tricks .pack{position:absolute;inset:0;translate:var(--dx,0) var(--dy,0);rotate:var(--rz,0deg)}
 .tricks .pack .back{translate:var(--bx,0) var(--by,0);rotate:var(--br,0deg)}
@@ -566,6 +601,7 @@ table.score thead th .tot{
   display:block;font-family:"IBM Plex Mono",monospace;
   font-size:14px;color:var(--ink);font-weight:500;letter-spacing:0;
 }
+table.score thead th .tot.lead{color:var(--brass)}
 table.score thead th .tot.up{animation:tot .5s var(--e-out)}
 @keyframes tot{0%{color:var(--brass);transform:translateY(-3px)}100%{color:var(--ink);transform:none}}
 table.score td{border-bottom:1px solid var(--hair-2);font-size:11px;color:var(--ink-3)}
@@ -575,10 +611,22 @@ table.score tr.now .sz span{color:var(--brass)}
 .sz{position:relative;text-align:left;padding-left:9px}
 .szbar{
   position:absolute;left:0;top:50%;translate:0 -50%;height:15px;width:var(--w);
-  background:oklch(.90 .02 92 / .085);border-radius:0 2px 2px 0;
+  background:oklch(.90 .02 92 / .07);border-radius:2px;
+}
+/* 進行中的那一局：左側一道黃銅細線，跟階梯上亮起的那一格同一個意思 */
+table.score tr.now .sz::before{
+  content:"";position:absolute;left:0;top:22%;bottom:22%;width:2px;border-radius:1px;
+  background:var(--brass);z-index:1;
 }
 .sz span{position:relative;color:var(--ink-2)}
+table.score tbody tr:hover td{background:oklch(.90 .02 92 / .035)}
 .cell .b{opacity:.5}
+/* 叫中／沒中：數字前面一個小點，跟座位牌上那排軌跡同一套記號 */
+.cell.hit::before,.cell.miss::before{
+  content:"";display:inline-block;width:4px;height:4px;border-radius:1px;margin-right:5px;vertical-align:1px;
+  background:var(--good);
+}
+.cell.miss::before{height:2px;background:var(--bad);opacity:.7;vertical-align:2px}
 .cell.hit{color:var(--good)}
 .cell .pt{margin-left:4px;color:var(--ink-2)}
 .cell.hit .pt{color:var(--good)}
@@ -596,7 +644,7 @@ table.score tr.now .sz span{color:var(--brass)}
 }
 @keyframes ov{from{opacity:0}to{opacity:1}}
 .sheet{
-  width:min(560px,100%);max-height:88vh;overflow:auto;
+  width:min(608px,100%);max-height:88vh;overflow:auto;   /* 人數那一排 2～10 共十顆要排得下 */
   padding:26px 28px 24px;border-radius:22px;
   background:linear-gradient(170deg, oklch(.26 .028 168) 0%, oklch(.205 .026 168) 100%);
   border:1px solid var(--glass-edge);
@@ -625,6 +673,10 @@ table.score tr.now .sz span{color:var(--brass)}
 }
 .warn b{color:var(--bad);font-weight:600}
 .sheet-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+/* 設定裡的牌面預覽：同一套 cardHTML／.back，只是縮成手牌尺寸 */
+.preview{display:flex;gap:10px;align-items:flex-end;--cw:62px;--ch:88px;margin:2px 0 12px;padding:14px 16px;border-radius:14px;background:oklch(.16 .03 168 / .55)}
+.preview .pvback{position:relative;width:var(--cw);height:var(--ch);flex:none}
+#deckNote{margin-bottom:6px}
 
 .rules{font-size:13.5px;color:var(--ink-2)}
 .rules h3{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brass);margin:22px 0 8px}
@@ -707,6 +759,13 @@ table.score tr.now .sz span{color:var(--brass)}
    疊在畫布上、由 JS 投影定位——文字保持向量清晰，鍵盤與螢幕閱讀器照常運作。 */
 body.is3d .table{position:relative;padding:0;gap:0;overflow:hidden}
 body.is3d .stage{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:manipulation}
+/* 畫布四角收暗一點：把視線留在桌上，也讓浮在上面的座位牌與文字更好讀 */
+body.is3d .table::after{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:
+    radial-gradient(118% 92% at 50% 46%, transparent 56%, rgba(0,0,0,.30) 100%),
+    linear-gradient(180deg, rgba(0,0,0,.20), transparent 16%);
+}
 body.is3d .center,
 body.is3d .tricks{display:none}
 
@@ -715,7 +774,8 @@ body.is3d .seats{position:absolute;inset:0;display:block;pointer-events:none;z-i
 body.is3d .seat{
   position:absolute;left:0;top:0;translate:-50% -50%;
   min-width:0;padding:8px 12px;border-radius:12px;
-  background:oklch(.17 .022 250 / .52);
+  /* 玻璃的底色跟桌布同色相：換王牌時跟著整個房間一起變 */
+  background:color-mix(in oklab, var(--felt-deep) 48%, oklch(.10 0 0 / .62));
   box-shadow:inset 0 0 0 1px var(--hair-2), 0 8px 22px rgba(0,0,0,.34);
   backdrop-filter:blur(9px) saturate(1.2);-webkit-backdrop-filter:blur(9px) saturate(1.2);
   transition:opacity .3s var(--e-out), box-shadow .3s var(--e-out);
@@ -724,7 +784,7 @@ body.is3d .seat{
 body.is3d .seat::before,
 body.is3d .seat + .seat::before{display:none}
 body.is3d .seat.is-active{
-  transform:none;background:oklch(.20 .026 250 / .62);
+  transform:none;background:color-mix(in oklab, var(--felt) 52%, oklch(.14 0 0 / .66));
   box-shadow:inset 0 0 0 1px var(--glass-lip), 0 10px 30px rgba(0,0,0,.42);
 }
 body.is3d .seat .spread{display:none}   /* 剩幾張牌由桌上那疊牌背自己說 */
@@ -763,8 +823,46 @@ body.is3d .status .msg,
 body.is3d .status .hint{text-shadow:0 2px 10px rgba(0,0,0,.6)}
 body.is3d .bidrow .pill,
 body.is3d .status .btn{
-  background:oklch(.17 .022 250 / .62);
+  background:color-mix(in oklab, var(--felt-deep) 48%, oklch(.10 0 0 / .66));
   backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+}
+
+/* 叫墩（立體模式）：桌子中央那圈計數環的讀數，與最後一顆骰子落定後的判詞。
+   環與骰子是 WebGL 畫的，這兩塊字還是 DOM——讀數投影到環心，判詞貼在畫面正中 */
+body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
+.bidhub{
+  position:absolute;left:0;top:0;translate:-50% -62%;z-index:2;pointer-events:none;
+  text-align:center;white-space:nowrap;text-shadow:0 2px 14px rgba(0,0,0,.75);transition:color .4s;
+}
+.bidhub .big{display:block;font-family:"Bodoni Moda",Georgia,serif;font-size:40px;font-weight:700;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.bidhub .big small{font-size:20px;font-weight:600;color:var(--ink-3);letter-spacing:0}
+.bidhub .sub{display:block;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2);margin-top:2px}
+.bidhub.exact,.bidhub.exact .sub{color:var(--brass)}
+.bidhub.under .sub{color:oklch(.70 .06 275)}
+.bidhub.over .sub{color:var(--bad)}
+.bidhub.wait .sub{animation:bidblink 1.6s ease-in-out infinite}
+@keyframes bidblink{50%{opacity:.35}}
+.bidhub.pop .big{animation:bidpop .5s var(--e-out)}
+@keyframes bidpop{0%{transform:scale(1.18)}100%{transform:none}}
+.bidverdict{
+  position:absolute;left:0;top:0;translate:-50% -50%;z-index:3;pointer-events:none;
+  text-align:center;text-shadow:0 2px 16px rgba(0,0,0,.8);
+  animation:bidrise .5s var(--e-out) both;
+}
+.bidverdict.out{animation:bidsink .38s ease-in both}
+@keyframes bidrise{from{opacity:0;translate:-50% -40%}to{opacity:1;translate:-50% -50%}}
+@keyframes bidsink{from{opacity:1}to{opacity:0;translate:-50% -58%}}
+.bidverdict .k{display:block;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.bidverdict .big{display:block;font-family:"Bodoni Moda",Georgia,serif;font-size:64px;font-weight:700;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.bidverdict .word{display:block;font-size:22px;font-weight:600;letter-spacing:.06em;margin-top:2px}
+.bidverdict.exact .big,.bidverdict.exact .word{color:var(--brass)}
+.bidverdict.under .big,.bidverdict.under .word{color:oklch(.70 .06 275)}
+.bidverdict.over .big,.bidverdict.over .word{color:var(--bad)}
+/* Bodoni 沒有減號，交給 Plex Mono */
+.bidverdict .sg{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:.72em;vertical-align:.08em;margin-right:.04em}
+@media (max-width:700px){
+  .bidhub .big{font-size:36px} .bidhub .big small{font-size:15px}
+  .bidverdict .big{font-size:52px} .bidverdict .word{font-size:18px}
 }
 
 /* 載入中／不支援 */
@@ -787,7 +885,7 @@ body.is3d .status .btn{
     transition-duration:.01ms !important;
   }
   html{transition:--felt 400ms linear, --felt-deep 400ms linear, --glow 400ms linear !important}
-  .card.is-dealt,.play.is-new,.play.is-new.from-hand,.die.is-cast,
+  .card.is-dealt,.play.is-new,.play.is-new.from-hand,.die.is-cast,.dice.is-cast .die,
   .deck .trumpcard.is-flip,.tricks .pack.is-land{animation:fade-in .28s ease both !important}
   .autonext i{animation:none !important;transform:scaleX(1)}
   .trick.is-collecting .play{animation:fade-out .22s ease both !important}
@@ -799,18 +897,12 @@ body.is3d .status .btn{
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-  <symbol id="p-s" viewBox="0 0 24 24">
-    <path d="M12 2.2C12 2.2 3.3 8.9 3.3 13.7c0 2.7 1.9 4.5 4.2 4.5 1.5 0 2.8-.8 3.5-2 0 2.4-.9 4.4-2.5 5.6h7c-1.6-1.2-2.5-3.2-2.5-5.6.7 1.2 2 2 3.5 2 2.3 0 4.2-1.8 4.2-4.5C20.7 8.9 12 2.2 12 2.2z"/>
-  </symbol>
-  <symbol id="p-h" viewBox="0 0 24 24">
-    <path d="M12 21.6S2.8 14.7 2.8 8.9c0-3.4 2.5-5.6 5.2-5.6 1.9 0 3.4 1.1 4 2.4.6-1.3 2.1-2.4 4-2.4 2.7 0 5.2 2.2 5.2 5.6 0 5.8-9.2 12.7-9.2 12.7z"/>
-  </symbol>
-  <symbol id="p-d" viewBox="0 0 24 24">
-    <path d="M12 1.8 20.6 12 12 22.2 3.4 12z"/>
-  </symbol>
-  <symbol id="p-c" viewBox="0 0 24 24">
-    <path d="M12 2.4a3.9 3.9 0 0 0-3.3 6 3.9 3.9 0 1 0-1.1 7.5c1.2 0 2.3-.6 3-1.5.1 3-.8 5.3-2.2 6.5h7.2c-1.4-1.2-2.3-3.5-2.2-6.5.7.9 1.8 1.5 3 1.5a3.9 3.9 0 1 0-1.1-7.5A3.9 3.9 0 0 0 12 2.4z"/>
-  </symbol>
+  <!-- 四個花色的路徑由下面的 SUIT_D 填進來，2D symbol 與 3D 貼圖共用同一組形狀 -->
+  <symbol id="p-s" viewBox="0 0 24 24"><path/></symbol>
+  <symbol id="p-h" viewBox="0 0 24 24"><path/></symbol>
+  <symbol id="p-d" viewBox="0 0 24 24"><path/></symbol>
+  <symbol id="p-c" viewBox="0 0 24 24"><path/></symbol>
+  <g id="courtdefs"></g>
 </svg>
 
 <div class="app">
@@ -832,11 +924,13 @@ body.is3d .status .btn{
         <button data-dim="3" aria-pressed="false">立體</button>
       </div>
       <div class="seg" id="speed">
-        <button data-sp="900" aria-pressed="false">慢</button>
-        <button data-sp="520" aria-pressed="true">中</button>
-        <button data-sp="200" aria-pressed="false">快</button>
+        <button data-sp="slow" aria-pressed="false">慢</button>
+        <button data-sp="mid" aria-pressed="true">中</button>
+        <button data-sp="fast" aria-pressed="false">快</button>
       </div>
+      <button class="btn" id="btnSfx" aria-pressed="true">音效</button>
       <button class="btn" id="btnScore">計分</button>
+      <button class="btn" id="btnPref">設定</button>
       <button class="btn" id="btnRules">規則</button>
       <button class="btn" id="btnRoom">和朋友玩</button>
       <button class="btn" id="btnSetup">新局</button>
@@ -885,6 +979,19 @@ body.is3d .status .btn{
     <div class="sheet-actions">
       <button class="btn" id="setupCancel">取消</button>
       <button class="btn primary" id="setupStart">開始</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="prefOv" hidden>
+  <div class="sheet">
+    <h2>設定</h2>
+    <p class="sub">牌面隨時可換，桌上的牌立刻跟著變，選擇會記住。</p>
+    <div class="field"><label>牌面</label><div class="opts" id="optDeck"></div></div>
+    <div class="preview" id="deckPreview" aria-hidden="true"></div>
+    <p class="sub" id="deckNote"></p>
+    <div class="sheet-actions">
+      <button class="btn" id="prefClose">關閉</button>
     </div>
   </div>
 </div>
@@ -968,9 +1075,910 @@ body.is3d .status .btn{
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
+
+<script>
+/* ============================================================
+   11 Up & Down — 音效層
+   ------------------------------------------------------------
+   牌桌是深夜的、暖的、近的：一盞頂燈、一塊絨布、一圈胡桃木。
+   聲音照同一套世界觀做——近距離收音的 Foley，一間小房間的殘響，
+   偶爾一顆溫暖的琴音，不出現遊戲機的「叮咚」。
+
+   這一層跟 3D 一樣是「加上去的」：引擎與連線層都不知道它存在。
+   唯一的接縫是 render() 最後那行 SFX.frame(G, me, best)——
+   把當下的牌局狀態遞過來，音效層自己跟上一次比對，差在哪就發什麼聲。
+   所以 2D、3D、單人、連線都是同一份，不需要各接一次。
+
+   聲音怎麼組成：每一個 Foley 都是三層疊的（電影音效的老規矩）——
+     · 起音（transient）：接觸的那一下，1-3ms，寬頻
+     · 本體（body）：材質在響，紙牌是 700-1500Hz 那塊「啪」
+     · 尾巴（tail）：桌面吸收掉的低頻，加一點房間的殘響
+   少了低頻那層，牌就像掉在真空裡；少了殘響，就像貼在耳朵上。
+
+   沒有任何音檔。全部是 Web Audio 即時合成，所以：
+     · 不多一個 byte，不多一次 request
+     · 每一次都不一樣（音高、時值、濾波隨機扰動），連發不會變機關槍
+   要換成錄音的話看檔案最下面 SFX.load()。
+   ============================================================ */
+(function(){
+"use strict";
+
+var AC = window.AudioContext || window.webkitAudioContext;
+if(!AC){ window.SFX = {frame:function(){}, on:function(){}, enabled:false}; return; }
+
+/* ---------------- 使用者偏好 ---------------- */
+var PREF = {on:true, vol:0.8};
+try{
+  var raw = localStorage.getItem("ud.sfx");
+  if(raw !== null) PREF.on = raw !== "0";
+  var v = parseFloat(localStorage.getItem("ud.sfxvol"));
+  if(v >= 0 && v <= 1) PREF.vol = v;
+}catch(e){}
+function savePref(){
+  try{
+    localStorage.setItem("ud.sfx", PREF.on ? "1" : "0");
+    localStorage.setItem("ud.sfxvol", String(PREF.vol));
+  }catch(e){}
+}
+
+/* ---------------- 音訊圖 ----------------
+   voices ──┬─────────────────────────────┐
+            └─ send ─> convolver ─> wet ──┴─> bus ─> 膠水壓縮 ─> 限幅 ─> 音量 ─> 出
+   殘響只收 voice 的 send，不收 bus，所以不會回授。
+   兩顆 DynamicsCompressor：前面那顆把整體黏起來（電影混音的 glue），
+   後面那顆只做保險，發牌那種一秒幾十下的密集聲不會爆掉。 */
+var ctx = null, bus = null, wet = null, send = null, master = null, ready = false, offline = false;
+var noiseBuf = null, pinkBuf = null;
+
+function boot(inject){
+  if(ctx) return ctx;
+  ctx = inject || new AC({latencyHint:"interactive"});
+  offline = !!inject;
+
+  master = ctx.createGain();
+  master.gain.value = PREF.on ? PREF.vol : 0;
+
+  var limit = ctx.createDynamicsCompressor();
+  limit.threshold.value = -1.5; limit.knee.value = 0; limit.ratio.value = 20;
+  limit.attack.value = 0.001;   limit.release.value = 0.05;
+
+  var glue = ctx.createDynamicsCompressor();
+  glue.threshold.value = -17; glue.knee.value = 14; glue.ratio.value = 2.6;
+  glue.attack.value = 0.004;  glue.release.value = 0.19;
+
+  /* 40Hz 以下小喇叭放不出來，留著只會佔掉限幅器的餘裕 */
+  var rumble = ctx.createBiquadFilter();
+  rumble.type = "highpass"; rumble.frequency.value = 38; rumble.Q.value = 0.6;
+
+  bus = ctx.createGain(); bus.gain.value = 1;
+  bus.connect(rumble); rumble.connect(glue); glue.connect(limit);
+  limit.connect(master); master.connect(ctx.destination);
+
+  var verb = ctx.createConvolver();
+  verb.buffer = makeRoom(1.15, 0.52);
+  wet = ctx.createGain(); wet.gain.value = 0.95;
+  send = ctx.createGain(); send.gain.value = 1;
+  send.connect(verb); verb.connect(wet); wet.connect(bus);
+
+  noiseBuf = makeNoise(2.2, false);
+  pinkBuf  = makeNoise(2.2, true);
+  ready = true;
+  return ctx;
+}
+
+/* 白噪音與粉紅噪音各存一份，所有 Foley 都從裡面隨機取一段。
+   紙、布這類材質用粉紅噪音比較像——白噪音的高頻太平，聽起來像嘶聲不像纖維。 */
+function makeNoise(sec, pink){
+  var sr = ctx.sampleRate, n = Math.floor(sec * sr);
+  var b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+  if(!pink){ for(var i=0;i<n;i++) d[i] = Math.random()*2 - 1; return b; }
+  /* Voss-McCartney 的簡化版：幾個一階低通疊起來就有 -3dB/oct */
+  var b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  for(var j=0;j<n;j++){
+    var w = Math.random()*2 - 1;
+    b0 = 0.99886*b0 + w*0.0555179;
+    b1 = 0.99332*b1 + w*0.0750759;
+    b2 = 0.96900*b2 + w*0.1538520;
+    b3 = 0.86650*b3 + w*0.3104856;
+    b4 = 0.55000*b4 + w*0.5329522;
+    b5 = -0.7616*b5 - w*0.0168980;
+    d[j] = (b0+b1+b2+b3+b4+b5+b6 + w*0.5362) * 0.11;
+    b6 = w*0.115926;
+  }
+  return b;
+}
+
+/* 房間：不是音樂廳，是一間鋪了地毯、擺著一張圓桌的小房間。
+   早期反射七下（牆、天花板、桌面），之後才是擴散的尾巴；
+   尾巴一邊衰減一邊變暗——高頻先被布和地毯吃掉，低頻留最久。
+   左右兩聲道用不同的亂數與略微不同的反射時間，聲音才會有寬度。 */
+function makeRoom(sec, rt60){
+  var sr = ctx.sampleRate, n = Math.floor(sec * sr);
+  var buf = ctx.createBuffer(2, n, sr);
+  var tau = rt60 / Math.log(1000);
+  var peak = 0;
+  for(var ch=0; ch<2; ch++){
+    var d = buf.getChannelData(ch), lp = 0;
+    for(var i=0;i<n;i++){
+      var t = i / sr;
+      /* 擴散不是一開始就滿的，前 14ms 慢慢長出來 */
+      var build = t < 0.014 ? (t / 0.014) : 1;
+      var env = Math.exp(-t / tau) * build;
+      var x = (Math.random()*2 - 1) * env;
+      var cut = 8500 * Math.pow(0.075, t / sec);          /* 尾巴越後面越暗 */
+      var a = 1 - Math.exp(-2 * Math.PI * cut / sr);
+      lp += a * (x - lp);
+      d[i] = lp;
+    }
+    var taps = [[0.0061,0.44],[0.0089,-0.36],[0.0134,0.31],[0.0187,-0.25],
+                [0.0248,0.20],[0.0331,-0.16],[0.0417,0.12]];
+    for(var k=0;k<taps.length;k++){
+      var idx = Math.floor((taps[k][0] * (ch ? 1.037 : 1)) * sr);
+      if(idx < n) d[idx] += taps[k][1] * (ch ? -0.92 : 1);
+    }
+    for(var m=0;m<n;m++) if(Math.abs(d[m]) > peak) peak = Math.abs(d[m]);
+  }
+  if(peak > 0){
+    var g = 0.5 / peak;
+    for(var c2=0;c2<2;c2++){
+      var dd = buf.getChannelData(c2);
+      for(var q=0;q<n;q++) dd[q] *= g;
+    }
+  }
+  return buf;
+}
+
+/* ---------------- 解鎖 ----------------
+   瀏覽器規定：沒有使用者動作之前不准出聲。所以整個引擎在第一次
+   點擊／觸控／按鍵之前是睡著的——順帶解決「一進頁面就自己發牌吵一輪」。 */
+var unlocked = false, LASTG = null;
+function unlock(){
+  if(unlocked) return;
+  unlocked = true;
+  boot();
+  if(ctx.state === "suspended") ctx.resume();
+  /* 有些 iOS 版本要真的播過一次才算數 */
+  var s = ctx.createBufferSource();
+  s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+  s.connect(ctx.destination); s.start(0);
+  /* 頁面剛開的那一局，牌是在拿到出聲許可之前就發完的，那一手註定是安靜的。
+     如果這時還停在第一局的叫牌階段，就補一聲很輕的洗牌——
+     牌庫本來就在桌上，荷官順手理一下，房間從這裡醒過來。 */
+  setTimeout(function(){
+    var g = LASTG;
+    if(g && g.ri === 0 && g.phase === "bid" && !g.played && (!g.trick || !g.trick.length))
+      SFX.shuffle(0.05, 0.55);
+  }, 40);
+}
+["pointerdown","touchstart","keydown","mousedown"].forEach(function(ev){
+  document.addEventListener(ev, unlock, {capture:true, passive:true});
+});
+
+function live(){
+  if(!PREF.on || !unlocked || !ready) return false;
+  if(!offline && ctx.state === "suspended") ctx.resume();
+  return true;
+}
+var now = function(){ return ctx.currentTime; };
+var rnd = function(a, b){ return a + Math.random() * (b - a); };
+
+/* 同一個聲音短時間內連發會疊成一坨。每個 key 記上一次的時間，
+   太近就直接丟掉——這是混音台上的 gate，不是省效能。 */
+var lastAt = {};
+function gate(key, ms){
+  var t = ctx.currentTime * 1000;
+  if(lastAt[key] && t - lastAt[key] < ms) return false;
+  lastAt[key] = t;
+  return true;
+}
+
+/* ---------------- 基本單元 ---------------- */
+
+/* 一顆噪音粒子：材質的聲音都由這個疊出來。
+   f0 → f1 是帶通中心的滑動——磨擦、滑動、鬆手的差別幾乎全在這條線上。 */
+function grain(t, o){
+  var src = ctx.createBufferSource();
+  src.buffer = o.pink === false ? noiseBuf : pinkBuf;
+  src.playbackRate.value = o.rate || 1;
+  var off = Math.random() * 1.6;
+
+  var bp = ctx.createBiquadFilter();
+  bp.type = o.type || "bandpass";
+  bp.Q.value = o.q || 1;
+  bp.frequency.setValueAtTime(Math.max(30, o.f0), t);
+  if(o.f1 && o.f1 !== o.f0)
+    bp.frequency.exponentialRampToValueAtTime(Math.max(30, o.f1), t + (o.sweep || o.dur));
+
+  var hp = null;
+  if(o.hp){ hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = o.hp; hp.Q.value = 0.7; }
+  var lpf = null;
+  if(o.lp){ lpf = ctx.createBiquadFilter(); lpf.type = "lowpass"; lpf.frequency.value = o.lp; lpf.Q.value = 0.7; }
+
+  var g = ctx.createGain();
+  var a = o.a === undefined ? 0.002 : o.a;
+  var pk = Math.max(0.00012, o.gain);
+  g.gain.setValueAtTime(0.00012, t);
+  g.gain.exponentialRampToValueAtTime(pk, t + a);
+  if(o.hold) g.gain.setValueAtTime(pk, t + a + o.hold);
+  g.gain.exponentialRampToValueAtTime(0.00012, t + a + (o.hold || 0) + o.dur);
+
+  var head = src, node = src;
+  if(hp){ node.connect(hp); node = hp; }
+  if(lpf){ node.connect(lpf); node = lpf; }
+  node.connect(bp); bp.connect(g);
+  out(g, o.pan, o.verb);
+  src.start(t, off, a + (o.hold || 0) + o.dur + 0.06);
+  src.stop(t + a + (o.hold || 0) + o.dur + 0.08);
+  return head;
+}
+
+/* 桌面被敲到的那一下低頻。牌與骰子都靠它才「落在東西上」而不是浮著。
+   絨布會把它吃掉大半，所以衰減很快、頻率往下滑一點點（桌板在讓） */
+function thump(t, o){
+  var osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(o.f, t);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(24, o.f * (o.bend || 0.72)), t + o.dur);
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(0.00012, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.00012, t + o.dur);
+  osc.connect(g);
+  out(g, o.pan, o.verb === undefined ? 0.05 : o.verb);
+  osc.start(t); osc.stop(t + o.dur + 0.03);
+}
+
+/* 溫暖的琴音：兩個算子的 FM（比例 1:1），調變指數快速衰減——
+   起音有一點「咬」，之後就剩乾淨的正弦。這是電鋼琴的做法，
+   比加法合成的鐘聲更適合這張桌子：不亮、不刺、放得進背景。 */
+function rhodes(t, o){
+  var f = o.f, dur = o.dur || 1.1;
+  var car = ctx.createOscillator(); car.type = "sine"; car.frequency.value = f;
+  var mod = ctx.createOscillator(); mod.type = "sine"; mod.frequency.value = f * (o.ratio || 1);
+  var mg = ctx.createGain();
+  mg.gain.setValueAtTime(f * (o.index || 2.6), t);
+  mg.gain.exponentialRampToValueAtTime(f * 0.02, t + (o.bark || 0.11));
+  mod.connect(mg); mg.connect(car.frequency);
+
+  var lp = ctx.createBiquadFilter();
+  lp.type = "lowpass"; lp.frequency.value = o.lp || 6500; lp.Q.value = 0.6;
+
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(0.00012, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.00012, t + dur);
+
+  car.connect(lp); lp.connect(g);
+  out(g, o.pan, o.verb === undefined ? 0.3 : o.verb);
+  car.start(t); mod.start(t);
+  car.stop(t + dur + 0.05); mod.stop(t + dur + 0.05);
+
+  /* 琴槌敲到的那一點雜訊，量很小，但少了它音就是「憑空出現」的 */
+  if(o.mallet !== false)
+    grain(t, {f0:f * 5.5, f1:f * 3, q:1.4, dur:0.026, gain:o.gain * 0.26, pan:o.pan, verb:0.12, pink:false});
+}
+
+/* 出口：每個聲音自己的定位與殘響送出量。
+   遠處的座位送多一點殘響、乾聲小一點——距離感是這樣來的，不是只有音量。 */
+function out(node, pan, verb){
+  var p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if(p){ p.pan.value = Math.max(-1, Math.min(1, pan || 0)); node.connect(p); node = p; }
+  node.connect(bus);
+  if(verb > 0){
+    var s = ctx.createGain(); s.gain.value = verb;
+    node.connect(s); s.connect(send);
+  }
+}
+
+/* ---------------- 牌 ----------------
+   一張牌落在絨布上，近距離收音會聽到三段：
+     0-3ms   角先碰到，寬頻的一下「喀」
+     3-45ms  牌身彈一下，700-1600Hz 那塊「啪」——認得出是紙牌就靠這段
+     20-90ms 桌板回應的低頻，絨布吃掉大半
+   落在已經有牌的地方會軟一點、低頻多一點（下面那疊在墊著）。 */
+function cardLand(t, o){
+  o = o || {};
+  var g = (o.gain === undefined ? 1 : o.gain) * 0.85;
+  var pan = o.pan || 0, verb = o.verb === undefined ? 0.19 : o.verb;
+  var soft = o.soft || 0;                       /* 0 = 落在桌上，1 = 落在牌堆上 */
+  var k = rnd(0.92, 1.09);                      /* 每一張都不一樣 */
+
+  /* 一、角先碰到：寬頻的一下 */
+  grain(t, {f0:3100*k*(1-soft*0.3), f1:1500*k, q:0.8, a:0.0008, dur:0.021,
+            gain:0.55*g*(1-soft*0.35), pan:pan, verb:verb*0.7, hp:600, pink:false});
+  /* 二、牌身在響：認得出是紙牌全靠這一段，帶要寬（Q 低），不然只剩「咚」跟「嘶」 */
+  grain(t + 0.0015, {f0:1450*k, f1:780*k, q:0.85, a:0.0016, dur:0.055 + soft*0.02,
+            gain:1.15*g, pan:pan, verb:verb});
+  /* 三、「啪」的那一下脆：紙被彈開的高一點的共振 */
+  grain(t + 0.003, {f0:2550*k, f1:1700*k, q:1.9, a:0.0012, dur:0.033,
+            gain:0.5*g*(1-soft*0.3), pan:pan, verb:verb*0.8, pink:false});
+  /* 四、紙的纖維 */
+  grain(t + 0.004, {f0:5600*k, f1:3400*k, q:0.9, a:0.001, dur:0.03,
+            gain:0.14*g*(1-soft*0.5), pan:pan, verb:verb*0.5, pink:false});
+  /* 五、桌板讓了一下。正弦波的能量很集中，一大就把上面四層全蓋掉——
+     真的牌落在鋪絨的桌上，低頻只是「有」，不是主角 */
+  thump(t + 0.002, {f:(126 - soft*22)*k, dur:0.055 + soft*0.03,
+            gain:0.13*g*(1+soft*0.6), pan:pan*0.5, verb:verb*0.4});
+}
+
+/* 一張牌從牌堆頂端被推出去：先是「唰」的摩擦，最後鬆手那一下。
+   帶通從高滑到低，就是紙離開紙的那個下滑音。 */
+function cardSlide(t, o){
+  o = o || {};
+  var g = (o.gain === undefined ? 1 : o.gain), pan = o.pan || 0;
+  var len = o.len || 0.075, k = rnd(0.9, 1.12);
+  grain(t, {f0:3400*k, f1:1250*k, q:0.85, a:0.008, hold:len*0.35, dur:len,
+            gain:0.3*g, pan:pan, verb:0.1, sweep:len*1.1});
+  grain(t, {f0:7200*k, f1:5200*k, q:0.7, a:0.012, dur:len*0.8,
+            gain:0.07*g, pan:pan, verb:0.06, pink:false});
+}
+
+/* 發牌時甩出去的那一張：滑出去 + 在空中 + 落地。 */
+function cardDeal(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain;
+  cardSlide(t, {gain:0.85*g, pan:(o.pan||0)*0.5, len:rnd(0.055, 0.08)});
+  cardLand(t + rnd(0.055, 0.085), {gain:0.72*g, pan:o.pan, verb:0.2, soft:o.soft || 0.35});
+}
+
+/* 牌在空中飛的那段。很輕，但沒有它，牌就是憑空出現在檯面上。 */
+function whoosh(t, o){
+  o = o || {};
+  var d = o.dur || 0.28;
+  grain(t, {f0:520, f1:2100, q:0.55, a:d*0.55, dur:d*0.5,
+            gain:0.075*(o.gain===undefined?1:o.gain), pan:o.pan||0, verb:0.12, sweep:d});
+}
+
+/* 洗牌：三段。
+   一、橋牌式交錯——三四十下牌緣彈開，密度先快後慢
+   二、合攏時的一陣悶響
+   三、在桌上頓齊，兩下。 */
+function riffle(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, span = o.span || 0.34, n = o.n || 34;
+  for(var i=0;i<n;i++){
+    var u = i / (n - 1);
+    /* 密度曲線：中段最密（真的洗牌就是這樣，兩端慢） */
+    var at = t + span * (u - Math.sin(2 * Math.PI * u) / (2 * Math.PI) * 0.55);
+    var amp = (0.5 + 0.5 * Math.sin(Math.PI * u)) * rnd(0.55, 1);
+    grain(at + rnd(-0.004, 0.004), {
+      f0:rnd(2400, 5200), f1:rnd(1200, 2200), q:rnd(1.2, 2.6),
+      a:0.0006, dur:rnd(0.008, 0.018), gain:0.19 * g * amp,
+      pan:rnd(-0.16, 0.16), verb:0.1, hp:900
+    });
+  }
+  /* 合攏 */
+  grain(t + span * 0.98, {f0:1500, f1:600, q:0.9, a:0.006, dur:0.1, gain:0.2*g, pan:0, verb:0.16});
+  thump(t + span * 1.0, {f:104, dur:0.09, gain:0.14*g, pan:0, verb:0.1});
+  /* 頓齊 */
+  cardLand(t + span + 0.13, {gain:0.5*g, soft:0.85, verb:0.2, pan:-0.05});
+  cardLand(t + span + 0.23, {gain:0.42*g, soft:0.9, verb:0.2, pan:0.06});
+}
+
+/* 收墩：一疊牌被拖過絨布。摩擦聲比單張長很多、也低很多，
+   再加一點不規則的起伏（布不是平的）。 */
+function sweep(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, d = o.dur || 0.3;
+  grain(t, {f0:1700, f1:520, q:0.65, a:d*0.3, hold:d*0.2, dur:d*0.7,
+            gain:0.2*g, pan:o.pan||0, verb:0.2, sweep:d});
+  grain(t + 0.02, {f0:340, f1:180, q:0.8, a:d*0.35, dur:d*0.6,
+            gain:0.1*g, pan:(o.pan||0)*0.6, verb:0.16, sweep:d});
+  cardLand(t + d * 0.92, {gain:0.55*g, soft:0.95, pan:o.pan||0, verb:0.24});
+}
+
+/* 一疊牌被放下（收進墩堆、收桌）。比單張重、低頻多、脆的部分少。 */
+function pack(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, pan = o.pan || 0;
+  grain(t, {f0:1250, f1:520, q:1.1, a:0.0016, dur:0.072, gain:0.5*g, pan:pan, verb:0.2});
+  grain(t + 0.006, {f0:2900, f1:1600, q:0.8, a:0.001, dur:0.03, gain:0.13*g, pan:pan, verb:0.12, pink:false});
+  thump(t + 0.002, {f:88, dur:0.12, gain:0.2*g, pan:pan*0.5, verb:0.14, bend:0.6});
+}
+
+/* ---------------- 骰子 ----------------
+   一顆塑膠骰子丟在絨布上：彈幾下，間隔越來越短，最後停住。
+   骰子本身有共振（角、面、內部空腔），所以每一下不是單純的噪音，
+   是三條高 Q 的帶通在響；絨布把它們壓得很短。 */
+function dieRoll(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, pan = o.pan || 0;
+  var verb = o.verb === undefined ? 0.18 : o.verb;
+  var k = rnd(0.93, 1.08);
+  var res = [1180 * k, 2460 * k, 4050 * k];
+  var gap = rnd(0.1, 0.13), at = t, amp = 1;
+  var bounces = 3 + Math.floor(Math.random() * 3);
+  for(var i=0;i<bounces;i++){
+    for(var r=0;r<res.length;r++){
+      grain(at, {
+        f0:res[r] * rnd(0.97, 1.03), q:rnd(5, 9), a:0.0008,
+        dur:(0.052 - r * 0.012) * rnd(0.8, 1.2),
+        gain:(0.66 - r * 0.16) * g * amp, pan:pan + rnd(-0.05, 0.05),
+        verb:verb, hp:500, pink:false
+      });
+    }
+    thump(at + 0.001, {f:132 * k, dur:0.04, gain:0.12 * g * amp, pan:pan*0.5, verb:verb*0.5});
+    at += gap; gap *= rnd(0.6, 0.74); amp *= rnd(0.55, 0.72);
+  }
+  /* 停住之前在布上蹭的那一小下 */
+  grain(at, {f0:2200, f1:900, q:1.2, a:0.004, dur:0.05, gain:0.08*g, pan:pan, verb:verb});
+}
+
+/* ---------------- 音階 ----------------
+   全部落在 F 大調九和弦的世界裡：暖、鬆、不宣告勝負，
+   像有人在隔壁房間彈了一下。 */
+function nf(semis){ return 440 * Math.pow(2, semis / 12); }
+var N = {
+  F2:nf(-28), Bb2:nf(-23), C3:nf(-21), D3:nf(-19), F3:nf(-16), G3:nf(-14),
+  A3:nf(-12), C4:nf(-9), D4:nf(-7), E4:nf(-5), F4:nf(-4), G4:nf(-2),
+  A4:nf(0), C5:nf(3), D5:nf(5), E5:nf(7), F5:nf(8), A5:nf(12), C6:nf(15)
+};
+
+/* ---------------- 事件 ---------------- */
+var SFX = {};
+
+/* 洗牌。發生在上一局打完到下一局開始的那段空檔——
+   畫面上那時什麼都沒動，正是荷官收牌、洗牌的時間。
+   開局第一次沒有空檔可用，就墊在發牌前面。 */
+SFX.shuffle = function(delay, gain){
+  if(!live()) return 0;
+  riffle(now() + (delay || 0.02), {gain:gain === undefined ? 0.9 : gain});
+  return 0.62;
+};
+
+/* 一張一張發。count 是這一局實際會發出去的張數，span 是視覺上發完要多久，
+   pre 是幾秒之後才開始（立體版換局時牌要先飛回牌庫，發牌是等它們回去才開始的）。
+   聲音跟著畫面走：平面只演我自己那幾張，立體繞整桌一圈，兩邊時間不一樣。 */
+SFX.deal = function(count, span, pre){
+  if(!live()) return 0;
+  var t0 = now() + 0.02 + (pre || 0);
+  var n = Math.max(1, Math.min(72, count));
+  var step = span / Math.max(1, n);
+  for(var i=0;i<n;i++){
+    cardDeal(t0 + i * step + rnd(-0.008, 0.008), {
+      gain:0.5 * (1 - Math.min(0.4, n / 220)), pan:rnd(-0.34, 0.34),
+      soft:i < n / 2 ? 0.2 : 0.5
+    });
+  }
+  return (pre || 0) + span;      /* 發完是什麼時候（秒） */
+};
+
+/* 換局時桌上的牌飛回牌庫（只有立體版演得出來）：一陣拖過絨布的聲音，
+   末尾是整副牌頓在牌庫上。 */
+SFX.gather = function(count, span){
+  if(!live()) return 0;
+  var t = now() + 0.02;
+  sweep(t, {dur:Math.max(0.18, span * 0.7), gain:0.6, pan:0});
+  var n = Math.max(1, Math.min(40, count)), step = span / n;
+  for(var i=0;i<n;i++)
+    cardLand(t + i * step + rnd(-0.01, 0.01), {gain:0.18, soft:0.9,
+             pan:rnd(-0.25, 0.25), verb:0.22});
+  pack(t + span, {gain:0.5, pan:0});
+  return span;
+};
+
+/* 翻王牌：抬起來、在半空翻正、放回牌庫頂端。 */
+SFX.flip = function(delay){
+  if(!live()) return;
+  var t = now() + (delay || 0);
+  cardSlide(t, {gain:0.55, len:0.06, pan:0.1});
+  grain(t + 0.16, {f0:2600, f1:4200, q:0.6, a:0.09, dur:0.08, gain:0.075, pan:0.1, verb:0.18, sweep:0.2});
+  cardLand(t + 0.42, {gain:0.72, soft:0.6, pan:0.1, verb:0.24});
+  /* 王牌定了，桌子換色——給一顆很輕的低音當註腳 */
+  rhodes(t + 0.44, {f:N.F3, dur:1.2, gain:0.045, pan:0, verb:0.45, index:1.9, lp:2600});
+};
+
+/* 有人放骰子 */
+SFX.bid = function(pan){ if(live()) dieRoll(now() + 0.01, {pan:pan || 0, gain:0.85}); };
+
+/* 出牌：飛過去，然後落在檯面上。fly 是飛行時間（毫秒），跟畫面同一個數字。 */
+SFX.play = function(o){
+  if(!live()) return;
+  o = o || {};
+  var t = now() + 0.01, fly = (o.fly || 340) / 1000;
+  whoosh(t, {dur:fly, gain:o.mine ? 1 : 0.7, pan:(o.pan || 0) * 0.7});
+  if(o.mine) cardSlide(t, {gain:0.5, len:0.05, pan:0});       /* 從手上抽出來 */
+  cardLand(t + fly * 0.93, {
+    gain:o.mine ? 0.95 : 0.8 * (1 - 0.22 * (o.far || 0)),
+    pan:o.pan || 0, soft:Math.min(0.7, (o.stack || 0) * 0.2),
+    verb:0.16 + 0.12 * (o.far || 0)
+  });
+};
+
+/* 這一墩定了：贏的那張往贏家推出去一小段 */
+SFX.push = function(pan){
+  if(!live()) return;
+  var t = now() + 0.01;
+  grain(t, {f0:1500, f1:700, q:0.8, a:0.02, dur:0.09, gain:0.46, pan:pan||0, verb:0.22, sweep:0.12});
+  thump(t + 0.03, {f:112, dur:0.07, gain:0.07, pan:(pan||0)*0.5, verb:0.1});
+};
+
+/* 收墩：整疊拖向贏家；是我贏的就多一顆暖音 */
+SFX.collect = function(o){
+  if(!live()) return;
+  o = o || {};
+  var t = now() + 0.01, d = (o.dur || 300) / 1000;
+  sweep(t, {dur:d, gain:0.9, pan:(o.pan || 0) * 0.8});
+  if(o.mine){
+    pack(t + d + 0.04, {gain:0.7, pan:o.pan || 0.5});
+    rhodes(t + d + 0.05, {f:N.C5, dur:0.85, gain:0.075, pan:0.12, verb:0.4, index:2.2});
+    rhodes(t + d + 0.055, {f:N.F4, dur:1.0, gain:0.06, pan:-0.06, verb:0.4, index:2.0, mallet:false});
+  }
+};
+
+/* 輪到你了。連線的時候這顆最重要——人不會一直盯著螢幕。
+   兩個音往上走五度，音量壓得很低，殘響給多，像從房間另一頭傳來。
+   音高刻意放在 A4／E5：手機和筆電的喇叭在 300Hz 以下幾乎不出聲，
+   原本寫在 A3／E4 的時候，在桌機上很好聽，在手機上等於沒有這顆。 */
+SFX.turn = function(){
+  if(!live() || !gate("turn", 1200)) return;
+  var t = now() + 0.01;
+  rhodes(t,        {f:N.A4, dur:0.9,  gain:0.062, pan:-0.1, verb:0.5, index:2.0, lp:4200});
+  rhodes(t + 0.1,  {f:N.E5, dur:1.15, gain:0.07,  pan:0.1,  verb:0.55, index:2.2, lp:4800});
+  rhodes(t,        {f:N.A3, dur:1.0,  gain:0.05,  pan:0,    verb:0.45, index:1.6, lp:2200, mallet:false});
+};
+
+/* 一局結束：叫中就是一串上行的九和弦，沒叫中就往下掉一個小三度。
+   沒叫中的那顆不是「錯誤音」——是低了一點、暗了一點，就這樣。 */
+SFX.round = function(hit){
+  if(!live()) return;
+  var t = now() + 0.02;
+  sweep(t, {dur:0.34, gain:0.5, pan:0});
+  if(hit){
+    var arp = [[N.F4, -0.18], [N.A4, 0.0], [N.C5, 0.14], [N.E5, -0.08]];
+    for(var i=0;i<arp.length;i++)
+      rhodes(t + 0.3 + i * 0.075, {
+        f:arp[i][0], dur:1.4 - i * 0.12, gain:0.115 - i * 0.012,
+        pan:arp[i][1], verb:0.42, index:2.4
+      });
+    rhodes(t + 0.3, {f:N.F2, dur:1.7, gain:0.07, pan:0, verb:0.3, index:1.2, lp:900, mallet:false});
+  }else{
+    rhodes(t + 0.3,  {f:N.F4, dur:1.0, gain:0.08,  pan:-0.06, verb:0.4,  index:1.7, lp:2200});
+    rhodes(t + 0.39, {f:N.D4, dur:1.5, gain:0.075, pan:0.06,  verb:0.42, index:1.5, lp:1900});
+    rhodes(t + 0.39, {f:N.D3, dur:1.6, gain:0.055, pan:0,     verb:0.35, index:1.2, lp:900, mallet:false});
+  }
+};
+
+/* 收桌 */
+SFX.over = function(win){
+  if(!live()) return;
+  var t = now() + 0.03;
+  sweep(t, {dur:0.42, gain:0.85});
+  pack(t + 0.46, {gain:0.95, pan:-0.1});
+  var base = t + 0.6;
+  var chord = win ? [[N.F3,0,0],[N.C4,0.085,-0.14],[N.A4,0.17,0.12],[N.E5,0.255,-0.08],[N.A5,0.34,0.16],[N.C6,0.43,0]]
+                  : [[N.F3,0,0],[N.C4,0.09,-0.12],[N.G4,0.18,0.1],[N.D5,0.27,-0.06]];
+  for(var i=0;i<chord.length;i++)
+    rhodes(base + chord[i][1], {
+      f:chord[i][0], dur:2.6 - i * 0.18, gain:(win ? 0.125 : 0.1) - i * 0.011,
+      pan:chord[i][2], verb:0.55, index:2.3
+    });
+  rhodes(base, {f:N.Bb2, dur:3.0, gain:0.075, pan:0, verb:0.35, index:1.1, lp:800, mallet:false});
+};
+
+/* 有人入座／加入房間 */
+SFX.join = function(){
+  if(!live() || !gate("join", 400)) return;
+  var t = now() + 0.01;
+  rhodes(t,       {f:N.C4, dur:0.7, gain:0.06, pan:-0.08, verb:0.45, index:2.0, lp:3600});
+  rhodes(t + 0.09,{f:N.G4, dur:0.9, gain:0.065, pan:0.08, verb:0.5, index:2.2, lp:4000});
+};
+
+/* 不能出的牌、伺服器回絕：一顆悶掉的低音，不刺耳 */
+SFX.no = function(){
+  if(!live() || !gate("no", 260)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:700, f1:380, q:1.4, a:0.001, dur:0.05, gain:0.5, pan:0, verb:0.12, pink:false});
+  /* 悶歸悶，還是得在手機喇叭上聽得到：中頻補一小顆短的，不然這顆等於不存在 */
+  grain(t, {f0:1250, f1:820, q:2.2, a:0.001, dur:0.028, gain:0.34, pan:0, verb:0.1, pink:false});
+  rhodes(t, {f:N.F3, dur:0.4, gain:0.11, pan:0, verb:0.2, index:1.1, lp:760, mallet:false});
+  rhodes(t + 0.06, {f:N.F4, dur:0.3, gain:0.055, pan:0, verb:0.18, index:1.0, lp:1100, mallet:false});
+};
+
+/* ---------------- 介面 ----------------
+   桌沿是胡桃木，按鈕的聲音就照木頭做：短、低、乾。 */
+SFX.tap = function(){
+  if(!live() || !gate("tap", 45)) return;
+  var t = now() + 0.005, k = rnd(0.94, 1.07);
+  grain(t, {f0:1150*k, f1:680*k, q:1.6, a:0.001, dur:0.028, gain:0.85, pan:0, verb:0.12, pink:false});
+  grain(t, {f0:2400*k, f1:1600*k, q:2.4, a:0.0008, dur:0.014, gain:0.3, pan:0, verb:0.1, pink:false});
+  thump(t, {f:196*k, dur:0.034, gain:0.13, pan:0, verb:0.08});
+};
+SFX.open = function(){
+  if(!live() || !gate("ov", 120)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:430, f1:2400, q:0.6, a:0.11, dur:0.1, gain:0.26, pan:0, verb:0.28, sweep:0.2});
+  rhodes(t + 0.05, {f:N.C5, dur:0.5, gain:0.06, pan:0, verb:0.4, index:1.4, lp:3000, mallet:false});
+};
+SFX.close = function(){
+  if(!live() || !gate("ov", 120)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:2000, f1:430, q:0.6, a:0.02, dur:0.15, gain:0.19, pan:0, verb:0.22, sweep:0.17, pink:false});
+  thump(t + 0.1, {f:150, dur:0.08, gain:0.055, pan:0, verb:0.1});
+};
+/* 平面／立體：整個房間換一次 */
+SFX.toggle = function(){
+  if(!live() || !gate("tg", 200)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:240, f1:1500, q:0.5, a:0.13, dur:0.22, gain:0.1, pan:0, verb:0.35, sweep:0.28});
+  thump(t + 0.02, {f:62, dur:0.4, gain:0.11, pan:0, verb:0.2, bend:1.45});
+  rhodes(t + 0.14, {f:N.F4, dur:0.8, gain:0.045, pan:0, verb:0.45, index:2.0, lp:3600, mallet:false});
+};
+
+/* ---------------- 開關 ---------------- */
+SFX.enabled = function(){ return PREF.on; };
+SFX.set = function(on){
+  PREF.on = !!on; savePref();
+  if(!ctx){ if(PREF.on) unlock(); return; }
+  unlock();
+  master.gain.cancelScheduledValues(ctx.currentTime);
+  master.gain.setTargetAtTime(PREF.on ? PREF.vol : 0, ctx.currentTime, 0.02);
+  if(PREF.on) setTimeout(function(){ SFX.tap(); }, 40);
+};
+SFX.volume = function(v){
+  if(v === undefined) return PREF.vol;
+  PREF.vol = Math.max(0, Math.min(1, v)); savePref();
+  if(ctx && PREF.on) master.gain.setTargetAtTime(PREF.vol, ctx.currentTime, 0.02);
+};
+
+/* ---------------- 牌局狀態差分 ----------------
+   render() 每畫一次就把 G 遞進來一次（連線模式每 420ms 一次）。
+   這裡跟上一次比對，只有「真的變了」才發聲。
+   照的是引擎的狀態，不是 DOM，所以平面與立體共用這一份。 */
+var M = {ri:-1, phase:"", played:-1, tn:-1, flip:-1, bids:{}, log:0, myTurn:false, n:0, seats:"",
+         shuffleAt:0};
+
+/* 座位在耳朵裡的位置：自己在正前方（不偏），對面也在正中間但遠。
+   越遠的乾聲越小、殘響越多——這是距離，不是音量。 */
+function seatAudio(i, me, n){
+  if(i < 0 || me < 0 || !n) return {pan:0, far:0.4};
+  var k = ((i - me) % n + n) % n;
+  var a = k * Math.PI * 2 / n;
+  return {pan:Math.sin(a) * 0.6, far:(1 - Math.cos(a)) / 2};
+}
+
+SFX.frame = function(G, me, best, o){
+  if(!G) return;
+  LASTG = G;
+  o = o || {};
+  /* 這裡從頁面一載入就開始跑，不等音訊解鎖——每一顆聲音自己會檢查 live()。
+     這樣做的理由：使用者第一次點擊之前，牌局已經發過牌、可能也叫過幾輪了。
+     如果等到解鎖才開始比對，第一次點擊會突然補放一整串早就過去的事。
+     狀態一路跟著走、聲音才等許可，接上的那一刻就只會聽到「接下來」發生的事。 */
+  var n = G.cfg ? G.cfg.n : 0;
+  var is3d = document.body.classList.contains("is3d");
+  var sp = o.speed || 1200;
+
+  /* 換人數／重開一桌：把記憶清掉，別把新桌子的第一手當成舊桌子的變化 */
+  if(n !== M.n){ M.n = n; M.ri = -1; M.phase = ""; M.played = -1; M.tn = -1; M.flip = -1; M.bids = {}; M.log = G.log ? G.log.length : 0; }
+
+  /* ---- 新的一局：洗牌 + 發牌 + 翻王牌 ---- */
+  if(G.ri !== M.ri){
+    var firstDeal = M.ri < 0;
+    M.ri = G.ri; M.bids = {}; M.played = -1; M.tn = -1;
+    /* 上一局的洗牌還沒放到就換局了（有人按「馬上開始」）：取消它，別蓋到新局的發牌 */
+    if(M.shuffleAt){ clearTimeout(M.shuffleAt); M.shuffleAt = 0; }
+    if(G.ri >= 0 && G.phase !== "lobby" && G.hs > 0){
+      /* 發牌要多久：跟著畫面。平面只演我手上那幾張，立體繞整桌一圈；
+         立體版換局時桌上的牌要先飛回牌庫，發牌是等它們回去才開始的 */
+      var cards, span, pre = 0;
+      if(is3d){
+        var step = Math.min(95, Math.max(38, sp * 0.11)) / 1000;
+        var back = G.ri > 0 && G.ladder ? n * (G.ladder[G.ri - 1] || 0) : 0;
+        if(back){ pre = 0.42 + back * 0.014; SFX.gather(back, pre); }
+        cards = n * G.hs; span = Math.max(0.2, (cards - 1) * step);
+      }else{
+        cards = G.hs; span = Math.max(0.12, (G.hs - 1) * 0.034);
+      }
+      /* 第一局沒有「上一局的空檔」可以洗牌，只好墊在發牌前面 */
+      if(firstDeal || G.ri === 0) pre += SFX.shuffle(0.02);
+      var after = SFX.deal(cards, span, pre);
+      if(G.trumpCard){
+        M.flip = G.ri;
+        SFX.flip(is3d ? after + 0.42 : Math.max(0.05, pre));
+      }
+    }
+  }
+  /* 王牌是後來才出現的（連線模式先收到 lobby 再收到牌） */
+  if(G.trumpCard && M.flip !== G.ri && G.ri >= 0){ M.flip = G.ri; SFX.flip(0.05); }
+
+  /* ---- 骰子 ---- */
+  if(G.bids) for(var i=0;i<n;i++){
+    var v = G.bids[i];
+    if(v === null || v === undefined) continue;
+    if(M.bids[i] === v) continue;
+    M.bids[i] = v;
+    /* 最後一個人叫完，phase 同一輪就變成 play 了——不能拿「還在叫牌階段」當條件，
+       否則整局只有最後那顆骰子是無聲的 */
+    SFX.bid(seatAudio(i, me, n).pan);
+  }
+
+  /* ---- 出牌 ---- */
+  var tn = G.trick ? G.trick.length : 0;
+  if(tn > M.tn && tn > 0 && M.tn >= 0){
+    for(var j = Math.max(0, M.tn); j < tn; j++){
+      var t = G.trick[j], sa = seatAudio(t.p, me, n);
+      SFX.play({
+        mine:t.p === me, pan:sa.pan, far:sa.far, stack:j,
+        fly:t.p === me ? Math.min(460, Math.max(240, sp * 0.62))
+                       : (is3d ? Math.min(480, Math.max(230, sp * 0.62)) : 340)
+      });
+    }
+  }
+  if(tn !== M.tn) M.tn = tn;
+
+  /* ---- 一墩打完：定格、收墩 ---- */
+  if(G.phase !== M.phase){
+    var was = M.phase;
+    M.phase = G.phase;
+    if(G.phase === "trickend" && best >= 0 && G.trick && G.trick[best]){
+      var w = G.trick[best].p, b = o.beats || {land:400, push:0, hold:900, sweep:260};
+      var wa = seatAudio(w, me, n);
+      setTimeout(function(){ SFX.push(wa.pan); }, b.land);
+      setTimeout(function(){ SFX.collect({mine:w === me, pan:wa.pan, dur:b.sweep}); },
+                 b.land + b.push + b.hold);
+      M.tn = -1;                                  /* 下一墩從頭數 */
+    }
+    if(G.phase === "roundend" && G.log && G.log.length){
+      var row = G.log[G.log.length - 1];
+      var cell = me >= 0 && row.cells ? row.cells[me] : null;
+      var lag = (o.beats ? o.beats.sweep : 460) + 120;
+      setTimeout(function(){ SFX.round(cell ? cell.hit : true); }, lag);
+      /* 這一局的分算完了，桌上安靜下來——荷官在收牌、洗牌，下一局才開始。
+         這段空檔（roundGap，至少 2.2 秒）本來完全沒有聲音 */
+      if(G.ri + 1 < G.ladder.length)
+        M.shuffleAt = setTimeout(function(){ M.shuffleAt = 0; SFX.shuffle(0.02, 0.8); }, lag + 1000);
+      M.log = G.log.length;
+    }
+    if(G.phase === "over") setTimeout(function(){
+      var top = Math.max.apply(null, G.score), mine = me >= 0 ? G.score[me] : -Infinity;
+      SFX.over(mine === top);
+    }, 320);
+    if(was === "lobby" && G.phase === "bid") { /* 開局：發牌聲已經在上面發過了 */ }
+  }
+
+  /* ---- 輪到我 ---- */
+  var mine = me >= 0 && G.turn === me && (G.phase === "bid" || G.phase === "play");
+  if(mine && !M.myTurn) SFX.turn();
+  M.myTurn = mine;
+
+  /* ---- 有人入座 ---- */
+  if(G.seats){
+    var key = G.seats.map(function(s){ return s.cid || ""; }).join("|");
+    if(M.seats && key !== M.seats && G.phase === "lobby") SFX.join();
+    M.seats = key;
+  }
+};
+
+/* ---------------- 介面的聲音 ----------------
+   用事件委派，不去改任何一個 onclick——那些 handler 是別人的地盤。 */
+var OPENERS = {btnRules:1, btnRoom:1, btnSetup:1, btnFinal:1, btnLobby:1, endAgain:1, setupStart:1};
+var CLOSERS = {rulesClose:1, setupCancel:1, endClose:1, scoreClose:1};
+document.addEventListener("click", function(e){
+  var el = e.target.closest ? e.target.closest("button, .opt, .bidbtn, [data-net]") : null;
+  if(!el) return;
+  if(el.closest("[data-nosfx]")) return;      /* 想自己管聲音的地方掛這個屬性 */
+  if(el.id && OPENERS[el.id]) return SFX.open();
+  if(el.id && CLOSERS[el.id]) return SFX.close();
+  if(el.id === "btnSfx") return;                             /* 開關自己會出聲 */
+  if(el.id === "btnScore")
+    return setTimeout(function(){
+      document.body.classList.contains("score-open") ? SFX.open() : SFX.close();
+    }, 0);
+  if(el.closest("#dim")) return SFX.toggle();
+  if(el.dataset && el.dataset.net) return el.dataset.net === "close" ? SFX.close() : SFX.tap();
+  if(el.hasAttribute && el.hasAttribute("data-card")){
+    if(el.disabled) return SFX.no();
+    return;                                                   /* 出牌的聲音由 frame() 負責 */
+  }
+  SFX.tap();
+}, true);
+
+/* ---------------- 換成錄音 ----------------
+   哪天要把某幾顆換成真的錄音（例如買了商用音效庫），在頁面載入後呼叫：
+     SFX.load({ play:["sfx/card_a.wav","sfx/card_b.wav"], bid:["sfx/die.wav"] })
+   給幾個檔就會輪流用（round-robin），避免同一個檔連放聽起來很假。
+   有錄音的那顆就走錄音，其餘照舊合成，不用一次換完。 */
+var SAMP = {};
+SFX.load = function(map){
+  boot();
+  Object.keys(map).forEach(function(k){
+    var urls = [].concat(map[k]);
+    Promise.all(urls.map(function(u){
+      return fetch(u).then(function(r){ return r.arrayBuffer(); })
+                     .then(function(a){ return ctx.decodeAudioData(a); });
+    })).then(function(bufs){
+      SAMP[k] = {bufs:bufs, i:0};
+      var orig = SFX[k];
+      SFX[k] = function(o){
+        if(!live()) return;
+        o = o || {};
+        var s = SAMP[k];
+        var src = ctx.createBufferSource();
+        src.buffer = s.bufs[s.i++ % s.bufs.length];
+        src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.06;   /* 每次一點點不一樣 */
+        var g = ctx.createGain();
+        g.gain.value = (o.gain === undefined ? 1 : o.gain) * 0.9;
+        src.connect(g);
+        out(g, o.pan || 0, o.verb === undefined ? 0.12 : o.verb);
+        src.start(now() + 0.005);
+      };
+      SFX[k].synth = orig;
+    }).catch(function(){});
+  });
+};
+
+/* 把某一顆離線算成一段音訊。用途有兩個：
+     · 開發時量它到底長什麼樣（峰值、時值、頻譜重心）
+     · 想把合成的結果導成 wav 交給別人接手，也是從這裡出去
+   SFX.bounce("play", {mine:true}, 1.2).then(buf => ...) */
+SFX.bounce = function(name, arg, sec){
+  var OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if(!OC || typeof SFX[name] !== "function") return Promise.reject(new Error("no " + name));
+  var keep = [ctx, bus, wet, send, master, ready, noiseBuf, pinkBuf, unlocked, offline, PREF.on];
+  ctx = null; ready = false; unlocked = true; PREF.on = true; lastAt = {};
+  var oc = new OC(2, Math.ceil((sec || 2) * 44100), 44100);
+  boot(oc);
+  master.gain.value = 0.8;
+  try{ (SFX[name].synth || SFX[name]).apply(null, [].concat(arg === undefined ? [] : arg)); }catch(e){}
+  return oc.startRendering().then(function(b){
+    ctx = keep[0]; bus = keep[1]; wet = keep[2]; send = keep[3]; master = keep[4];
+    ready = keep[5]; noiseBuf = keep[6]; pinkBuf = keep[7]; unlocked = keep[8];
+    offline = keep[9]; PREF.on = keep[10]; lastAt = {};
+    return b;
+  });
+};
+
+/* 頂列那顆開關。按鈕的行為歸這一層自己管，
+   不去動 classic script 裡那一片 onclick 綁定。 */
+(function(){
+  var b = document.getElementById("btnSfx");
+  if(!b) return;
+  var paint = function(){
+    b.setAttribute("aria-pressed", PREF.on ? "true" : "false");
+    b.setAttribute("aria-label", PREF.on ? "音效開著，點一下關掉" : "音效關著，點一下打開");
+  };
+  paint();
+  b.addEventListener("click", function(){ SFX.set(!PREF.on); paint(); });
+})();
+
+/* console 裡想單獨試某一顆：SFX.demo("round", true) */
+SFX.demo = function(name, a){ unlock(); if(typeof SFX[name] === "function") SFX[name](a); };
+
+window.SFX = SFX;
+})();
+</script>
+
 <script>
 (function(){
 "use strict";
+
+/* ================= 節奏：想調就調這裡 ================= */
+/* 這一區是給人改的，單位全部是毫秒。改完存檔、重新整理就生效。
+   懶得改檔也行：
+     · 網址加 ?hold=4000 → 三個速度檔的定格都變 4 秒；?pace=1400 → 基準節奏
+     · 開 console 直接改，例如 TUNE.trickHold.slow = 5000，下一墩就照新的走，
+       不用重新整理。調到滿意再把數字寫回這裡。 */
+const TUNE = {
+  /* 一墩打完分四段：最後一張牌落定 → 贏的那張推出去 → 完全定格 → 收墩飛向贏家 */
+  trickHold: {slow:2600, mid:1400, fast:700},   /* 定格多久。三檔各一個，最常動的就是這個 */
+  trickPush: 300,                               /* 推出去的那一下花多久 */
+  trickSweep: 460,                              /* 收墩飛走花多久 */
+
+  /* 一局打完到下一局自動開始之間的停頓 */
+  roundGap: 2200,
+
+  /* 慢／中／快三顆按鈕的基準節奏，越大越慢。
+     叫牌、出牌、發牌、牌飛的速度全都跟著它走——整場覺得太快就把 slow 開大 */
+  speeds: {slow:900, mid:520, fast:200}
+};
+window.TUNE = TUNE;                             /* 讓 console 改得到 */
+try{
+  const q = new URLSearchParams(location.search);
+  const hold = +q.get("hold"), pace = +q.get("pace");
+  if(hold > 0) for(const k in TUNE.trickHold) TUNE.trickHold[k] = hold;
+  if(pace > 0) for(const k in TUNE.speeds) TUNE.speeds[k] = pace;
+}catch(e){}
 
 /* ================= 牌 ================= */
 const SUITS = [
@@ -979,6 +1987,21 @@ const SUITS = [
   {k:"D", sym:"p-d", name:"方塊", red:true},
   {k:"C", sym:"p-c", name:"梅花", red:false}
 ];
+/* 四個花色的形狀（0 0 24 24）。頁面上的 <symbol> 與 3D 貼圖都吃這一組 */
+const SUIT_D = [
+  /* 黑桃：尖頭、圓潤雙葉、底部收成有腰的柄 */
+  "M12 1.5C10.1 4.3 2.5 9.4 2.5 14.5c0 2.9 2.05 4.9 4.55 4.9 1.75 0 3.1-.95 3.9-2.35.1 2.75-.75 4.55-2.55 5.45h7.2c-1.8-.9-2.65-2.7-2.55-5.45.8 1.4 2.15 2.35 3.9 2.35 2.5 0 4.55-2 4.55-4.9C21.5 9.4 13.9 4.3 12 1.5z",
+  /* 紅心：頂凹深一點、尾端收尖 */
+  "M12 21.6C11.1 20.9 2.4 15 2.4 8.8 2.4 5.4 4.8 3 7.7 3c1.9 0 3.5 1.1 4.3 2.7C12.8 4.1 14.4 3 16.3 3c2.9 0 5.3 2.4 5.3 5.8 0 6.2-8.7 12.1-9.6 12.8z",
+  /* 方塊：四邊微微外凸的法式菱形 */
+  "M12 1.4c2.4 4.4 5.2 8 8.9 10.6-3.7 2.6-6.5 6.2-8.9 10.6-2.4-4.4-5.2-8-8.9-10.6C6.8 9.4 9.6 5.8 12 1.4z",
+  /* 梅花：三葉等大，柄從中心往下張開 */
+  "M12 2.3a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM6.3 8.9a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM17.7 8.9a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM11 11.2c.35 3.4-.2 7.1-2.7 10.4h7.4c-2.5-3.3-3.05-7-2.7-10.4z"
+];
+SUITS.forEach(function(su, i){
+  const p = document.querySelector("#" + su.sym + " path");
+  if(p) p.setAttribute("d", SUIT_D[i]);
+});
 const FACE = {11:"J",12:"Q",13:"K",14:"A"};
 const rankLabel = r => FACE[r] || String(r);
 const PEAK_CAP = 11;
@@ -1170,7 +2193,7 @@ const MY = {
   name:(function(){ try{ return localStorage.getItem("ud.name") || ""; }catch(e){ return ""; } })()
 };
 const NET = {code:null, chan:null, sb:null, state:"ok", err:"", busy:false};
-let G = null, MODE = "solo", SPEED = 520, applying = false;
+let G = null, MODE = "solo", SPEED_KEY = "mid", SPEED = TUNE.speeds.mid, applying = false;
 let MYHAND = [], MYHAND_RI = -1;
 
 const SEEN = {round:-1, phase:"", bids:{}, keys:{}, scores:[], flip:-1, won:0};
@@ -1178,10 +2201,22 @@ const SEEN = {round:-1, phase:"", bids:{}, keys:{}, scores:[], flip:-1, won:0};
 /* 我剛按下的那張牌在畫面上的位置——出牌動畫要從那裡起飛 */
 let PLAY_FROM = null;
 /* 一局打完到下一局自動開始之間的停頓 */
-const roundGap = () => Math.max(2200, SPEED * 4);
-/* 一墩打完到收墩之間的停頓。至少兩秒：贏的那張推出來定在那裡，
-   讓大家看完是誰用哪張牌贏的，才把牌收走、開下一墩 */
-const trickGap = () => Math.max(2000, SPEED * 2.6);
+const roundGap = () => Math.max(TUNE.roundGap, SPEED * 4);
+/* 一墩打完的四段節奏。2D 與 3D 共用這一份，改 TUNE 兩邊一起變 */
+function trickBeats(){
+  const hold = TUNE.trickHold[SPEED_KEY];
+  return {
+    land: Math.max(380, Math.round(SPEED * .7)),                  /* 等最後一張牌落定 */
+    push: Math.max(0, TUNE.trickPush),                            /* 贏的那張推出去 */
+    hold: Math.max(0, hold === undefined ? TUNE.trickHold.mid : hold),   /* 完全不動 */
+    sweep: Math.max(60, TUNE.trickSweep)                          /* 收墩飛向贏家 */
+  };
+}
+/* 一墩打完到下一墩開始之間的總停頓 */
+const trickGap = () => {
+  const b = trickBeats();
+  return b.land + b.push + b.hold + b.sweep + 60;
+};
 
 const mySeat = () => {
   if(!G) return -1;
@@ -1224,10 +2259,13 @@ setInterval(function(){
   const now = Date.now(), d = SPEED;
   const firstBid = G.phase === "bid" && G.bids.every(b => b === null);
   const bidWait = firstBid && !REDUCED ? Math.max(d*.7, 980) : d*.7;
+  /* 叫完到第一張牌之間多停一下：立體牌桌上叫墩的收場判詞要讀得完，牌才飛進來 */
+  const firstPlay = G.phase === "play" && G.played === 0 && !G.trick.length;
+  const playWait = firstPlay && IS3D() && !REDUCED ? Math.max(d*.8, 2800) : d*.8;
   let changed = false;
   if(G.phase === "bid" && seatPlayable(G.turn) && now - G.at > bidWait){
     applyBid(G, G.turn, aiBid(G, G.turn)); changed = true;
-  }else if(G.phase === "play" && seatPlayable(G.turn) && now - G.at > d*.8){
+  }else if(G.phase === "play" && seatPlayable(G.turn) && now - G.at > playWait){
     applyPlay(G, G.turn, aiCard(G, G.turn).id); changed = true;
   }else if(G.phase === "trickend" && now - G.at > trickGap()){
     resolveTrick(G); changed = true;
@@ -1253,7 +2291,7 @@ setInterval(function(){
     if(G.seats[i].kind === "human" && isLive(G.seats[i].cid)){ ticker = i; break; }
   if(ticker < 0 || G.seats[ticker].cid !== MY.pid) return;
   if(rounding) api("next", {code:NET.code});
-  else api("tick", {code:NET.code, speed:SPEED});
+  else api("tick", {code:NET.code, speed:SPEED, gap:trickGap()});
 }, 420);
 
 /* 心跳：告訴大家我還在（不然 30 秒後我的位子會被 AI 接手） */
@@ -1404,49 +2442,457 @@ const LAY = {
   9 :[[0,0],[1,0],[0,1/3],[1,1/3],[.5,.5],[0,2/3],[1,2/3],[0,1],[1,1]],
   10:[[0,0],[1,0],[.5,1/6],[0,1/3],[1,1/3],[0,2/3],[1,2/3],[.5,5/6],[0,1],[1,1]]
 };
-function cardFace(card){
-  const href = "#" + SUITS[card.s].sym;
-  const lab = rankLabel(card.r);
+/* ================= 牌面主題 ================= */
+/* 五套可切換的牌面（設定裡選，預設「愛德華金邊」）。每套只描述材質：紙色、墨色、字型、角標位置、
+   人像配色、邊框與中央裝飾、牌背。版面（viewBox 0 0 100 140、點陣、對稱角標）五套共用。
+   2D 的 cardFace() 與 3D 的貼圖都從 faceSpec() 取同一份：art 是 SVG 片段（兩邊都畫得出來），
+   texts 是字——2D 用 <text>，3D 用 canvas fillText，因為外部字型進不了當成圖片載入的 SVG。 */
+const CARD_DIR = "cards/";
+const COURT_KEYS = ["JS","JH","JD","JC","QS","QH","QD","QC","KS","KH","KD","KC"];
+/* 人像框。左邊留到 23.5：角標的 Q 尾巴（Baskerville、Cormorant 都長）才不會掃到框線 */
+const PIC = {x:23.5, y:27.6, w:53, h:84.8};
+/* 黑桃 A 的緞帶（100×140 座標） */
+const ACE = {
+  ribbon:"M34 92.5h32v7.5H34z",
+  tails:"M34 92.5h-4.6l2.3 3.75-2.3 3.75H34zM66 92.5h4.6l-2.3 3.75 2.3 3.75H66z"
+};
+const NAME_OF = {11:"JACK", 12:"QUEEN", 13:"KING"};
+const R180 = '<g transform="rotate(180 50 70)">';
+const escX = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 
-  function unit(x, y, w){
-    const cx = 28 + x * 44, cy = 33 + y * 74, h = w;
-    const g = '<use href="' + href + '" x="' + (cx - w/2).toFixed(2) + '" y="' + (cy - h/2).toFixed(2) +
-              '" width="' + w + '" height="' + h + '"/>';
-    return y > .5
-      ? '<g transform="rotate(180 ' + cx.toFixed(2) + ' ' + cy.toFixed(2) + ')">' + g + '</g>'
-      : g;
-  }
-
-  let mid;
-  if(card.r === 14){
-    mid = unit(.5, .5, 42);
-  }else if(card.r >= 11){
-    /* 花牌：上下對稱的雙頭版面，跟實體牌一樣是點對稱的 */
-    const half = '<text x="50" y="55" font-size="30" text-anchor="middle">' + lab + '</text>' +
-                 '<use href="' + href + '" x="44" y="56" width="12" height="12"/>';
-    mid =
-      '<rect class="ornament" x="23.5" y="23.5" width="53" height="93" rx="4" fill="none" ' +
-        'stroke="currentColor" stroke-width="1" opacity=".34"/>' +
-      '<rect class="ornament" x="26.5" y="26.5" width="47" height="87" rx="2.5" fill="none" ' +
-        'stroke="currentColor" stroke-width=".7" opacity=".2"/>' +
-      '<line x1="26.5" y1="70" x2="73.5" y2="70" stroke="currentColor" stroke-width=".7" opacity=".2"/>' +
-      half + '<g transform="rotate(180 50 70)">' + half + '</g>';
-  }else{
-    mid = LAY[card.r].map(p => unit(p[0], p[1], 15)).join("");
-  }
-
-  /* 角標：左上一組，右下一組（旋轉 180 度），跟實體牌相同 */
-  const corner = '<text x="12.5" y="26" font-size="' + (lab.length > 1 ? 17 : 22) +
-      '" text-anchor="middle">' + lab + '</text>' +
-    '<use href="' + href + '" x="7.5" y="29.5" width="10" height="10"/>';
-
-  return '<svg class="cf" viewBox="0 0 100 140" aria-hidden="true">' +
-    corner + '<g transform="rotate(180 50 70)">' + corner + '</g>' + mid + '</svg>';
+function rectSVG(x, y, w, h, attrs){
+  return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" ' + attrs + '/>';
 }
+function insetSVG(i, attrs, rx){
+  return rectSVG(i, i, 100 - 2*i, 140 - 2*i,
+    'rx="' + (rx == null ? Math.max(1, 5.8 - i*.5).toFixed(1) : rx) + '" fill="none" ' + attrs);
+}
+/* 一枚花色：<use> 頁面上的 symbol（3D 的獨立 SVG 也自帶同一組 symbol） */
+function pipUse(sym, cx, cy, w, flip){
+  const g = '<use href="#' + sym + '" fill="currentColor" x="' + (cx - w/2).toFixed(2) + '" y="' + (cy - w/2).toFixed(2) +
+    '" width="' + w + '" height="' + w + '"/>';
+  return flip ? '<g transform="rotate(180 ' + cx.toFixed(2) + ' ' + cy.toFixed(2) + ')">' + g + '</g>' : g;
+}
+function pipsSVG(sym, r, w, x0, dx){
+  return LAY[r].map(p => pipUse(sym, x0 + p[0]*dx, 33 + p[1]*74, w, p[1] > .5)).join("");
+}
+/* 牌背用：花色直接內嵌路徑（牌背是獨立 SVG，沒有頁面的 symbol） */
+function pipPath(i, x, y, rot, scale, fill, op){
+  return '<g transform="translate(' + x + ' ' + y + ') rotate(' + rot + ') scale(' + scale + ') translate(-12 -12)">' +
+    '<path d="' + SUIT_D[i] + '" fill="' + fill + '"' + (op != null ? ' opacity="' + op + '"' : '') + '/></g>';
+}
+function T(str, x, y, size, o){ return Object.assign({str:str, x:x, y:y, size:size}, o || {}); }
+
+/* ---- 宮廷牌人像 ----
+   docs/cards/{J,Q,K}{S,H,D,C}.svg（CC0，Dmitry Fomin，英式雙頭人像），原檔只用五個顏色：
+   墨／深紅／舊金／石板藍／紙白。啟動時把 12 個檔抓成文字，依牌面主題換色：
+   2D 塞成頁面上的 <symbol>，3D 包進獨立 SVG 畫成貼圖。抓不到（例如 file://）就退回 <image> 放原檔。 */
+const COURT_SRC_COLORS = ["#1A1714", "#A32B25", "#C9A552", "#4A5188", "#FBF8F1"];
+const COURT = {txt:null, ready:null};
+function loadCourts(){
+  if(COURT.ready) return COURT.ready;
+  COURT.ready = Promise.all(COURT_KEYS.map(function(k){
+    return fetch(CARD_DIR + k + ".svg").then(r => r.ok ? r.text() : null).catch(() => null);
+  })).then(function(list){
+    if(list.some(t => !t)) return false;
+    COURT.txt = {};
+    list.forEach(function(t, i){
+      COURT.txt[COURT_KEYS[i]] = t.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+    });
+    return true;
+  });
+  return COURT.ready;
+}
+function courtPalette(deck, s){ return typeof deck.court === "function" ? deck.court(s) : deck.court; }
+function courtSymbol(key, pal){
+  const cols = [pal.ci, pal.cr, pal.cg, pal.cs, pal.cw];
+  let t = COURT.txt[key];
+  COURT_SRC_COLORS.forEach(function(c, i){ t = t.split(c).join(cols[i]); });
+  return '<symbol id="court-' + key + '" viewBox="30 30 300 480">' + t + '</symbol>';
+}
+function courtUse(key, standalone){
+  if(COURT.txt || standalone)
+    return '<use href="#court-' + key + '" x="' + PIC.x + '" y="' + PIC.y + '" width="' + PIC.w + '" height="' + PIC.h + '"/>';
+  return '<image href="' + CARD_DIR + key + '.svg" x="' + PIC.x + '" y="' + PIC.y + '" width="' + PIC.w +
+    '" height="' + PIC.h + '" preserveAspectRatio="xMidYMid meet"/>';
+}
+/* 把目前牌面的 12 張人像裝進頁面的 <symbol>，換牌面時整組換掉 */
+function installCourts(){
+  const host = document.getElementById("courtdefs");
+  if(!host || !COURT.txt) return;
+  host.innerHTML = COURT_KEYS.map(k => courtSymbol(k, courtPalette(DECK, "SHDC".indexOf(k[1])))).join("");
+}
+function courtFrame(stroke){ return rectSVG(PIC.x, PIC.y, PIC.w, PIC.h, 'fill="none" ' + stroke); }
+
+/* ---- 五套牌面 ---- */
+const DECKS = {};
+const DECK_ORDER = ["gilt", "casino", "four", "note", "blue"];
+
+/* 愛德華金邊：奶油紙、Baskerville、整張牌鑲雙線金邊，黑桃 A 是稅章式的雙環配金緞帶。
+   像 1900 年前後 Goodall／De La Rue 的英國牌。預設。 */
+DECKS.gilt = {
+  id:"gilt", name:"愛德華金邊", paper:["#F3ECD9", "#E7DCC2"], ink:"#2B2320", red:"#9C2F2A", noise:.18, gold:"#B8964F",
+  font:{family:'"Libre Baskerville",Baskerville,Georgia,serif', weight:700, ls:-.01, load:['700 20px "Libre Baskerville"']},
+  corner:{x:12, size:20, size2:15, base:24.5, pipY:31.5, pw:9.5},
+  pips:{w:15, x0:28, dx:44},
+  court:{ci:"#2B2320", cr:"#9C2F2A", cg:"#B8964F", cs:"#455A78", cw:"#F7F1E2"},
+  frame:function(){
+    const g = this.gold;
+    return insetSVG(3.2, 'stroke="' + g + '" stroke-width=".6" opacity=".95"') +
+           insetSVG(4.8, 'stroke="' + g + '" stroke-width=".3" opacity=".8"');
+  },
+  mid:function(card, o){
+    const g = this.gold;
+    if(card.r === 14 && card.s === 0) return {
+      art:'<ellipse cx="50" cy="70" rx="23" ry="31" fill="none" stroke="currentColor" stroke-width="1"/>' +
+          '<ellipse cx="50" cy="70" rx="20.6" ry="28.4" fill="none" stroke="' + g + '" stroke-width=".5"/>' +
+          pipUse("p-s", 50, 64, 40, false) +
+          '<path d="' + ACE.ribbon + '" fill="' + g + '"/><path d="' + ACE.tails + '" fill="' + g + '" opacity=".8"/>' +
+          '<path d="' + ACE.ribbon + '" fill="none" stroke="currentColor" stroke-width=".35"/>',
+      texts:[T("11", 50, 67.8, 11.5, {fill:o.paper}),
+             T("UP & DOWN", 50, 97.85, 3.8, {fill:this.ink, family:"Archivo,sans-serif", weight:600, ls:.2})]
+    };
+    if(card.r === 14) return {art:'<circle cx="50" cy="70" r="24" fill="none" stroke="' + g + '" stroke-width=".45"/>' + pipUse(o.sym, 50, 70, 34, false)};
+    if(card.r >= 11) return {art:courtUse(o.key, o.standalone) + courtFrame('stroke="' + g + '" stroke-width=".9"') +
+      rectSVG(PIC.x + 1.3, PIC.y + 1.3, PIC.w - 2.6, PIC.h - 2.6, 'fill="none" stroke="' + this.ink + '" stroke-width=".3" opacity=".5"') +
+      [[PIC.x, PIC.y], [PIC.x + PIC.w, PIC.y], [PIC.x, PIC.y + PIC.h], [PIC.x + PIC.w, PIC.y + PIC.h]]
+        .map(p => '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="1.1" fill="' + g + '"/>').join("")};
+    return {art:pipsSVG(o.sym, card.r, 15, 28, 44)};
+  },
+  back:{
+    bg:"#6E2029", num:{y:77.5, size:21, color:"#EFE6CF", ls:-.03}, word:{y:104, size:4.2, color:"#C4A15A"},
+    art:function(){
+      const iv = "#EFE6CF", g = "#C4A15A", cl = "#6E2029";
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">' +
+        '<defs><pattern id="bp" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 2q2-3 4 0t4 0M0 6q2 3 4 0t4 0" fill="none" stroke="' + iv + '" stroke-width=".4" opacity=".3"/></pattern></defs>' +
+        '<rect width="100" height="140" rx="5.8" fill="' + iv + '"/>' +
+        '<rect x="4" y="4" width="92" height="132" rx="3" fill="' + cl + '"/>' +
+        '<rect x="4" y="4" width="92" height="132" rx="3" fill="url(#bp)"/>' +
+        '<rect x="6.2" y="6.2" width="87.6" height="127.6" rx="2.2" fill="none" stroke="' + iv + '" stroke-width=".55" opacity=".8"/>' +
+        '<rect x="8" y="8" width="84" height="124" rx="1.6" fill="none" stroke="' + g + '" stroke-width=".3" opacity=".8"/>' +
+        '<g transform="rotate(45 50 70)"><rect x="34" y="54" width="32" height="32" fill="' + cl + '" stroke="' + iv + '" stroke-width=".8"/>' +
+        '<rect x="36.6" y="56.6" width="26.8" height="26.8" fill="none" stroke="' + g + '" stroke-width=".4"/></g>' +
+        pipPath(0, 16, 16.5, 0, .34, iv, .85) + pipPath(1, 84, 16.5, 0, .34, iv, .85) +
+        pipPath(2, 16, 123.5, 180, .34, iv, .85) + pipPath(3, 84, 123.5, 180, .34, iv, .85) +
+        '</svg>';
+    }
+  }
+};
+
+/* 賭場：亮白紙、Pantone 186 正紅、jumbo 角標（點陣往內縮讓位），人像用 Copag 那種飽和紅藍黃。
+   牌背賭場藍菱格加白邊。 */
+DECKS.casino = {
+  id:"casino", name:"賭場", paper:["#FFFFFF", "#F4F4F2"], ink:"#141416", red:"#CF1126", noise:.05,
+  font:{family:'"Barlow Semi Condensed","Archivo Narrow",sans-serif', weight:700, ls:-.01, load:['700 25px "Barlow Semi Condensed"']},
+  corner:{x:13, size:25, size2:18, base:27, pipY:30.5, pw:11},
+  pips:{w:14, x0:30, dx:40},
+  court:{ci:"#141416", cr:"#CF1126", cg:"#E6B93A", cs:"#1F4E9C", cw:"#FFFFFF"},
+  frame:null,
+  mid:function(card, o){
+    if(card.r === 14 && card.s === 0) return {
+      art:pipUse("p-s", 50, 66, 48, false),
+      texts:[T("11", 50, 71, 15, {fill:"#FFFFFF"}), T("UP & DOWN", 50, 100, 3.8, {family:"Archivo,sans-serif", weight:600, ls:.22})]
+    };
+    if(card.r === 14) return {art:pipUse(o.sym, 50, 70, 42, false)};
+    if(card.r >= 11) return {art:courtUse(o.key, o.standalone) + courtFrame('stroke="' + this.ink + '" stroke-width=".9" opacity=".55"')};
+    return {art:pipsSVG(o.sym, card.r, 14, 30, 40)};
+  },
+  back:{
+    bg:"#1D4F9E", num:{y:76, size:16, color:"#FFFFFF", ls:0}, word:null,
+    art:function(){
+      const bl = "#1D4F9E";
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">' +
+        '<defs><pattern id="bp" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 2.5h5M2.5 0v5" stroke="#fff" stroke-width=".38" opacity=".55"/></pattern></defs>' +
+        '<rect width="100" height="140" rx="5.8" fill="#fff"/>' +
+        '<rect x="4" y="4" width="92" height="132" rx="3" fill="' + bl + '"/>' +
+        '<rect x="4" y="4" width="92" height="132" rx="3" fill="url(#bp)"/>' +
+        '<rect x="6.2" y="6.2" width="87.6" height="127.6" rx="2.2" fill="none" stroke="#fff" stroke-width=".7" opacity=".95"/>' +
+        '<circle cx="50" cy="70" r="12" fill="' + bl + '" stroke="#fff" stroke-width=".8"/>' +
+        '</svg>';
+    }
+  }
+};
+
+/* 賭場四色：Mike Caro 的四色慣例——黑桃黑、紅心紅、方塊藍、梅花綠。角標、點陣、牌邊細框、
+   連人像的衣袍都跟著花色換色（黑桃人像全灰階）。手機上叫墩最不會看錯。 */
+DECKS.four = {
+  id:"four", name:"賭場四色", paper:["#FFFFFF", "#F5F5F3"], ink:"#1B1B1F", red:"#D0342C", noise:.05,
+  suit:["#1B1B1F", "#D0342C", "#1E63C4", "#1F8A4C"],
+  font:{family:'Archivo,sans-serif', weight:700, ls:-.03, load:['700 20px "Archivo"']},
+  corner:{x:12.5, size:20, size2:15.5, base:24.5, pipY:29.5, pw:10},
+  pips:{w:15.5, x0:28, dx:44},
+  court:function(s){
+    return [{ci:"#1B1B1F", cr:"#5A5B63", cg:"#D9B34A", cs:"#3D3F4A", cw:"#FFFFFF"},
+            {ci:"#1B1B1F", cr:"#D0342C", cg:"#E2B542", cs:"#8A3A36", cw:"#FFFFFF"},
+            {ci:"#1B1B1F", cr:"#1E63C4", cg:"#E2B542", cs:"#5B86D3", cw:"#FFFFFF"},
+            {ci:"#1B1B1F", cr:"#1F8A4C", cg:"#E2B542", cs:"#5BA36E", cw:"#FFFFFF"}][s];
+  },
+  frame:function(){ return insetSVG(2.6, 'stroke="currentColor" stroke-width=".5" opacity=".3"'); },
+  mid:function(card, o){
+    if(card.r === 14 && card.s === 0) return {
+      art:pipUse("p-s", 50, 64, 46, false) +
+          '<path d="' + ACE.ribbon + '" fill="currentColor"/><path d="' + ACE.tails + '" fill="currentColor" opacity=".75"/>',
+      texts:[T("11", 50, 68.6, 12.5, {fill:"#FFFFFF"}),
+             T("UP & DOWN", 50, 97.85, 3.8, {fill:"#FFFFFF", family:"Archivo,sans-serif", weight:600, ls:.2})]
+    };
+    if(card.r === 14) return {art:pipUse(o.sym, 50, 70, 38, false)};
+    if(card.r >= 11) return {art:courtUse(o.key, o.standalone) + courtFrame('stroke="currentColor" stroke-width=".8" opacity=".55"')};
+    return {art:pipsSVG(o.sym, card.r, 15.5, 28, 44)};
+  },
+  back:{
+    bg:"#24252B", num:{y:75, size:15, color:"#1B1B1F", ls:-.04}, word:null,
+    art:function(){
+      const c = this.suit || DECKS.four.suit;
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">' +
+        '<defs><pattern id="bp" width="5" height="5" patternUnits="userSpaceOnUse"><circle cx="2.5" cy="2.5" r=".45" fill="#fff" opacity=".18"/></pattern></defs>' +
+        '<rect width="100" height="140" rx="5.8" fill="#fff"/>' +
+        '<rect x="4" y="4" width="92" height="132" rx="3" fill="#24252B"/>' +
+        '<rect x="4" y="4" width="92" height="132" rx="3" fill="url(#bp)"/>' +
+        '<rect x="6.4" y="6.4" width="87.2" height="127.2" rx="2" fill="none" stroke="#fff" stroke-width=".4" opacity=".35"/>' +
+        '<circle cx="50" cy="70" r="22" fill="#fff"/>' +
+        pipPath(0, 50, 55, 0, .5, c[0]) + pipPath(1, 65, 70, 0, .5, c[1]) +
+        pipPath(2, 35, 70, 0, .5, c[2]) + pipPath(3, 50, 85, 0, .5, c[3]) +
+        '</svg>';
+    }
+  }
+};
+
+/* 鈔票雕刻：Kings Wild 的鈔票語言——扭索紋（guilloché）邊框、Cormorant 雕版角標、人像下方的名牌、
+   A 放在同心虛線的玫瑰章裡。黑花色整張墨綠單色雕版，紅花色整張胭脂單色。 */
+DECKS.note = {
+  id:"note", name:"鈔票雕刻", paper:["#EFE8D6", "#E5DCC4"], ink:"#1F3D2B", red:"#8E2A26", noise:.2,
+  font:{family:'"Cormorant Garamond",Garamond,Georgia,serif', weight:700, ls:-.01, lining:true, load:['700 21px "Cormorant Garamond"']},
+  corner:{x:12, size:21, size2:16, base:25.5, pipY:32, pw:9.5},
+  pips:{w:15, x0:28, dx:44},
+  court:function(s){
+    return SUITS[s].red
+      ? {ci:"#5A211E", cr:"#8E2A26", cg:"#C09A8D", cs:"#7A3A34", cw:"#F3EDDC"}
+      : {ci:"#1F3D2B", cr:"#4A6B57", cg:"#93A792", cs:"#37584A", cw:"#F3EDDC"};
+  },
+  frame:function(card){
+    const id = "gpat" + card.s;   /* 每個花色一個 id：頁面上 url(#id) 只認第一個，顏色得跟著花色 */
+    return '<defs><pattern id="' + id + '" width="6" height="3" patternUnits="userSpaceOnUse">' +
+      '<path d="M0 1.5c1-1.5 2-1.5 3 0s2 1.5 3 0M0 1.5c1 1.5 2 1.5 3 0s2-1.5 3 0" fill="none" stroke="currentColor" stroke-width=".28" opacity=".85"/></pattern></defs>' +
+      rectSVG(3.8, 3.8, 92.4, 132.4, 'rx="3.6" fill="none" stroke="url(#' + id + ')" stroke-width="3"') +
+      insetSVG(2.3, 'stroke="currentColor" stroke-width=".35" opacity=".7"') +
+      insetSVG(5.3, 'stroke="currentColor" stroke-width=".35" opacity=".7"');
+  },
+  rosette:function(r){
+    return '<circle cx="50" cy="70" r="' + r + '" fill="none" stroke="currentColor" stroke-width=".9" stroke-dasharray=".5 .7" opacity=".9"/>' +
+      '<circle cx="50" cy="70" r="' + (r - 2.6) + '" fill="none" stroke="currentColor" stroke-width=".5" stroke-dasharray=".3 .5" opacity=".8"/>' +
+      '<circle cx="50" cy="70" r="' + (r - 4.6) + '" fill="none" stroke="currentColor" stroke-width=".3" opacity=".7"/>';
+  },
+  mid:function(card, o){
+    if(card.r === 14 && card.s === 0) return {
+      art:this.rosette(27) + pipUse("p-s", 50, 68, 38, false) + '<rect x="36" y="97" width="28" height="6" fill="currentColor"/>',
+      texts:[T("11", 50, 71.5, 10.5, {fill:o.paper}),
+             T("UP & DOWN", 50, 101.6, 3.8, {fill:o.paper, family:"Archivo,sans-serif", weight:600, ls:.22})]
+    };
+    if(card.r === 14) return {art:this.rosette(26) + pipUse(o.sym, 50, 70, 30, false)};
+    if(card.r >= 11) return {
+      art:courtUse(o.key, o.standalone) + courtFrame('stroke="currentColor" stroke-width=".6"') +
+          '<rect x="33" y="109.2" width="34" height="6.6" fill="' + o.paper + '" stroke="currentColor" stroke-width=".4"/>',
+      texts:[T(NAME_OF[card.r], 50, 114.3, 4.1, {ls:.24})]
+    };
+    return {art:pipsSVG(o.sym, card.r, 15, 28, 44)};
+  },
+  back:{
+    bg:"#1F3D2B", num:{y:77.5, size:21, color:"#EFE8D6", ls:-.01}, word:{y:107, size:4.2, color:"#EFE8D6"},
+    art:function(){
+      const iv = "#EFE8D6", gr = "#1F3D2B";
+      const ring = (r, w, da, op) => '<circle cx="50" cy="70" r="' + r + '" fill="none" stroke="' + iv + '" stroke-width="' + w + '"' +
+        (da ? ' stroke-dasharray="' + da + '"' : '') + ' opacity="' + op + '"/>';
+      /* 四角的面額「11」：兩道短桿，字型進不了這張圖 */
+      const den = (x, y) => '<path d="M' + (x - 2.3) + ' ' + (y - 3.4) + 'v6.8M' + (x + 2.3) + ' ' + (y - 3.4) + 'v6.8" stroke="' + iv +
+        '" stroke-width="1.5" stroke-linecap="round"/><path d="M' + (x - 3.6) + ' ' + (y - 2.2) + 'l1.3-1.2M' + (x + 1) + ' ' + (y - 2.2) +
+        'l1.3-1.2" stroke="' + iv + '" stroke-width=".8" stroke-linecap="round"/>';
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">' +
+        '<defs><pattern id="bp" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><path d="M0 2h4" stroke="' + iv + '" stroke-width=".25" opacity=".22"/></pattern>' +
+        '<pattern id="bq" width="6" height="3" patternUnits="userSpaceOnUse"><path d="M0 1.5c1-1.5 2-1.5 3 0s2 1.5 3 0M0 1.5c1 1.5 2 1.5 3 0s2-1.5 3 0" fill="none" stroke="' + iv + '" stroke-width=".28" opacity=".85"/></pattern></defs>' +
+        '<rect width="100" height="140" rx="5.8" fill="' + iv + '"/>' +
+        '<rect x="3.6" y="3.6" width="92.8" height="132.8" rx="3.4" fill="' + gr + '"/>' +
+        '<rect x="3.6" y="3.6" width="92.8" height="132.8" rx="3.4" fill="url(#bp)"/>' +
+        '<rect x="7" y="7" width="86" height="126" rx="2.4" fill="none" stroke="url(#bq)" stroke-width="3"/>' +
+        '<rect x="5.4" y="5.4" width="89.2" height="129.2" rx="2.8" fill="none" stroke="' + iv + '" stroke-width=".35"/>' +
+        '<rect x="8.6" y="8.6" width="82.8" height="122.8" rx="2" fill="none" stroke="' + iv + '" stroke-width=".35"/>' +
+        ring(29, 1, ".5 .7", .9) + ring(26.4, .6, ".3 .5", .85) + ring(24.2, .3, "", .8) + ring(20, .5, ".2 .8", .7) +
+        '<circle cx="50" cy="70" r="17" fill="' + gr + '" stroke="' + iv + '" stroke-width=".4"/>' +
+        den(19, 22) + den(81, 22) + '<g transform="rotate(180 50 70)">' + den(19, 22) + den(81, 22) + '</g>' +
+        '</svg>';
+    }
+  }
+};
+
+/* 青花：冷白釉面、鈷藍為主色，紅花色用釉裡紅。整張牌一圈回紋邊，人像換成鈷藍（紅花色為釉裡紅）單色，
+   角標明朝體。牌背鈷藍底、白色八瓣蓮紋與回紋帶。 */
+DECKS.blue = {
+  id:"blue", name:"青花", paper:["#FBFCFA", "#EDF0F2"], ink:"#1E3F8F", red:"#B23A2E", noise:.08,
+  font:{family:'"Shippori Mincho B1","Noto Serif TC",serif', weight:800, ls:0, load:['800 20px "Shippori Mincho B1"']},
+  corner:{x:12, size:19.5, size2:15, base:25, pipY:31.5, pw:9.5},
+  pips:{w:15, x0:28, dx:44},
+  court:function(s){
+    return SUITS[s].red
+      ? {ci:"#B23A2E", cr:"#C8635A", cg:"#E2AFA6", cs:"#963129", cw:"#F8F9F7"}
+      : {ci:"#1E3F8F", cr:"#4C6CB8", cg:"#9AB0DB", cs:"#2C4F9E", cw:"#F8F9F7"};
+  },
+  frame:function(card){
+    const id = "kf" + card.s;
+    return '<defs><pattern id="' + id + '" width="6" height="6" patternUnits="userSpaceOnUse">' +
+      '<path d="M0 5h5V1H1v2.5h2.5" fill="none" stroke="currentColor" stroke-width=".5"/></pattern></defs>' +
+      rectSVG(3.8, 3.8, 92.4, 132.4, 'rx="3.6" fill="none" stroke="url(#' + id + ')" stroke-width="3.2"') +
+      insetSVG(2.1, 'stroke="currentColor" stroke-width=".3" opacity=".8"') +
+      insetSVG(5.5, 'stroke="currentColor" stroke-width=".3" opacity=".8"');
+  },
+  rings:'<circle cx="50" cy="70" r="24" fill="none" stroke="currentColor" stroke-width=".8"/>' +
+        '<circle cx="50" cy="70" r="21.5" fill="none" stroke="currentColor" stroke-width=".35"/>',
+  mid:function(card, o){
+    if(card.r === 14 && card.s === 0) return {
+      art:this.rings + pipUse("p-s", 50, 69, 36, false),
+      texts:[T("11", 50, 71.5, 10.5, {fill:o.paper}),
+             T("UP & DOWN", 50, 102, 3.8, {family:"Archivo,sans-serif", weight:600, ls:.22})]
+    };
+    if(card.r === 14) return {art:this.rings + pipUse(o.sym, 50, 70, 30, false)};
+    if(card.r >= 11) return {art:courtUse(o.key, o.standalone) + courtFrame('stroke="currentColor" stroke-width=".7" opacity=".85"')};
+    return {art:pipsSVG(o.sym, card.r, 15, 28, 44)};
+  },
+  back:{
+    bg:"#1E3F8F", num:{y:75, size:13, color:"#F8F9F7", ls:0}, word:{y:114, size:4.2, color:"#F8F9F7"},
+    art:function(){
+      const pw = "#F8F9F7", co = "#1E3F8F";
+      let petals = "";
+      for(let i = 0; i < 8; i++)
+        petals += '<path d="M50 70c-6-9-6-21 0-29c6 8 6 20 0 29z" fill="none" stroke="' + pw + '" stroke-width=".6" transform="rotate(' + (i*45) + ' 50 70)"/>';
+      return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140">' +
+        '<defs><pattern id="bp" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 5h5V1H1v2.5h2.5" fill="none" stroke="' + pw + '" stroke-width=".5"/></pattern></defs>' +
+        '<rect width="100" height="140" rx="5.8" fill="' + pw + '"/>' +
+        '<rect x="3.6" y="3.6" width="92.8" height="132.8" rx="3.4" fill="' + co + '"/>' +
+        '<rect x="7.4" y="7.4" width="85.2" height="125.2" rx="2.4" fill="none" stroke="url(#bp)" stroke-width="3.2"/>' +
+        '<rect x="5.6" y="5.6" width="88.8" height="128.8" rx="2.8" fill="none" stroke="' + pw + '" stroke-width=".35"/>' +
+        '<rect x="9.2" y="9.2" width="81.6" height="121.6" rx="2" fill="none" stroke="' + pw + '" stroke-width=".35"/>' +
+        '<circle cx="50" cy="70" r="33" fill="none" stroke="' + pw + '" stroke-width=".45"/>' + petals +
+        '<circle cx="50" cy="70" r="10" fill="' + co + '" stroke="' + pw + '" stroke-width=".6"/>' +
+        '</svg>';
+    }
+  }
+};
+
+/* ---- 目前的牌面 ---- */
+let DECK = DECKS.gilt;
+(function(){
+  let saved = "";
+  try{ saved = localStorage.getItem("ud.deck") || ""; }catch(e){}
+  if(DECKS[saved]) DECK = DECKS[saved];
+  document.documentElement.dataset.deck = DECK.id;
+})();
+function suitColor(deck, s){ return deck.suit ? deck.suit[s] : (SUITS[s].red ? deck.red : deck.ink); }
+
+/* 五套牌面的 CSS 一次產生：紙色、墨色、角標字型、紙紋濃度、牌背底圖與牌背文字的顏色尺寸。
+   牌背文字的垂直位置要量過字型才準，在 applyBackText() 另外設。 */
+function deckCSS(){
+  return DECK_ORDER.map(function(id){
+    const d = DECKS[id], sel = 'html[data-deck="' + id + '"]', b = d.back, n = b.num, w = b.word;
+    let s = sel + '{--card:' + d.paper[0] + ';--card-2:' + d.paper[1] + ';--card-ink:' + d.ink + ';--card-red:' + d.red +
+      ';--back-img:url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(b.art()) + '")' +
+      ';--bk-bg:' + b.bg + ';--bk-nc:' + n.color + ';--bk-ns:' + (n.size/100) + ';--bk-nls:' + (n.ls || 0) + 'em' +
+      ';--bk-nf:' + (n.family || d.font.family) + ';--bk-nw:' + (n.weight || d.font.weight) +
+      (w ? ';--bk-wc:' + w.color + ';--bk-ws:' + (w.size/100) + ';--bk-wd:block' : ';--bk-wd:none') + '}\n';
+    s += sel + ' .card .cf text{font-family:' + d.font.family + ';font-weight:' + d.font.weight + ';letter-spacing:' + d.font.ls + 'em' +
+      (d.font.lining ? ';font-variant-numeric:lining-nums' : '') + '}\n';
+    s += sel + ' .card::after{opacity:' + d.noise + '}\n';
+    if(d.suit) s += d.suit.map((c, i) => sel + ' .card.s' + i + '{color:' + c + '}').join("") + '\n';
+    return s;
+  }).join("");
+}
+(function(){
+  const st = document.createElement("style");
+  st.id = "deckcss"; st.textContent = deckCSS();
+  document.head.appendChild(st);
+})();
+/* 字在 line-height:1 的盒子裡，基線離盒頂 = 半行距 + ascent。量出來才能把「11」放進徽章正中 */
+function baselineRatio(font){
+  try{
+    const g = document.createElement("canvas").getContext("2d");
+    g.font = font;
+    const m = g.measureText("11");
+    if(m.fontBoundingBoxAscent == null) return .78;
+    const A = m.fontBoundingBoxAscent / 100, D = m.fontBoundingBoxDescent / 100;
+    return (1 - (A + D)) / 2 + A;
+  }catch(e){ return .78; }
+}
+function applyBackText(){
+  const d = DECK, n = d.back.num, w = d.back.word, st = document.documentElement.style;
+  const k = baselineRatio((n.weight || d.font.weight) + " 100px " + (n.family || d.font.family));
+  st.setProperty("--bk-ny", ((n.y - k * n.size) / 100).toFixed(4));
+  if(w){
+    const kw = baselineRatio("600 100px Archivo, sans-serif");
+    st.setProperty("--bk-wy", ((w.y - kw * w.size) / 100).toFixed(4));
+  }
+}
+function loadDeckFonts(d){
+  if(!document.fonts) return Promise.resolve();
+  return Promise.all(d.font.load.concat(['600 12px "Archivo"']).map(f => document.fonts.load(f))).catch(function(){});
+}
+function setDeck(id, o){
+  const d = DECKS[id] || DECKS.gilt;
+  DECK = d;
+  document.documentElement.dataset.deck = d.id;
+  try{ localStorage.setItem("ud.deck", d.id); }catch(e){}
+  installCourts();
+  applyBackText();
+  loadDeckFonts(d).then(applyBackText);
+  if(G && !(o && o.silent)) render();
+  if(UD.onDeck) UD.onDeck(d.id);
+}
+loadCourts().then(function(ok){
+  if(!ok) return;
+  installCourts();
+  if(G) render();
+});
+
+/* ---- 一張牌面 ---- */
+/* 回傳 {art, texts, col}。art 是 SVG 片段（角標花色、邊框、中央）；texts 是要疊的字：
+   {str, x, y, size, fill?, family?, weight?, ls?, rot?}，沒給的欄位跟牌面字型走、顏色跟花色走。 */
+function faceSpec(card, standalone){
+  const d = DECK, su = SUITS[card.s], lab = rankLabel(card.r), c = d.corner;
+  const col = suitColor(d, card.s), paper = d.paper[0];
+  let art = d.frame ? d.frame(card, col) : "";
+  const cp = pipUse(su.sym, c.x, c.pipY + c.pw/2, c.pw, false);
+  art += cp + R180 + cp + '</g>';
+  const fs = lab.length > 1 ? c.size2 : c.size;
+  const texts = [T(lab, c.x, c.base, fs), T(lab, c.x, c.base, fs, {rot:1})];
+  const m = d.mid(card, {col:col, paper:paper, sym:su.sym, lab:lab, key:lab + su.k, standalone:!!standalone});
+  art += m.art;
+  if(m.texts) texts.push.apply(texts, m.texts);
+  return {art:art, texts:texts, col:col, courtMissing:card.r >= 11 && card.r <= 13 && !COURT.txt};
+}
+function textSVG(t){
+  const st = [];
+  if(t.fill) st.push("fill:" + t.fill);
+  if(t.family) st.push("font-family:" + t.family);
+  if(t.weight) st.push("font-weight:" + t.weight);
+  if(t.ls != null) st.push("letter-spacing:" + t.ls + "em");
+  const el = '<text x="' + t.x + '" y="' + t.y + '" font-size="' + t.size + '" text-anchor="middle"' +
+    (st.length ? ' style="' + st.join(";") + '"' : '') + '>' + escX(t.str) + '</text>';
+  return t.rot ? R180 + el + '</g>' : el;
+}
+function cardFace(card){
+  const f = faceSpec(card, false);
+  return '<svg class="cf" viewBox="0 0 100 140" aria-hidden="true">' + f.art + f.texts.map(textSVG).join("") + '</svg>';
+}
+/* 3D 貼圖用：獨立 SVG，自帶花色 symbol 與（換好色的）人像，沒有字 */
+function faceArtSVG(card){
+  const f = faceSpec(card, true);
+  let defs = SUITS.map((su, i) => '<symbol id="' + su.sym + '" viewBox="0 0 24 24"><path d="' + SUIT_D[i] + '"/></symbol>').join("");
+  if(card.r >= 11 && card.r <= 13 && COURT.txt)
+    defs += courtSymbol(rankLabel(card.r) + SUITS[card.s].k, courtPalette(DECK, card.s));
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560" viewBox="0 0 100 140" color="' + f.col + '">' +
+    '<defs>' + defs + '</defs>' + f.art + '</svg>';
+}
+
 function cardHTML(card, o){
   o = o || {};
   const su = SUITS[card.s];
-  const cls = ["card", su.red ? "red" : "",
+  const cls = ["card", "s" + card.s, su.red ? "red" : "",
                o.trumpMark ? "trump-mark" : ""].join(" ");
   const face = cardFace(card);
   return o.button
@@ -1460,10 +2906,13 @@ function dieHTML(v, seat){
   const a = ' data-die="' + seat + '"';
   if(v === null || v === undefined) return '<div class="die empty"' + a + '><span class="num">?</span></div>';
   if(v === 0) return '<div class="die"' + a + ' aria-label="叫 0 墩"><span class="num">0</span></div>';
-  if(v > 6) return '<div class="die"' + a + ' aria-label="叫 ' + v + ' 墩"><span class="num">' + v + '</span></div>';
-  return '<div class="die"' + a + ' aria-label="叫 ' + v + ' 墩">' + PIPS[v].map(i =>
+  const pips = n => PIPS[n].map(i =>
     '<span class="pip" style="grid-row:' + Math.ceil(i/3) + ';grid-column:' + (((i-1)%3)+1) + '"></span>'
-  ).join("") + '</div>';
+  ).join("");
+  /* 叫 7 以上：兩顆骰子，一顆 6 加一顆餘數——桌上的立體骰子也是這樣擺 */
+  if(v > 6) return '<span class="dice"' + a + ' role="img" aria-label="叫 ' + v + ' 墩">' +
+    '<div class="die">' + pips(6) + '</div><div class="die">' + pips(v - 6) + '</div></span>';
+  return '<div class="die"' + a + ' aria-label="叫 ' + v + ' 墩">' + pips(v) + '</div>';
 }
 function seatLabel(i){
   const s = G.seats[i];
@@ -1497,7 +2946,23 @@ function seatHTML(i){
       '<span class="won ' + cls + '"><b>' + (G.won[i]||0) + '</b> / ' +
       (bid === null || bid === undefined ? "—" : bid) + '</span>' +
       '<span class="spread">' + Array.from({length:handCount(i)}, () => "<i></i>").join("") +
-    '</span></div></div>';
+    '</span></div>' + trailHTML(i) + '</div>';
+}
+/* 叫中的軌跡：每局一格，綠＝叫中、紅＝沒中、框起來的是這一局。
+   分數只是個總數，這一排才看得出一個人今晚穩不穩——不看數字也讀得懂 */
+function trailHTML(i){
+  const log = G.log || [];
+  let hits = 0, h = "";
+  for(let r = 0; r < G.ladder.length; r++){
+    const row = log[r];
+    if(row){
+      const c = row.cells[i], hit = !!(c && c.hit);
+      if(hit) hits++;
+      h += '<i class="' + (hit ? "hit" : "miss") + '"></i>';
+    }else h += '<i class="' + (r === G.ri ? "now" : "") + '"></i>';
+  }
+  return '<span class="trail' + (G.ladder.length > 24 ? " dense" : "") + '" role="img" aria-label="' +
+    log.length + ' 局中叫中 ' + hits + ' 局">' + h + '</span>';
 }
 
 /* 桌面顏色：王牌花色決定色相，局數階梯決定深度 */
@@ -1623,6 +3088,10 @@ function render(){
   }else if(G.phase === "trickend" && $("trick").classList.contains("is-won")) pushWinner();
   SEEN.scores = G.score.slice();
   if(UD.sync3d) UD.sync3d();
+  /* 音效層跟 3D 一樣，是加上去的一層：把當下的牌局狀態遞過去，
+     它自己跟上一次比對，差在哪就發什麼聲。平面與立體共用這一份——
+     聲音照的是引擎的狀態，不是畫面上的 DOM。載入失敗就什麼都不會發生。 */
+  if(window.SFX) SFX.frame(G, me, bi, {speed:SPEED, beats:trickBeats()});
 }
 
 /* 我贏到的墩：背朝上疊在右手邊，一墩一疊 */
@@ -1752,10 +3221,10 @@ function pushWinner(){
 /* 定格夠久了才收墩——檯面上的牌先聚成一疊，整疊再飛向贏家，是我贏的就飛進右手邊的墩堆 */
 function scheduleCollect(){
   if(IS3D()) return;
-  const total = trickGap() - 60;
-  const dur = Math.min(620, Math.max(280, Math.round(SPEED * .8)));   /* 收墩飛多久 */
-  const land = Math.max(380, Math.round(SPEED * .7));                 /* 等最後一張牌落定 */
-  const wait = Math.max(land + 420, total - dur);                     /* 定格到什麼時候 */
+  const b = trickBeats();
+  const dur = b.sweep;                         /* 收墩飛多久 */
+  const land = b.land;                         /* 等最後一張牌落定 */
+  const wait = land + b.push + b.hold;         /* 定格到什麼時候才開始收 */
   const at = G.at;
   const still = function(){
     if(!G || G.phase !== "trickend" || G.at !== at || !G.trick.length) return null;
@@ -1817,6 +3286,14 @@ function tallyScores(){
   document.querySelectorAll(".tot").forEach(function(el){ el.classList.add("up"); });
 }
 
+/* 這一局全桌一共叫了幾墩、比桌上多還是少。出牌時一直帶著：
+   這局是在搶還是在讓，決定每一張牌要不要拿 */
+function bidClimate(sep){
+  if(!G.bids || !G.bids.length || G.bids.some(b => b === null || b === undefined)) return "";
+  const sum = G.bids.reduce((a, b) => a + b, 0), d = sum - G.hs;
+  return (sep ? '<span class="sep"> · </span>' : '') + '叫 ' + sum + '/' + G.hs +
+    (d === 0 ? ' 剛好' : d < 0 ? ' 保守局' : ' 搶墩局');
+}
 function renderStatus(me){
   const el = $("status");
   if(NET.err){ setHTML(el, '<span class="msg" style="color:var(--bad)">' + NET.err + '</span>'); return; }
@@ -1837,12 +3314,23 @@ function renderStatus(me){
   if(G.phase === "bid"){
     let sum = 0, placed = 0;
     for(let i=0;i<G.cfg.n;i++) if(G.bids[i] !== null && G.bids[i] !== undefined){ sum += G.bids[i]; placed++; }
+    const left = G.hs - sum;
+    /* 叫到一半就報「剩幾墩沒人要」：最後一位看一眼就知道自己叫幾會剛好 */
     const tally = '<span class="hint">已叫 ' + sum + ' / 共 ' + G.hs + ' 墩' +
-      (placed === G.cfg.n ? (sum > G.hs ? '<span class="sep"> · </span>超叫 ' + (sum-G.hs)
-        : sum < G.hs ? '<span class="sep"> · </span>欠叫 ' + (G.hs-sum) : '<span class="sep"> · </span>剛好') : '') + '</span>';
+      (placed ? '<span class="sep"> · </span>' + (placed === G.cfg.n
+        ? (left < 0 ? '超叫 ' + (-left) + '，搶墩局' : left > 0 ? '欠叫 ' + left + '，保守局' : '剛好')
+        : (left < 0 ? '已經超 ' + (-left) : left > 0 ? '剩 ' + left : '已經剛好')) : '') + '</span>';
     if(G.turn === me){
+      /* 我是最後一位：每顆數字下面直接標出叫了之後全桌會多要或少要幾墩 */
+      const last = placed === G.cfg.n - 1;
       let b = "";
-      for(let v=0;v<=G.hs;v++) b += '<button class="bidbtn" data-bid="' + v + '">' + v + '</button>';
+      for(let v=0;v<=G.hs;v++){
+        const d = sum + v - G.hs;
+        b += last
+          ? '<button class="bidbtn fc ' + (d === 0 ? "ex" : d < 0 ? "un" : "ov") + '" data-bid="' + v + '"><b>' + v + '</b><i>' +
+            (d === 0 ? "剛好" : d < 0 ? "欠 " + (-d) : "超 " + d) + '</i></button>'
+          : '<button class="bidbtn" data-bid="' + v + '">' + v + '</button>';
+      }
       setHTML(el, '<span class="msg">你要叫幾墩？</span>' + tally +
         '<span class="bidrow"><span class="pill">' + b + '</span></span>');
     }else setHTML(el, '<span class="msg"><b>' + who + '</b> 正在放骰子…</span>' + tally);
@@ -1856,9 +3344,9 @@ function renderStatus(me){
       setHTML(el, '<span class="msg">輪到<b>你</b>出牌</span><span class="hint">' +
         (G.led === null || G.led === undefined ? "你先出，這墩由你決定花色"
           : must ? "必須跟出 " + pip(G.led) + " " + SUITS[G.led].name
-                 : "手上沒有 " + pip(G.led) + "，可出任意牌") + '</span>');
+                 : "手上沒有 " + pip(G.led) + "，可出任意牌") + bidClimate(true) + '</span>');
     }else setHTML(el, '<span class="msg"><b>' + who + '</b> 出牌中…</span><span class="hint">' +
-      (G.led === null || G.led === undefined ? "" : "跟牌花色 " + pip(G.led)) + '</span>');
+      (G.led === null || G.led === undefined ? bidClimate(false) : "跟牌花色 " + pip(G.led) + bidClimate(true)) + '</span>');
     return;
   }
 
@@ -1912,8 +3400,10 @@ function renderLedger(){
   let h = '<colgroup><col class="c-sz"><col class="c-tr">' +
     '<col span="' + G.cfg.n + '"></colgroup>' +
     '<thead><tr><th class="rd">張</th><th class="rd">王</th>';
+  const top = Math.max.apply(null, G.score.map(v => v || 0));
   for(let i=0;i<G.cfg.n;i++)
-    h += '<th>' + seatLabel(i).replace("（你）", "") + '<span class="tot">' + (G.score[i]||0) + '</span></th>';
+    h += '<th>' + seatLabel(i).replace("（你）", "") + '<span class="tot' +
+      (G.log.length && (G.score[i]||0) === top ? " lead" : "") + '">' + (G.score[i]||0) + '</span></th>';
   h += '</tr></thead><tbody>';
   G.ladder.forEach(function(size, i){
     const row = G.log[i], now = i === G.ri;
@@ -2035,7 +3525,8 @@ document.addEventListener("click", function(e){
   if(e.target.id === "btnLobby"){ openNet(); return; }
   const sp = e.target.closest("#speed button");
   if(sp){
-    SPEED = +sp.dataset.sp;
+    SPEED_KEY = sp.dataset.sp;
+    SPEED = TUNE.speeds[SPEED_KEY] || TUNE.speeds.mid;
     document.querySelectorAll("#speed button").forEach(function(b){
       b.setAttribute("aria-pressed", b === sp ? "true" : "false");
     });
@@ -2099,10 +3590,12 @@ $("rulesClose").onclick = function(){ $("rulesOv").hidden = true; };
 $("btnRoom").onclick = openNet;
 $("btnSetup").onclick = function(){ openSetup(); };
 $("setupCancel").onclick = function(){ $("setupOv").hidden = true; };
+$("btnPref").onclick = function(){ openPref(); };
+$("prefClose").onclick = function(){ $("prefOv").hidden = true; };
 $("endClose").onclick = function(){ $("endOv").hidden = true; };
 $("endAgain").onclick = function(){ $("endOv").hidden = true; openSetup(); };
 document.addEventListener("keydown", function(e){
-  if(e.key === "Escape"){ $("rulesOv").hidden = true; $("setupOv").hidden = true; $("netOv").hidden = true; setScore(false); }
+  if(e.key === "Escape"){ $("rulesOv").hidden = true; $("setupOv").hidden = true; $("prefOv").hidden = true; $("netOv").hidden = true; setScore(false); }
 });
 
 /* ================= 單人設定 ================= */
@@ -2119,7 +3612,7 @@ function optRow(host, items, current, onPick){
   };
 }
 function paintSetup(){
-  optRow($("optPlayers"), [3,4,5,6].map(v => ({v:v, t:v + " 人"})), draft.n, v => draft.n = +v);
+  optRow($("optPlayers"), [2,3,4,5,6,7,8,9,10].map(v => ({v:v, t:v + " 人"})), draft.n, v => draft.n = +v);
   optRow($("optDecks"), [{v:1,t:"單副"},{v:2,t:"雙副"}], draft.decks, v => draft.decks = +v);
   optRow($("optMin"), [9,7,6,5,4,3,2].map(v => ({v:v, t:v + " 以上"})), draft.minRank, v => draft.minRank = +v);
   const size = deckSizeOf(draft.decks, draft.minRank);
@@ -2133,6 +3626,23 @@ function paintSetup(){
       ' 張，階梯頂點會降到 ' + peak + ' 張、共 ' + rounds + ' 局。</div>' : '';
 }
 function openSetup(){ paintSetup(); $("setupOv").hidden = false; }
+
+/* ================= 設定 ================= */
+const DECK_DESC = {
+  gilt:"奶油紙、雙線金邊、稅章式黑桃 A。1900 年前後英國牌的樣子。",
+  casino:"亮白紙、大角標、賭場藍菱格牌背。桌上最好認。",
+  four:"黑桃黑、紅心紅、方塊藍、梅花綠，人像也跟著換色。手機上叫墩不會看錯花色。",
+  note:"鈔票雕版：扭索紋邊框、人像名牌、玫瑰章。黑花色墨綠、紅花色胭脂。",
+  blue:"青花瓷：鈷藍與釉裡紅、回紋邊、蓮紋牌背。"
+};
+function paintPref(){
+  optRow($("optDeck"), DECK_ORDER.map(id => ({v:id, t:DECKS[id].name})), DECK.id, function(v){ setDeck(v); paintPref(); });
+  $("deckNote").textContent = DECK_DESC[DECK.id] || "";
+  $("deckPreview").innerHTML =
+    [[14,0],[13,1],[12,0],[7,2]].map(p => cardHTML({r:p[0], s:p[1], id:"pv" + p[0] + p[1]})).join("") +
+    '<div class="pvback"><div class="back"></div></div>';
+}
+function openPref(){ paintPref(); $("prefOv").hidden = false; }
 $("setupStart").onclick = function(){
   $("setupOv").hidden = true; $("endOv").hidden = true;
   unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
@@ -2154,16 +3664,23 @@ function startSolo(){
    上面那張 2D 牌桌就原封不動繼續運作——3D 是加上去的一層，不是取代。 */
 const UD = window.UD = {
   SUITS:SUITS, LAY:LAY, rankLabel:rankLabel, legalCards:legalCards, REDUCED:REDUCED,
+  SUIT_D:SUIT_D, PIC:PIC, CARD_DIR:CARD_DIR, COURT_KEYS:COURT_KEYS, cardHTML:cardHTML,
+  /* 牌面主題：3D 層從這裡拿目前牌面的規格、每張牌的獨立 SVG 與牌背；換牌面時呼叫 onDeck */
+  DECKS:DECKS, DECK_ORDER:DECK_ORDER, deck:function(){ return DECK; }, setDeck:setDeck,
+  faceSpec:faceSpec, faceArtSVG:faceArtSVG, backArt:function(){ return DECK.back.art(); },
+  courtsReady:function(){ return COURT.ready; }, onDeck:null,
   get G(){ return G; },
   get MODE(){ return MODE; },
   get SPEED(){ return SPEED; },
   mySeat:mySeat, seatLabel:seatLabel, handCount:handCount, trickBest:trickBest,
-  trickGap:trickGap,
+  trickGap:trickGap, trickBeats:trickBeats,
   doPlay:doPlay,
   felt:null,      /* paintTable 算好的桌色，3D 層拿去染桌布 */
   sync3d:null     /* 3D 層裝好之後掛上來；沒掛就等於這段不存在 */
 };
 
+applyBackText();
+loadDeckFonts(DECK).then(applyBackText);
 startSolo();
 })();
 </script>
@@ -2213,93 +3730,94 @@ function feltColor(){
   const f = UD.felt || {L:.245, C:.042, h:168};
   return oklchLinear(f.L, f.C, f.h);
 }
+/* 房間的顏色：比桌布深、比頁面的 --felt-deep 再沉一點，同色相。
+   背景與霧都用它，畫布才會跟頁面其餘部分是同一個房間，而不是一塊藍黑色的洞 */
+function roomColor(){
+  const f = UD.felt || {L:.245, C:.042, h:168};
+  return oklchLinear(Math.max(.085, f.L - .135), f.C * .62, f.h);
+}
+/* 顏色的過場：桌布、背景、霧各自一條，換王牌時一起慢慢轉過去 */
+const fades = [];
+function fade(col, rgb){
+  const to = new THREE.Color().setRGB(rgb[0], rgb[1], rgb[2], THREE.LinearSRGBColorSpace);
+  if(col.equals(to)) return;
+  for(let i = fades.length - 1; i >= 0; i--) if(fades[i].col === col) fades.splice(i, 1);
+  if(UD.REDUCED){ col.copy(to); return; }
+  fades.push({col:col, from:col.clone(), to:to, t0:nowMs()});
+}
 
 /* ================= 牌面 ================= */
-/* 跟 2D 版的 cardFace() 是同一套版面（viewBox 0 0 100 140），
-   只是改用 canvas 畫成貼圖。花色路徑直接沿用頁面上那四個 symbol。 */
-const SUIT_D = [
-  "M12 2.2C12 2.2 3.3 8.9 3.3 13.7c0 2.7 1.9 4.5 4.2 4.5 1.5 0 2.8-.8 3.5-2 0 2.4-.9 4.4-2.5 5.6h7c-1.6-1.2-2.5-3.2-2.5-5.6.7 1.2 2 2 3.5 2 2.3 0 4.2-1.8 4.2-4.5C20.7 8.9 12 2.2 12 2.2z",
-  "M12 21.6S2.8 14.7 2.8 8.9c0-3.4 2.5-5.6 5.2-5.6 1.9 0 3.4 1.1 4 2.4.6-1.3 2.1-2.4 4-2.4 2.7 0 5.2 2.2 5.2 5.6 0 5.8-9.2 12.7-9.2 12.7z",
-  "M12 1.8 20.6 12 12 22.2 3.4 12z",
-  "M12 2.4a3.9 3.9 0 0 0-3.3 6 3.9 3.9 0 1 0-1.1 7.5c1.2 0 2.3-.6 3-1.5.1 3-.8 5.3-2.2 6.5h7.2c-1.4-1.2-2.3-3.5-2.2-6.5.7.9 1.8 1.5 3 1.5a3.9 3.9 0 1 0-1.1-7.5A3.9 3.9 0 0 0 12 2.4z"
-];
-const CARD_BG = "#F7F3E7", CARD_BG2 = "#E8E0CB";
-const CARD_INK = "#1A1714", CARD_RED = "#A32B25";
-const FW = 256, FH = 362;            /* 每格貼圖的像素尺寸 */
+/* 跟 2D 版的 cardFace() 是同一套版面（viewBox 0 0 100 140），只是改用 canvas 畫成貼圖。
+   花色、黑桃 A 的裝飾、宮廷牌人像框、牌背底圖都直接拿 2D 那份常數——改一處兩邊一起變。 */
+const SUIT_D = UD.SUIT_D;
+/* 紙色、墨色、字型都跟目前的牌面走：UD.deck() */
+let FW = 384, FH = 543;              /* 每格貼圖的像素尺寸，buildAtlas 依格數決定：人像要撐得住放大看，
+                                        整張圖集又不能超過 4096（13 點數 × 4 花色 = 52 格時退到 320） */
 const CARD_W = 1, CARD_H = 1.4146;   /* 世界單位：一張牌寬 = 1 */
-const THICK = .0125;
+const THICK = .007;                  /* 一張牌的厚度：真牌約是牌寬的 0.5%，這裡取 0.7% 讓疊起來還數得出 */
+const Y0 = .0008;                    /* 牌底離桌布多高：貼著，但不穿進去 */
+const AO_OP = .58;                   /* 接觸陰影最深的濃度 */
 
-let SUIT_PATH = null;
-function suitPath(i){
-  if(!SUIT_PATH) SUIT_PATH = SUIT_D.map(d => new Path2D(d));
-  return SUIT_PATH[i];
+/* 每張牌的圖（邊框、花色、人像）由 2D 那邊的 faceArtSVG() 給成獨立 SVG，這裡載成 Image 畫進貼圖；
+   字另外用 canvas 疊——外部字型進不了當成圖片載入的 SVG。牌背同理。換牌面就整組重載。 */
+const ART = {face:{}, back:null, ready:null, deck:null};
+function loadImg(src){
+  return new Promise(function(res){
+    const im = new Image();
+    im.onload = function(){ res(im); };
+    im.onerror = function(){ res(null); };
+    im.src = src;
+  });
+}
+const svgImg = txt => loadImg("data:image/svg+xml;charset=utf-8," + encodeURIComponent(txt));
+function artReady(){
+  const d = UD.deck();
+  if(ART.ready && ART.deck === d.id) return ART.ready;
+  ART.deck = d.id; ART.face = {}; ART.back = null;
+  ART.ready = Promise.resolve(UD.courtsReady()).then(function(){
+    const jobs = [];
+    for(let r = 2; r <= 14; r++) for(let s = 0; s < 4; s++){
+      const k = r + ":" + s;
+      jobs.push(svgImg(UD.faceArtSVG({r:r, s:s})).then(function(im){ ART.face[k] = im; }));
+    }
+    jobs.push(svgImg(UD.backArt()).then(function(im){ ART.back = im; }));
+    return Promise.all(jobs);
+  });
+  return ART.ready;
 }
 
 function paperFill(g, w, h){
   const lg = g.createLinearGradient(0, 0, w * .42, h);
-  lg.addColorStop(0, CARD_BG); lg.addColorStop(1, CARD_BG2);
+  const d = UD.deck();
+  lg.addColorStop(0, d.paper[0]); lg.addColorStop(1, d.paper[1]);
   g.fillStyle = lg; g.fillRect(0, 0, w, h);
-  /* 左上斜光，跟 2D 版同一道 */
+  /* 左上斜光。2D 版是 .85；貼圖上有真實燈光會再打一次亮，這裡只留一點紙感 */
   const hl = g.createLinearGradient(0, 0, w * .55, h * .42);
-  hl.addColorStop(0, "rgba(255,255,255,.85)"); hl.addColorStop(1, "rgba(255,255,255,0)");
+  hl.addColorStop(0, "rgba(255,255,255,.3)"); hl.addColorStop(1, "rgba(255,255,255,0)");
   g.fillStyle = hl; g.fillRect(0, 0, w, h);
 }
 
-/* 一張牌面。座標系與 cardFace() 完全一致，改動時兩邊要一起改。 */
+/* 一張牌面。版面與 2D 的 cardFace() 是同一份 faceSpec()：圖畫 Image，字用 canvas 依牌面字型疊上去。 */
 function drawFace(g, rank, suit){
   const S1 = FW / 100;
   g.save();
   g.scale(S1, S1);
-  g.fillStyle = UD.SUITS[suit].red ? CARD_RED : CARD_INK;
-  g.strokeStyle = g.fillStyle;
-  const path = suitPath(suit);
-  const lab = UD.rankLabel(rank);
-
-  function glyph(cx, cy, w, flip){
-    g.save(); g.translate(cx, cy);
-    if(flip) g.rotate(Math.PI);
-    g.scale(w/24, w/24); g.translate(-12, -12);
-    g.fill(path); g.restore();
+  const d = UD.deck(), f = UD.faceSpec({r:rank, s:suit}, true);
+  const im = ART.face[rank + ":" + suit];
+  if(im) g.drawImage(im, 0, 0, 100, 140);
+  g.textAlign = "center"; g.textBaseline = "alphabetic";
+  if(f.courtMissing){   /* 人像檔沒抓到：退回大字 */
+    g.fillStyle = f.col; g.font = d.font.weight + " 30px " + d.font.family;
+    g.fillText(UD.rankLabel(rank), 50, 80);
   }
-  function unit(x, y, w){
-    glyph(28 + x*44, 33 + y*74, w, y > .5);
-  }
-  function text(str, x, y, size){
-    g.font = '700 ' + size + 'px "Bodoni Moda", Georgia, serif';
-    g.textAlign = "center"; g.textBaseline = "alphabetic";
-    try{ g.letterSpacing = (-.02 * size) + "px"; }catch(e){}
-    g.fillText(str, x, y);
-    try{ g.letterSpacing = "0px"; }catch(e){}
-  }
-
-  /* 中央 */
-  if(rank === 14){
-    unit(.5, .5, 42);
-  }else if(rank >= 11){
+  for(const t of f.texts){
     g.save();
-    g.globalAlpha = .34; g.lineWidth = 1;
-    g.beginPath(); g.roundRect(23.5, 23.5, 53, 93, 4); g.stroke();
-    g.globalAlpha = .2; g.lineWidth = .7;
-    g.beginPath(); g.roundRect(26.5, 26.5, 47, 87, 2.5); g.stroke();
-    g.beginPath(); g.moveTo(26.5, 70); g.lineTo(73.5, 70); g.stroke();
-    g.restore();
-    for(const turn of [0, 1]){
-      g.save();
-      if(turn){ g.translate(50, 70); g.rotate(Math.PI); g.translate(-50, -70); }
-      text(lab, 50, 55, 30);
-      glyph(50, 62, 12, false);
-      g.restore();
-    }
-  }else{
-    for(const pt of UD.LAY[rank]) unit(pt[0], pt[1], 15);
-  }
-
-  /* 角標：左上一組，右下同一組轉 180 度 */
-  for(const turn of [0, 1]){
-    g.save();
-    if(turn){ g.translate(50, 70); g.rotate(Math.PI); g.translate(-50, -70); }
-    text(lab, 12.5, 26, lab.length > 1 ? 17 : 22);
-    glyph(12.5, 34.5, 10, false);
+    if(t.rot){ g.translate(50, 70); g.rotate(Math.PI); g.translate(-50, -70); }
+    const ls = t.ls == null ? d.font.ls : t.ls;
+    g.font = (t.weight || d.font.weight) + " " + t.size + "px " + (t.family || d.font.family);
+    g.fillStyle = t.fill || f.col;
+    try{ g.letterSpacing = (ls * t.size) + "px"; }catch(e){}
+    g.fillText(t.str, t.x, t.y);
     g.restore();
   }
   g.restore();
@@ -2311,6 +3829,7 @@ function buildAtlas(minRank){
   for(let r = minRank; r <= 14; r++) ranks.push(r);
   const cells = ranks.length * 4;
   const cols = Math.min(8, cells), rows = Math.ceil(cells / cols);
+  FW = cells > 32 ? 320 : 384; FH = Math.round(FW * 1.4146);
   const cv = document.createElement("canvas");
   cv.width = cols * FW; cv.height = rows * FH;
   const g = cv.getContext("2d");
@@ -2334,29 +3853,30 @@ function buildAtlas(minRank){
   return {tex, cell, cols, rows};
 }
 
-/* 牌背：與 2D 版 .back 同一張圖 */
+/* 牌背：底圖與 2D 版 .back 同一張 back.art()，字用 canvas 疊上去（跟 .back 的偽元素同一組位置與字型） */
 function buildBack(){
   const cv = document.createElement("canvas");
   cv.width = FW; cv.height = FH;
   const g = cv.getContext("2d");
-  const lg = g.createLinearGradient(0, 0, FW * .5, FH);
-  lg.addColorStop(0, "#35395E"); lg.addColorStop(1, "#1E2140");
-  g.fillStyle = lg; g.fillRect(0, 0, FW, FH);
-  g.save();
-  g.strokeStyle = "rgba(255,255,255,.10)"; g.lineWidth = 2;
-  const step = 13;
-  for(let i = -FH; i < FW + FH; i += step){
-    g.beginPath(); g.moveTo(i, 0); g.lineTo(i + FH, FH); g.stroke();
-    g.beginPath(); g.moveTo(i, FH); g.lineTo(i + FH, 0); g.stroke();
+  const d = UD.deck(), b = d.back;
+  if(ART.back) g.drawImage(ART.back, 0, 0, FW, FH);
+  else{ g.fillStyle = b.bg; g.fillRect(0, 0, FW, FH); }
+  const S1 = FW / 100;
+  g.save(); g.scale(S1, S1);
+  g.textAlign = "center"; g.textBaseline = "alphabetic";
+  const n = b.num;
+  g.fillStyle = n.color;
+  g.font = (n.weight || d.font.weight) + " " + n.size + "px " + (n.family || d.font.family);
+  try{ g.letterSpacing = ((n.ls || 0) * n.size) + "px"; }catch(e){}
+  g.fillText("11", n.x == null ? 50 : n.x, n.y);
+  if(b.word){
+    const w = b.word;
+    g.fillStyle = w.color;
+    g.font = "600 " + w.size + "px Archivo, sans-serif";
+    try{ g.letterSpacing = (.2 * w.size) + "px"; }catch(e){}
+    g.fillText("UP & DOWN", 50, w.y);
   }
   g.restore();
-  const rg = g.createRadialGradient(FW/2, FH/2, 0, FW/2, FH/2, FW * .42);
-  rg.addColorStop(0, "rgba(255,255,255,.17)"); rg.addColorStop(1, "rgba(255,255,255,0)");
-  g.fillStyle = rg; g.fillRect(0, 0, FW, FH);
-  g.strokeStyle = CARD_BG; g.lineWidth = 14;
-  g.strokeRect(7, 7, FW - 14, FH - 14);
-  g.strokeStyle = "rgba(26,23,20,.22)"; g.lineWidth = 3;
-  g.strokeRect(15, 15, FW - 30, FH - 30);
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -2368,7 +3888,7 @@ const geoCache = new Map();
 function cardGeo(depth){
   const key = depth.toFixed(4);
   if(geoCache.has(key)) return geoCache.get(key);
-  const w = CARD_W, h = CARD_H, r = .062;
+  const w = CARD_W, h = CARD_H, r = .058;
   const x = -w/2, y = -h/2;
   const sh = new THREE.Shape();
   sh.moveTo(x + r, y);
@@ -2407,6 +3927,10 @@ function cardGeo(depth){
 /* ================= 補間 ================= */
 const easeOut = t => 1 - Math.pow(1 - t, 3);
 const easeIO  = t => t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+/* 翻面用：兩頭慢、中段快（二次），牌立起來看不見的那一瞬最短 */
+const easeFlip = t => t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+/* 落地時微微過頭再回來——牌拍在桌上的那一下 */
+const easeBack = t => { const c = 1.25, u = t - 1; return 1 + (c + 1) * u*u*u + c * u*u; };
 const tweens = [];
 const nowMs = () => performance.now();
 
@@ -2421,13 +3945,24 @@ function tween(target, to, o){
     if(o.queue) base = Math.max(base, tweens[i].t0 + tweens[i].dur);
     else tweens.splice(i, 1);                      /* 平常同一個目標只留最新一段 */
   }
+  /* bump：沿途多出來又回去的量，正弦形。y 的 bump 就是拋物線；也可以給 ry 一點在空中的轉。
+     eases：個別屬性自己的曲線——翻面要 easeFlip、落地的縮放要 easeBack，位置照一般的走 */
+  const bump = o.bump ? Object.assign({}, o.bump) : null;
   const t = {
     target, from: o.queue ? null : snap(target, to), to, t0: base + (o.delay || 0),
     dur: Math.max(16, o.dur == null ? 340 : o.dur),
-    ease: o.ease || easeOut, arc: o.arc || 0, onEnd: o.onEnd || null
+    ease: o.ease || easeOut, eases: o.eases || null,
+    bump: o.arc ? Object.assign({y:o.arc}, bump || {}) : bump,
+    onEnd: o.onEnd || null
   };
   tweens.push(t);
   return t;
+}
+/* 這個目標身上還有多久的補間沒跑完（含排在後面的） */
+function remaining(target){
+  let r = 0; const now = nowMs();
+  for(const w of tweens) if(w.target === target) r = Math.max(r, w.t0 + w.dur - now);
+  return r;
 }
 function jump(target, to){
   for(let i = tweens.length - 1; i >= 0; i--)
@@ -2441,24 +3976,59 @@ function stepTweens(t){
     if(!w.from) w.from = snap(w.target, w.to);
     let k = Math.min(1, (t - w.t0) / w.dur);
     const e = w.ease(k);
-    for(const p in w.to) w.target[p] = w.from[p] + (w.to[p] - w.from[p]) * e;
-    if(w.arc) w.target.y += Math.sin(k * Math.PI) * w.arc;
+    for(const p in w.to){
+      const ep = (w.eases && w.eases[p]) ? w.eases[p](k) : e;
+      w.target[p] = w.from[p] + (w.to[p] - w.from[p]) * ep;
+    }
+    if(w.bump){ const s = Math.sin(k * Math.PI); for(const p in w.bump) w.target[p] += s * w.bump[p]; }
     if(k >= 1){ tweens.splice(i, 1); if(w.onEnd) w.onEnd(); }
   }
 }
 /* ================= 排位 ================= */
-/* 一切都用極座標排。角度 0 就是我，往右數過去是下一位——
-   跟 2D 版座位由左到右的順序一致。 */
-/* 牌寬 = 1 個世界單位，其餘都用牌寬量。真實牌桌大約是 14 張牌寬，
+/* 一切都用極座標排。牌寬 = 1 個世界單位，其餘都用牌寬量。真實牌桌大約是 14 張牌寬，
    這裡收到 9.5 左右——再大遠端的牌就讀不出來了。 */
-const HAND_Y = .28, HAND_Z = 3.02, HAND_PITCH = -1.04, HAND_S = .72;
-const R_SEAT = 4.32, R_PLAY = 1.06, R_FAN = 3.16, R_PILE = 3.34;
-const FELT_R = 4.46, PILE_OUT = 1.02;
+/* HAND_Y 是握牌的高度。牌斜著、又繞軸心扇開，邊上那幾張的下角比中間那張低很多——
+   最多張時低了將近半個牌寬；握得不夠高，牌的下半截就會沒進桌面被桌布切掉 */
+const HAND_Y = .60, HAND_Z = 3.02, HAND_PITCH = -1.04, HAND_S = .72;
+const R_SEAT = 4.32, R_PLAY = 1.06, R_FAN = 3.16, R_DECK = 3.66;
+const FELT_R = 4.46;
+/* 贏得的墩：不疊成塔，一墩一疊、每疊錯開約半張排成一列，一眼數得出來；
+   一列的長度與疊數由那個座位分到多寬的空檔決定（見 pileGeom），排滿就往桌子中央再起一列 */
+const R_PILE = 2.42, PILE_S = .70, PILE_SMIN = .46, PILE_COLS = 6;
 
-function ang(i){
-  const G = UD.G;
-  return (i - S.me) * Math.PI * 2 / G.cfg.n;
+/* ---- 每個座位坐在哪 ---- */
+/* 角度 0 是我，往右數過去是下一位——跟 2D 版座位由左到右的順序一致。
+   但整圈不是平分的。鏡頭就架在我的座位上，平分的話靠我這半邊的兩個位子
+   會被透視推到畫面最下緣，跟我的手牌、墩堆、名牌擠在同一塊地方：
+   7、8 人局時我的名牌與左手邊那位的名牌直接疊在一起，
+   對手的東西離我的手牌只剩 0.14 個牌寬。
+   所以近端固定留一個扇形給自己，對手平分剩下的弧。
+   MY_ARC 是那個扇形的一半，由「對手最近能坐到哪」定：他手上的牌在 R_FAN 那一圈，
+   cos(MY_ARC)·R_FAN 要落在我的墩堆（z≈2.3）之前，牌才不會坐進我的東西裡。
+   人少的時候 2π/n 本來就比它大，那就維持整圈平分，4 人局還是漂亮的十字。 */
+const MY_ARC = 78 * Math.PI / 180;
+/* 我那塊扇形裡，靠中線這一段是握著的牌佔的；贏得的墩從這裡起算往右排 */
+const HAND_ARC = 20 * Math.PI / 180;
+let ANGS = {n:0, a:[0]};
+function angles(){
+  const n = UD.G.cfg.n;
+  if(ANGS.n === n) return ANGS.a;
+  const m = n - 1, a = [0];
+  const g = Math.max(Math.PI * 2 / n, MY_ARC);
+  const st = m > 1 ? (Math.PI * 2 - g * 2) / (m - 1) : 0;
+  for(let k = 0; k < m; k++) a.push(g + st * k);
+  ANGS = {n:n, a:a};
+  return a;
 }
+const seatNo = i => ((i - S.me) % UD.G.cfg.n + UD.G.cfg.n) % UD.G.cfg.n;
+function ang(i){ return angles()[seatNo(i)]; }
+/* 這個座位到右手邊那位之間空多少角度。手牌能扇多寬、墩堆排得下幾疊都照它算，
+   每個人的東西才會待在自己那一塊裡。 */
+function gapR(i){
+  const n = UD.G.cfg.n, a = angles(), k = seatNo(i);
+  return (k + 1 < n ? a[k + 1] : Math.PI * 2) - a[k];
+}
+const gapL = i => gapR(i - 1);
 /* xs 是 x 方向的壓扁係數：直式螢幕把圓桌壓成橢圓，
    座位靠得近一點，整張桌子才進得了畫面。牌本身不壓，只壓位置。 */
 const polar = (r, a) => ({x: r * Math.sin(a) * S.xs, z: r * Math.cos(a)});
@@ -2467,13 +4037,19 @@ const polarR = (r, a) => ({x: r * Math.sin(a), z: r * Math.cos(a)});
 /* 從那個座位面向中央時的「右手邊」 */
 const side  = a => ({x: Math.cos(a) * S.xs, z: -Math.sin(a)});
 
-/* 牌庫塞在兩個座位之間的空檔，半徑取在「檯面之外、手牌之內」，
-   這樣不管幾個人都不會壓到誰的牌 */
+/* 牌庫塞在對面兩個座位之間的空檔，半徑取在墩堆那一圈之外、貼著桌沿——
+   空檔裡由內往外是墩堆、牌庫，誰的牌都不壓到 */
+/* 牌庫放在我左手邊、我自己那塊扇形裡——桌上唯一保證沒有別人東西的地方。
+   兩位之間的空檔看起來也放得下，但那是假的：空檔在墩堆那一圈（R_PILE）以外會被
+   兩邊的手牌各佔去半個扇形，8 人以上剩不到半張牌寬，牌庫一放上去就壓在人家手上。
+   我這一側沒有任何人的手牌，半徑取在墩堆那一圈之外（2.92）與桌沿（4.46）之間，
+   一張全尺寸的牌直放剛好進得去，王牌翻開來也離鏡頭最近、看得最清楚。
+   角度往左開，但不繞過左手邊那位的手牌，也不貼到我自己的牌上。 */
 function deckSpot(){
-  const n = UD.G.cfg.n;
-  const a = (Math.floor(n/2) + .5) * Math.PI * 2 / n;
-  const p = polar(2.25, a);
-  return {x:p.x, z:p.z, ry:a + .11, a:a};
+  const a = -Math.min(gapL(S.me) * .55, 50 * Math.PI / 180);
+  const p = polar(R_DECK, a);
+  /* 只歪一點點：那條帶子只有一個牌長寬，歪多了四個角就會一頭戳進墩堆、一頭壓上桌沿 */
+  return {x:p.x, z:p.z, ry:a + .06, a:a};
 }
 function seatAnchor(i){
   if(i === S.me){ const m = S.mePlate; return {x:m[0] * S.xs, y:m[1], z:m[2]}; }
@@ -2482,110 +4058,712 @@ function seatAnchor(i){
      不挪的話兩側的名牌會正好壓在檯面那一墩的左右兩張上 */
   return {x:p.x, y:S.plateY, z:p.z - S.plateBack};
 }
+/* 檯面那一墩是桌子中央的東西，不跟著座位的弧走：照人數平分一圈排成規規矩矩的一圈。
+   座位擠在上半弧的時候（人多），跟著座位排會把六七張牌疊成一坨，誰出了什麼都看不出來。
+   哪張是誰出的，由「從他手上飛過來」與收墩時整墩飛向贏家交代，不靠位置。 */
 function playSlot(i, k){
-  const a = ang(i), p = polarR(R_PLAY, a);
-  return {x:p.x, y:.004 + k * (THICK + .002), z:p.z,
+  const n = UD.G.cfg.n, a = seatNo(i) * Math.PI * 2 / n;
+  const p = polarR(Math.max(R_PLAY, .72 / (Math.PI * 2 / n)), a);
+  return {x:p.x, y:Y0 + THICK/2 + k * (THICK + .0015), z:p.z,
           rx:-Math.PI/2, ry:Math.sin(a) * .5 + (((i * 37) % 9) - 4) * .014, rz:0, flip:0, s:1};
 }
 function fanSlot(i, k, n){
   const a = ang(i), p = polar(R_FAN, a), sd = side(a);
-  const dx = Math.min(.19, 1.45 / Math.max(n, 1));
+  /* 整把牌不越過自己那半個扇形，兩邊各再留一點縫：人多時才不會跟隔壁的牌交疊。
+     7 人以上才會壓到這條線，人少時維持原本的張法 */
+  const room = Math.max(.12, Math.min(gapL(i), gapR(i)) * R_FAN - 1.0);
+  const dx = Math.min(.19, 1.45 / Math.max(n, 1), room / Math.max(n - 1, 1));
   const off = (k - (n - 1) / 2) * dx;
-  return {x:p.x + sd.x * off, y:.004 + k * .0035, z:p.z + sd.z * off,
+  return {x:p.x + sd.x * off, y:Y0 + THICK/2 + k * .0025, z:p.z + sd.z * off,
           rx:-Math.PI/2, ry:a + off * .13, rz:0, flip:Math.PI, s:.74};
 }
-/* 贏得的墩收在自己的右手邊，一墩一疊真的疊上去。
-   每疊的厚度就是一墩的張數，所以塔的高度＝墩數，數得出來；
-   再加一點角度亂數，看起來才像手收的而不是機器堆的。 */
-function pileSlot(i, k, per){
-  const a = ang(i), sd = side(a);
-  /* 自己那疊要讓開手牌，所以給固定位置；別人的收在座位外側 */
-  const p = (i === S.me) ? {x:S.mePile * S.xs, z:2.42} : polar(R_PILE, a);
-  const th = THICK * per;
-  const drift = k * .062;
-  const out = (i === S.me ? 0 : PILE_OUT) + drift;
-  return {x:p.x + sd.x * out, y:.006 + (k * th + th/2) * .78,
-          z:p.z + sd.z * out,
-          rx:-Math.PI/2, ry:a + (((k * 53) % 13) - 6) * .026, rz:0, flip:Math.PI, s:.78};
+/* 贏得的墩收在自己的右手邊：一墩一疊平放在桌布上，排成一列、每疊錯開約半張，
+   數得出來，也看得出每疊的厚度就是那一墩的張數；一列排滿就往桌子中央再起一列。
+   一列擺得下幾疊、每疊多大，由「這個座位到右手邊那位之間空多少」算出來——
+   一律照四疊、每疊 .70 排的話，6 人局起那一列就會排到隔壁的位子上，
+   8 人局甚至排到我的手牌裡。人多的時候疊子縮小、列變短，各自待在自己那塊空檔裡。 */
+function pileGeom(i){
+  /* 這一局最多能贏幾墩，就是這一列最多要放幾疊。排成兩列剛好——
+     再多列會一路往桌子中央疊過去，壓到檯面那一墩 */
+  const need = Math.max(1, Math.min(11, (UD.G && UD.G.hs) || 1));
+  const want = Math.max(1, Math.min(PILE_COLS, Math.ceil(need / 2)));
+  /* 對手的那一列擺在他與右手邊那位之間的空檔正中央；
+     自己的從手牌右緣（HAND_ARC）起算往右排——自己那塊扇形的另一半是握著的牌 */
+  const me = i === S.me, g = gapR(i), a0 = me ? HAND_ARC : g / 2;
+  const room = R_PILE * (me ? g - HAND_ARC : g);   /* 這一列可以佔多長的弧 */
+  const s = Math.min(PILE_S, Math.max(PILE_SMIN, room / 2.9));
+  /* 擺不下就少幾疊、多一列；最擠也不讓兩疊疊掉四分之三以上，不然數不出來 */
+  const cols = Math.max(1, Math.min(want, Math.floor((room - s) / (s * .26)) + 1));
+  const step = cols > 1 ? Math.min(s * .52, (room - s) / (cols - 1)) : s * .52;
+  const wide = s + (cols - 1) * step;
+  return {a: ang(i) + a0 + (me ? wide / 2 / R_PILE : 0), s: s, cols: cols, step: step,
+          rowgap: s * 1.4146 * .62};
 }
+function pileSlot(i, k, per){
+  const G = pileGeom(i);
+  const row = Math.floor(k / G.cols), col = k % G.cols;
+  const th = THICK * per * G.s;                    /* 這一疊縮了 G.s，厚度也跟著縮 */
+  /* 每一疊的位置用角度給，不用直線位移：往桌子中央走的第二列半徑小，
+     同樣的角度扇形自然就窄了一點——不然兩個人的第二列會在中間撞在一起 */
+  const a = G.a + (col - (G.cols - 1) / 2) * (G.step / R_PILE);
+  const p = polar(R_PILE - row * G.rowgap, a);
+  return {x:p.x, y:Y0 + th/2, z:p.z,
+          rx:-Math.PI/2, ry:a + (((k * 53) % 13) - 6) * .010, rz:0, flip:Math.PI, s:G.s};
+}
+/* 手牌那個傾斜平面的兩個方向（世界座標）：沿牌面往上、以及牌面的法線（朝向鏡頭） */
+const HP_C = Math.cos(HAND_PITCH), HP_S = Math.sin(HAND_PITCH);
+/* 扇形像真的握在手裡：所有的牌繞著牌中心下方 HAND_R 處的一個軸心轉，
+   下緣聚在一起、上緣張開，左上角的點數排成一道弧。 */
+const HAND_R = 1.9;
 function handSlot(k, n){
-  const dx = Math.min(S.handDx, S.handSpan / Math.max(n, 1));
-  const t = n > 1 ? (k - (n - 1) / 2) / ((n - 1) / 2) : 0;
-  return {x: (k - (n - 1) / 2) * dx,
-          y: HAND_Y - t * t * .09 + k * .0015,
-          z: HAND_Z + t * t * .14 - k * .002,
-          rx: HAND_PITCH, ry: 0, rz: -t * Math.min(.30, .045 * n), flip:0, s:HAND_S};
+  /* 相鄰兩張沿弧線錯開多少：牌少時寬一點好點，牌多時收到剩點數與一點花色露出來（牌寬 .72 的 33%～55%）。
+     直式螢幕整把再收窄一點 */
+  let dx = Math.max(.236, Math.min(.40, 2.6 / Math.max(n, 1))) * (S.handSpan / 3.15);
+  dx = Math.min(dx, 1.40 * HAND_R / Math.max(n - 1, 1));   /* 整把最多張開 80 度：牌再多就收得更緊 */
+  const th = (k - (n - 1) / 2) * (dx / HAND_R);            /* 這張繞軸心轉了多少 */
+  const px = HAND_R * Math.sin(th), drop = HAND_R * (Math.cos(th) - 1);
+  /* 位移全部在「牌面自己的平面」裡算（沿牌面往上／往右），不能沿世界的 y：
+     沿 y 往下會同時往牌面後方退，退的量比疊牌的墊高還大，順序就亂了。
+     疊的順序照真的拿牌——右邊那張壓在左邊那張上面：每張沿法線多墊 .03，
+     空隙留夠，上面那張的影子才落得到下面那張 */
+  const lift = k * .03;
+  return {x: px,
+          y: HAND_Y + drop * HP_C - lift * HP_S,
+          z: HAND_Z + drop * HP_S + lift * HP_C,
+          rx: HAND_PITCH, ry: 0, rz: -th, flip:0, s:HAND_S};
 }
 
 /* ================= 場景 ================= */
+/* 一間安靜的房間：深色地板、胡桃木桌沿、一盞柔和的頂燈。
+   背景與霧跟著桌布的顏色走，畫布和頁面其餘部分才是同一個空間。 */
+
+/* ---- 材質都是算出來的，不載圖 ---- */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+/* 週期性的值雜訊：格點取隨機值、平滑插值、幾個八度疊起來。邊界會接上，貼圖重複時沒有縫 */
+function noiseField(size, cells, octaves, seed){
+  const rnd = mulberry32(seed);
+  const acc = new Float32Array(size * size);
+  const smooth = t => t * t * (3 - 2 * t);
+  let amp = 1, tot = 0, c = cells;
+  for(let o = 0; o < octaves; o++){
+    const lat = new Float32Array(c * c);
+    for(let i = 0; i < c * c; i++) lat[i] = rnd();
+    for(let y = 0; y < size; y++){
+      const fy = y / size * c, y0 = Math.floor(fy), ty = smooth(fy - y0), y1 = (y0 + 1) % c;
+      for(let x = 0; x < size; x++){
+        const fx = x / size * c, x0 = Math.floor(fx), tx = smooth(fx - x0), x1 = (x0 + 1) % c;
+        const a = lat[y0 * c + x0], b = lat[y0 * c + x1], d = lat[y1 * c + x0], e = lat[y1 * c + x1];
+        const top = a + (b - a) * tx, bot = d + (e - d) * tx;
+        acc[y * size + x] += (top + (bot - top) * ty) * amp;
+      }
+    }
+    tot += amp; amp *= .5; c *= 2;
+  }
+  for(let i = 0; i < acc.length; i++) acc[i] /= tot;
+  return acc;
+}
+function sampler(f, size){
+  return function(u, v){
+    const x = ((u % 1) + 1) % 1 * size, y = ((v % 1) + 1) % 1 * size;
+    const x0 = Math.floor(x) % size, y0 = Math.floor(y) % size, tx = x - Math.floor(x), ty = y - Math.floor(y);
+    const x1 = (x0 + 1) % size, y1 = (y0 + 1) % size;
+    const a = f[y0 * size + x0], b = f[y0 * size + x1], c = f[y1 * size + x0], d = f[y1 * size + x1];
+    const top = a + (b - a) * tx, bot = c + (d - c) * tx;
+    return top + (bot - top) * ty;
+  };
+}
+function fieldTex(f, size, o){
+  const cv = document.createElement("canvas"); cv.width = cv.height = size;
+  const g = cv.getContext("2d"), im = g.createImageData(size, size), d = im.data;
+  for(let i = 0; i < f.length; i++){ const v = f[i] * 255; d[i*4] = d[i*4+1] = d[i*4+2] = v; d[i*4+3] = 255; }
+  g.putImageData(im, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if(o && o.repeat) t.repeat.set(o.repeat, o.repeat);
+  if(o && o.srgb) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+/* 桌布：燈罩下的光暈畫在布上（中央亮、往外慢慢沉、最外一圈是木沿投下的暗），
+   疊上絨面的斑駁與細纖維。燈不必開到會把牌面燒白 */
+function feltTex(){
+  const N = 1024, cv = document.createElement("canvas"); cv.width = cv.height = N;
+  const g = cv.getContext("2d"), im = g.createImageData(N, N), d = im.data;
+  const mottle = sampler(noiseField(256, 6, 4, 11), 256);
+  const fine = mulberry32(5);
+  for(let y = 0; y < N; y++) for(let x = 0; x < N; x++){
+    const dx = x / N - .5, dy = y / N - .5, r = Math.min(1, Math.sqrt(dx*dx + dy*dy) * 2);
+    let v = .90 - .22 * Math.pow(r, 2.2);
+    if(r > .965) v *= 1 - (r - .965) / .035 * .42;
+    v *= 1 + (mottle(x / N * 3, y / N * 3) - .5) * .16 + (fine() - .5) * .05;
+    const c = Math.max(0, Math.min(255, v * 255));
+    const i = (y * N + x) * 4; d[i] = d[i+1] = d[i+2] = c; d[i+3] = 255;
+  }
+  g.putImageData(im, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+/* 胡桃木：年輪沿著桌沿繞一圈（像彎板收邊），緩慢起伏加細孔。u 是繞圈方向，v 沿著剖面 */
+function woodTex(){
+  const W = 2048, H = 256, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d"), im = g.createImageData(W, H), d = im.data;
+  const low = sampler(noiseField(256, 4, 3, 21), 256), hi = sampler(noiseField(256, 32, 3, 22), 256);
+  const A = [0x3a, 0x24, 0x16], B = [0x6c, 0x48, 0x2f];
+  for(let y = 0; y < H; y++) for(let x = 0; x < W; x++){
+    const u = x / W, v = y / H;
+    const wob = (low(u * 2, v * .5) - .5) * 2.2;
+    const ring = .5 + .5 * Math.sin((v * 7 + wob + (hi(u * 3, v) - .5) * .4) * Math.PI * 2);
+    const k = Math.pow(ring, 1.4) * .66 + hi(u * 12, v * 3) * .34;
+    const i = (y * W + x) * 4;
+    for(let ch = 0; ch < 3; ch++) d[i+ch] = A[ch] + (B[ch] - A[ch]) * k;
+    d[i+3] = 255;
+  }
+  g.putImageData(im, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping; t.repeat.set(3, 1);
+  return t;
+}
+/* 接觸陰影：一片比牌略大、中央深邊緣散開的黑，貼在每張牌底下。
+   由外往內疊十幾層圓角矩形把邊緣糊開——不用 canvas filter，舊 Safari 沒有 */
+function aoTex(){
+  const W = 128, H = 176, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d");
+  const steps = 14;
+  for(let i = 0; i < steps; i++){
+    const k = i / (steps - 1), m = 4 + (1 - k) * 16;
+    g.fillStyle = "rgba(0,0,0," + (.05 + k * .05).toFixed(3) + ")";
+    g.beginPath(); g.roundRect(m, m, W - 2*m, H - 2*m, 9); g.fill();
+  }
+  const t = new THREE.CanvasTexture(cv);
+  return t;
+}
+/* 環境光不是載一張 HDR，而是拼一間房：天花板一片暖光、兩側是壁爐那頭的橘、深胡桃木的牆，
+   經 PMREM 之後成為牌與桌面的漫射環境。牌很粗糙，這道光只給均勻的底亮，不會出現亮斑。 */
+function makeEnv(r){
+  const pm = new THREE.PMREMGenerator(r);
+  const room = new THREE.Scene();
+  const em = (c, k) => new THREE.MeshBasicMaterial({color:new THREE.Color(c).multiplyScalar(k)});
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(24, 12, 24), em(0x3a2616, .5));
+  walls.material.side = THREE.BackSide;
+  room.add(walls);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(7, 7), em(0xfff2e2, 4.5));
+  ceil.position.set(0, 5.9, 1.2); ceil.rotation.x = Math.PI / 2;
+  room.add(ceil);
+  for(const sx of [-1, 1]){
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(5, 3), em(0xff9a50, 1.2));
+    p.position.set(sx * 10, 2.4, 0); p.rotation.y = -sx * Math.PI / 2;
+    room.add(p);
+  }
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.4), em(0x5a3a22, .7));
+  front.position.set(0, 2.0, 10.5); front.rotation.y = Math.PI;
+  room.add(front);
+  const env = pm.fromScene(room, .06).texture;
+  pm.dispose();
+  return env;
+}
+
+const TABLE_H = 2.3;      /* 桌面到地板的高度（牌寬單位） */
+
+/* ================= 書房 ================= */
+/* 壁爐・夜讀（2026-09-10 Francis 從三案裡選的）：整間胡桃木護牆板，對面嵌牆書櫃、兩盞壁燈，
+   右手邊石砌壁爐、爐台上兩支蠟燭，左手邊窄書櫃、一幅畫、一盞落地燈，腳下一張波斯團花毯，
+   每個座位一張墨綠軟包椅。鏡頭維持現版的牌局取景，所以房間在畫面裡只露出地毯、椅背上緣與火光；
+   看不到的地方一樣做——翻王牌時燈一亮、牆會透出來，環境光也是照這間房算的。
+   尺度：桌面 y=0、地板 -TABLE_H、天花 8.7（桌高 2.3 ≈ 75 公分，房高就是 3.6 公尺）；
+   牆在 x=±14、z=-13（對面）與 +14（鏡頭背後）。所有零件都關在這個函式裡，名字不外漏。 */
+const ROOM_RX = 14, ROOM_ZB = -13, ROOM_ZF = 14, ROOM_CEIL = 8.7;
+const R_CHAIR = 6.7;                 /* 椅子中心離桌心多遠：椅面前緣剛好探到桌沿外 */
+function buildRoom(r, scene){
+  const FLOOR_Y = -TABLE_H, CEIL_Y = ROOM_CEIL, RX = ROOM_RX, ZB = ROOM_ZB, ZF = ROOM_ZF;
+  const MAXA = r.capabilities.getMaxAnisotropy();
+
+  /* ---- 畫布貼圖 ---- */
+  function cv2d(w, h){ const c = document.createElement("canvas"); c.width = w; c.height = h; return [c, c.getContext("2d")]; }
+  function ctex(c, o){
+    const t = new THREE.CanvasTexture(c);
+    if(!o || !o.linear) t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = MAXA;
+    if(o && o.repeat){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(o.repeat[0], o.repeat[1]); }
+    return t;
+  }
+  const hex = (a, b, c) => "rgb(" + (a|0) + "," + (b|0) + "," + (c|0) + ")";
+  /* 一塊有年輪走向的木板：u 沿板長、v 橫過板寬。a 深色、b 淺色 */
+  function woodCanvas(a, b, W, H, seed, streak){
+    const [c, g] = cv2d(W, H), im = g.createImageData(W, H), d = im.data;
+    const low = sampler(noiseField(256, 4, 3, seed), 256), hi = sampler(noiseField(256, 32, 3, seed + 1), 256);
+    for(let y = 0; y < H; y++) for(let x = 0; x < W; x++){
+      const u = x / W, v = y / H;
+      const wob = (low(u * 2, v * .5) - .5) * 2.2;
+      const ring = .5 + .5 * Math.sin((v * streak + wob + (hi(u * 3, v) - .5) * .4) * Math.PI * 2);
+      const k = Math.pow(ring, 1.4) * .62 + hi(u * 12, v * 3) * .38;
+      const i = (y * W + x) * 4;
+      d[i] = a[0] + (b[0] - a[0]) * k; d[i+1] = a[1] + (b[1] - a[1]) * k; d[i+2] = a[2] + (b[2] - a[2]) * k; d[i+3] = 255;
+    }
+    g.putImageData(im, 0, 0);
+    return c;
+  }
+  const WOOD = {walnut:{a:[0x3a,0x24,0x16], b:[0x6c,0x48,0x2f]}, dark:{a:[0x2a,0x18,0x0e], b:[0x55,0x36,0x22]}};
+  const woodMats = {};
+  function woodMat(kind, rep){
+    const key = kind + (rep || "");
+    if(woodMats[key]) return woodMats[key];
+    const w = WOOD[kind], t = ctex(woodCanvas(w.a, w.b, 1024, 256, kind === "walnut" ? 21 : 61, 7), {repeat:rep || [1, 1]});
+    return woodMats[key] = new THREE.MeshPhysicalMaterial({map:t, roughness:.55, metalness:0, bumpMap:t, bumpScale:.0015, clearcoat:.25, clearcoatRoughness:.4});
+  }
+  /* 寬板地板：一排一排錯開的長板，每塊深淺不一 */
+  function plankFloor(w, PH){
+    const Nn = 1024, [c, g] = cv2d(Nn, Nn), rnd = mulberry32(9);
+    g.fillStyle = hex(w.a[0] * .5, w.a[1] * .5, w.a[2] * .5); g.fillRect(0, 0, Nn, Nn);
+    const plank = woodCanvas(w.a, w.b, 1024, 64, 45, 4);
+    const rows = Math.round(Nn / PH);
+    for(let rw = 0; rw < rows; rw++){
+      const off = (rw % 3) * 340 + rnd() * 120;
+      for(let x = -Nn + (off % 600); x < Nn; x += 600){
+        const sh = .84 + rnd() * .32;
+        g.globalAlpha = 1; g.drawImage(plank, 0, 0, 1024, 64, x, rw * PH + 1, 596, PH - 2);
+        g.globalAlpha = Math.max(0, 1 - sh); g.fillStyle = "#000"; g.fillRect(x, rw * PH + 1, 596, PH - 2);
+        g.globalAlpha = Math.max(0, sh - 1) * .5; g.fillStyle = "#fff"; g.fillRect(x, rw * PH + 1, 596, PH - 2);
+      }
+    }
+    g.globalAlpha = 1;
+    return c;
+  }
+  /* 織紋：一層細細的經緯線壓在圖案上，再用 soft-light 疊一層染色不均，毯子才不像印出來的 */
+  function weaveOver(g, W, H, k){
+    g.save();
+    for(let y = 0; y < H; y += 3){ g.fillStyle = (y % 6 === 0) ? "rgba(0,0,0," + k + ")" : "rgba(255,255,255," + (k * .55) + ")"; g.fillRect(0, y, W, 1.5); }
+    for(let x = 0; x < W; x += 3){ g.fillStyle = (x % 6 === 0) ? "rgba(0,0,0," + (k * .6) + ")" : "rgba(255,255,255," + (k * .35) + ")"; g.fillRect(x, 0, 1.2, H); }
+    const f = noiseField(128, 6, 3, 77), [nc, ng] = cv2d(128, 128), im = ng.createImageData(128, 128);
+    for(let i = 0; i < f.length; i++){ const v = 128 + (f[i] - .5) * 90; im.data[i*4] = im.data[i*4+1] = im.data[i*4+2] = v; im.data[i*4+3] = 255; }
+    ng.putImageData(im, 0, 0);
+    g.globalCompositeOperation = "soft-light"; g.globalAlpha = .9;
+    g.fillStyle = g.createPattern(nc, "repeat");
+    g.save(); g.scale(4, 4); g.fillRect(0, 0, W / 4, H / 4); g.restore();
+    g.restore();
+  }
+  function weaveBump(W, H){
+    const [c, g] = cv2d(W, H);
+    g.fillStyle = "#808080"; g.fillRect(0, 0, W, H);
+    for(let y = 0; y < H; y += 3){ g.fillStyle = (y % 6 === 0) ? "#5a5a5a" : "#a0a0a0"; g.fillRect(0, y, W, 1.5); }
+    for(let x = 0; x < W; x += 3){ g.fillStyle = (x % 6 === 0) ? "#666" : "#999"; g.fillRect(x, 0, 1.2, H); }
+    const t = ctex(c, {linear:true}); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); return t;
+  }
+  /* 毯子兩端的流蘇：畫在透明畫布邊上 */
+  function fringe(g, W, H, pad, col){
+    g.strokeStyle = col; g.lineWidth = 2.2; g.lineCap = "round";
+    for(let y = pad + 4; y < H - pad; y += 7){
+      const j = Math.sin(y * .37) * 5;
+      g.beginPath(); g.moveTo(pad, y); g.lineTo(6 + j, y + Math.sin(y) * 3); g.stroke();
+      g.beginPath(); g.moveTo(W - pad, y); g.lineTo(W - 6 - j, y + Math.cos(y) * 3); g.stroke();
+    }
+  }
+  /* 波斯團花：茜紅底、靛藍團花與角花、象牙細紋邊。畫在 2048×1536 的座標上，實際畫布縮四分之三 */
+  function persianRug(){
+    const W = 2048, H = 1536, P = 46, K = .75, [c, g] = cv2d(W * K, H * K);
+    g.scale(K, K);
+    const madder = "#7a2e26", indigo = "#24304d", ivory = "#d9cbb0", gold = "#b58a3c", deep = "#4d1c18";
+    fringe(g, W, H, P, ivory);
+    g.fillStyle = ivory; g.fillRect(P, P, W - 2*P, H - 2*P);
+    g.fillStyle = indigo; g.fillRect(P + 30, P + 30, W - 2*P - 60, H - 2*P - 60);
+    const flower = (x, y, rd) => { g.fillStyle = ivory; for(let k = 0; k < 8; k++){ const a = k / 8 * Math.PI * 2; g.beginPath(); g.arc(x + Math.cos(a) * rd * .6, y + Math.sin(a) * rd * .6, rd * .42, 0, Math.PI * 2); g.fill(); } g.fillStyle = gold; g.beginPath(); g.arc(x, y, rd * .3, 0, Math.PI * 2); g.fill(); };
+    for(let x = P + 110; x < W - P - 60; x += 160){ flower(x, P + 105, 34); flower(x, H - P - 105, 34); }
+    for(let y = P + 265; y < H - P - 200; y += 160){ flower(P + 105, y, 34); flower(W - P - 105, y, 34); }
+    g.fillStyle = ivory; g.fillRect(P + 180, P + 180, W - 2*P - 360, H - 2*P - 360);
+    g.fillStyle = madder; g.fillRect(P + 200, P + 200, W - 2*P - 400, H - 2*P - 400);
+    const corner = (x, y, sx, sy) => {
+      const lobe = (n, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(x, y); g.lineTo(x + sx * n, y); g.quadraticCurveTo(x + sx * n * .62, y + sy * n * .29, x + sx * n * .48, y + sy * n * .48); g.quadraticCurveTo(x + sx * n * .29, y + sy * n * .62, x, y + sy * n); g.closePath(); g.fill(); };
+      lobe(420, indigo); lobe(330, ivory); lobe(280, indigo);
+    };
+    corner(P + 200, P + 200, 1, 1); corner(W - P - 200, P + 200, -1, 1); corner(P + 200, H - P - 200, 1, -1); corner(W - P - 200, H - P - 200, -1, -1);
+    const cx = W / 2, cy = H / 2;
+    const lobed = (rd, n, col) => { g.fillStyle = col; g.beginPath(); for(let k = 0; k <= n * 2; k++){ const a = k / (n * 2) * Math.PI * 2, rr = rd * (k % 2 ? .86 : 1); g.lineTo(cx + Math.cos(a) * rr * 1.25, cy + Math.sin(a) * rr); } g.closePath(); g.fill(); };
+    lobed(400, 12, ivory); lobed(372, 12, indigo); lobed(300, 10, ivory); lobed(272, 10, madder); lobed(190, 8, indigo); lobed(160, 8, gold); lobed(96, 8, deep); lobed(60, 6, ivory);
+    g.fillStyle = indigo;
+    for(const s of [-1, 1]){ g.beginPath(); g.moveTo(cx, cy + s * 560); g.lineTo(cx + 70, cy + s * 430); g.lineTo(cx - 70, cy + s * 430); g.closePath(); g.fill(); }
+    g.fillStyle = "rgba(217,203,176,.55)";
+    for(let y = P + 330; y < H - P - 300; y += 110) for(let x = P + 330; x < W - P - 300; x += 110){
+      if(Math.hypot(x - cx, (y - cy) * 1.25) < 520) continue;
+      g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.fill(); g.fillRect(x - 16, y - 1.5, 32, 3); g.fillRect(x - 1.5, y - 16, 3, 32);
+    }
+    weaveOver(g, W, H, .14);
+    return c;
+  }
+  /* 書脊：淺灰底、兩道更淺的橫帶，乘上每本書自己的顏色就是燙金書名的位置 */
+  function spineTex(){
+    const [c, g] = cv2d(64, 128);
+    g.fillStyle = "#d4d4d4"; g.fillRect(0, 0, 64, 128);
+    g.fillStyle = "#f6f6f6"; g.fillRect(6, 14, 52, 4); g.fillRect(6, 24, 52, 2); g.fillRect(6, 100, 52, 3);
+    g.fillStyle = "#bdbdbd"; g.fillRect(0, 0, 3, 128); g.fillRect(61, 0, 3, 128);
+    return ctex(c);
+  }
+  /* 護牆板：一格 6 × 11 個世界單位，下方矮板、腰線、上方高板、踢腳 */
+  function panelCanvas(){
+    const W = 768, H = 1408, [c, g] = cv2d(W, H), w = WOOD.dark;
+    const base = woodCanvas(w.a, w.b, 256, 1408, 63, 9);
+    g.save(); g.translate(W, 0); g.rotate(Math.PI / 2); g.drawImage(base, 0, 0, 256, 1408, 0, 0, 1408, W); g.restore();   /* 直紋 */
+    const u = W / 6;
+    const panel = (x, y, pw, ph) => {
+      g.fillStyle = "rgba(0,0,0,.28)"; g.fillRect(x, y, pw, ph);
+      g.fillStyle = "rgba(255,225,190,.10)"; g.fillRect(x + 10, y + 10, pw - 20, ph - 20);
+      g.fillStyle = "rgba(255,240,210,.22)"; g.fillRect(x + 10, y + 10, pw - 20, 3); g.fillRect(x + 10, y + 10, 3, ph - 20);
+      g.fillStyle = "rgba(0,0,0,.45)"; g.fillRect(x + 10, y + ph - 13, pw - 20, 3); g.fillRect(x + pw - 13, y + 10, 3, ph - 20);
+      g.fillStyle = "rgba(255,225,190,.06)"; g.fillRect(x + 26, y + 26, pw - 52, ph - 52);
+    };
+    const rail = (y, h) => { g.fillStyle = "rgba(255,230,200,.16)"; g.fillRect(0, y, W, h); g.fillStyle = "rgba(0,0,0,.4)"; g.fillRect(0, y + h - 4, W, 4); g.fillStyle = "rgba(255,240,215,.3)"; g.fillRect(0, y, W, 3); };
+    for(const k of [0, 1]){ panel(k * W / 2 + .35 * u, .9 * u, W / 2 - .7 * u, 6.4 * u); panel(k * W / 2 + .35 * u, 8.3 * u, W / 2 - .7 * u, 2.1 * u); }
+    rail(7.6 * u, .4 * u); rail(.2 * u, .3 * u); rail(10.6 * u, .4 * u);
+    return c;
+  }
+  /* 掛畫：暗色風景一片 */
+  function paintingCanvas(seed){
+    const W = 512, H = 384, [c, g] = cv2d(W, H);
+    const gr = g.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, "#3b3f57"); gr.addColorStop(.6, "#8a7a6a"); gr.addColorStop(1, "#23201c");
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    const f = sampler(noiseField(128, 3, 3, seed), 128);
+    g.fillStyle = "#1c1a18"; g.beginPath(); g.moveTo(0, H);
+    for(let x = 0; x <= W; x += 6) g.lineTo(x, H * .62 + (f(x / W, .5) - .5) * 160);
+    g.lineTo(W, H); g.closePath(); g.fill();
+    g.fillStyle = "rgba(255,230,180,.25)"; g.beginPath(); g.arc(W * .68, H * .3, 26, 0, Math.PI * 2); g.fill();
+    return c;
+  }
+  function flameTex(){
+    const W = 128, H = 192, [c, g] = cv2d(W, H);
+    g.beginPath(); g.moveTo(64, 4); g.bezierCurveTo(120, 80, 122, 150, 64, 186); g.bezierCurveTo(6, 150, 8, 80, 64, 4); g.closePath(); g.clip();
+    const gr = g.createRadialGradient(64, 140, 4, 64, 120, 110);
+    gr.addColorStop(0, "rgba(255,246,200,1)"); gr.addColorStop(.3, "rgba(255,170,60,.95)"); gr.addColorStop(.62, "rgba(220,80,20,.5)"); gr.addColorStop(1, "rgba(120,20,0,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    return ctex(c);
+  }
+
+  /* ---- 幾何零件 ---- */
+  function box(w, h, d, mat, x, y, z){
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    if(x !== undefined) m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true; return m;
+  }
+  /* 圓角盒：圓角矩形往 z 擠出、邊緣倒圓。沒載 addons，所以不用 RoundedBoxGeometry */
+  const rboxGeo = new Map();
+  function rbox(w, h, d, rad, mat, x, y, z){
+    const key = [w, h, d, rad].join(",");
+    let geo = rboxGeo.get(key);
+    if(!geo){
+      const R = Math.min(rad, w / 2 - .01, h / 2 - .01, d / 2 - .01), cr = Math.max(.01, Math.min(R, (w - 2 * R) / 2, (h - 2 * R) / 2));
+      const sw = w - 2 * R, sh = h - 2 * R, s = new THREE.Shape();
+      s.moveTo(-sw/2 + cr, -sh/2); s.lineTo(sw/2 - cr, -sh/2); s.quadraticCurveTo(sw/2, -sh/2, sw/2, -sh/2 + cr);
+      s.lineTo(sw/2, sh/2 - cr); s.quadraticCurveTo(sw/2, sh/2, sw/2 - cr, sh/2); s.lineTo(-sw/2 + cr, sh/2);
+      s.quadraticCurveTo(-sw/2, sh/2, -sw/2, sh/2 - cr); s.lineTo(-sw/2, -sh/2 + cr); s.quadraticCurveTo(-sw/2, -sh/2, -sw/2 + cr, -sh/2);
+      geo = new THREE.ExtrudeGeometry(s, {depth:d - 2 * R, bevelEnabled:true, bevelThickness:R, bevelSize:R, bevelSegments:3, curveSegments:5});
+      geo.center();
+      rboxGeo.set(key, geo);
+    }
+    const m = new THREE.Mesh(geo, mat);
+    if(x !== undefined) m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true; return m;
+  }
+  function cyl(rt, rb, h, mat, x, y, z, seg){
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 24), mat);
+    if(x !== undefined) m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true; return m;
+  }
+  const BRASS = new THREE.MeshStandardMaterial({color:0xC9A552, metalness:.85, roughness:.32});
+  const BRASS_DARK = new THREE.MeshStandardMaterial({color:0x6b5230, metalness:.8, roughness:.4});
+  const STONE = new THREE.MeshStandardMaterial({color:0xb2a189, roughness:.9});
+  /* 墨綠絲絨：sheen 給布在側光下那層淡淡的回光 */
+  const uphMat = col => new THREE.MeshPhysicalMaterial({color:col, roughness:.85, metalness:0, sheen:.5, sheenRoughness:.7, sheenColor:new THREE.Color(0x5f8a72)});
+  const MOSS = uphMat(0x17332a);
+  const SHADE = () => new THREE.MeshStandardMaterial({color:0xe8d7b5, emissive:0xffc98a, emissiveIntensity:1.2, side:THREE.DoubleSide, roughness:.9});
+
+  /* 書：整間房的書收進一個 InstancedMesh，一次畫完。每本書一個矩陣、一個顏色 */
+  const PALETTE = ["#5a221c","#6b2a24","#1f3a30","#172e25","#22293f","#2c3550","#8e6a2b","#23201d","#2e2622","#3b302a","#4b2d3c","#6a4b3a","#7a5a3a","#7a2e26","#b0813a"];
+  const books = {mats:[], cols:[], rnd:mulberry32(303)};
+  function shade(hexCol, rnd){ const c = new THREE.Color(hexCol); c.offsetHSL(0, 0, (rnd() - .5) * .08); return c; }
+  /* 書櫃：兩側板、背板、頂底板、層板，層板上塞滿書（偶爾一疊橫放、偶爾留一口氣） */
+  function bookcase(o){
+    const g = new THREE.Group();
+    const w = o.w, h = o.h, d = o.d || 1.15, n = o.shelves || 6, T = .1, mat = o.mat;
+    g.add(box(.12, h, d, mat, -w/2 + .06, h/2, 0), box(.12, h, d, mat, w/2 - .06, h/2, 0));
+    g.add(box(w, h, .06, mat, 0, h/2, -d/2 + .03));
+    g.add(box(w, T, d, mat, 0, h - T/2, 0));
+    g.add(box(w, .35, d, mat, 0, .175, 0));
+    const y0 = .35, ch = (h - y0 - T) / n;
+    for(let k = 0; k < n; k++) g.add(box(w - .24, T, d - .04, mat, 0, y0 + k * ch + T/2, 0));
+    g.position.set(o.x, o.y, o.z); g.rotation.y = o.ry || 0; g.updateMatrixWorld(true);
+    const rnd = books.rnd, m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), e = new THREE.Euler();
+    const put = (col) => { m.compose(p, q, s).premultiply(g.matrixWorld); books.mats.push(m.clone()); books.cols.push(col); };
+    for(let k = 0; k < n; k++){
+      const base = y0 + k * ch + T, hmax = ch * .92;
+      let x = -w/2 + .12 + .06 + rnd() * .15;
+      const fill = (o.fill || .92) - (k === n - 1 ? .25 * rnd() : 0);
+      const xEnd = -w/2 + .12 + (w - .24) * fill;
+      while(x < xEnd){
+        const rr = rnd();
+        if(rr < .07){ x += .25 + rnd() * .7; continue; }
+        if(rr < .16){
+          const cnt = 2 + Math.floor(rnd() * 3), bl = .62 + rnd() * .25, bd = .78 + rnd() * .12; let yy = base;
+          for(let i = 0; i < cnt; i++){
+            const th = .12 + rnd() * .1;
+            p.set(x + bl/2, yy + th/2, (rnd() - .5) * .08); s.set(bl, th, bd * .8); e.set(0, (rnd() - .5) * .16, 0); q.setFromEuler(e);
+            put(shade(PALETTE[Math.floor(rnd() * PALETTE.length)], rnd)); yy += th;
+          }
+          x += bl + .06; continue;
+        }
+        const th = .13 + rnd() * .19, bh = hmax * (.66 + rnd() * .34), bd = d * (.6 + rnd() * .18);
+        const lean = (rr > .92 && x > -w/2 + .6) ? (rnd() - .5) * .2 : 0;
+        p.set(x + th/2 + Math.abs(lean) * bh * .5, base + bh/2, -d/2 + .06 + bd/2 + (rnd() - .5) * .06);
+        s.set(th, bh, bd); e.set(0, 0, lean); q.setFromEuler(e);
+        put(shade(PALETTE[Math.floor(rnd() * PALETTE.length)], rnd));
+        x += th + .012 + Math.abs(lean) * .6;
+      }
+    }
+    return g;
+  }
+  function buildBooks(){
+    const n = books.mats.length;
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({map:spineTex(), roughness:.78, metalness:0}), n);
+    for(let i = 0; i < n; i++){ im.setMatrixAt(i, books.mats[i]); im.setColorAt(i, books.cols[i]); }
+    im.instanceMatrix.needsUpdate = true; if(im.instanceColor) im.instanceColor.needsUpdate = true;
+    im.castShadow = im.receiveShadow = true;
+    return im;
+  }
+  /* 墨綠軟包椅：圓角坐墊、微微後仰的靰背、兩側扶手，底下一圈深木座與短腳，靰背上兩對釘扣。
+     椅子的正面朝 +z；擺到座位上再轉向桌心 */
+  const chairWood = woodMat("dark");
+  const btnMat = new THREE.MeshStandardMaterial({color:0x162c23, roughness:.9});
+  function chair(){
+    const g = new THREE.Group(), legs = .42;
+    for(const sx of [-1, 1]) for(const sz of [-1, 1]) g.add(cyl(.09, .07, legs, chairWood, sx * .82, legs/2, sz * .75, 12));
+    g.add(box(1.8, .5, 1.76, chairWood, 0, legs + .25, 0));
+    g.add(rbox(2.0, .52, 1.96, .15, MOSS, 0, legs + .74, .02));
+    const back = rbox(2.0, 1.8, .46, .17, MOSS, 0, legs + 1.56, -.86); back.rotation.x = -.13; g.add(back);
+    for(const sx of [-1, 1]) g.add(rbox(.4, .7, 1.86, .13, MOSS, sx * .99, legs + .94, -.06));
+    for(const sx of [-.5, .5]) for(const yy of [1.55, 2.15]){ const b = cyl(.06, .06, .03, btnMat, sx, legs + yy, -.62 - (yy - 1.55) * .117, 10); b.rotation.x = Math.PI/2 - .13; g.add(b); }
+    return g;
+  }
+  /* 壁燈：銅座、短桿、亮著的布罩，裡面一顆點光 */
+  function sconce(){
+    const g = new THREE.Group();
+    g.add(box(.16, .5, .08, BRASS_DARK, 0, 0, .04), cyl(.03, .03, .5, BRASS, 0, .25, .3, 8));
+    const sh = new THREE.Mesh(new THREE.ConeGeometry(.36, .42, 24, 1, true), SHADE()); sh.position.set(0, .6, .3); g.add(sh);
+    const l = new THREE.PointLight(0xffc78a, 4.5, 9, 2); l.position.set(0, .5, .45); g.add(l);
+    return g;
+  }
+  function floorLamp(){
+    const g = new THREE.Group();
+    g.add(cyl(.5, .55, .08, BRASS_DARK, 0, .04, 0, 32), cyl(.04, .04, 5.6, BRASS, 0, 2.85, 0, 12));
+    const sh = new THREE.Mesh(new THREE.CylinderGeometry(.85, 1.0, 1.1, 40, 1, true), SHADE()); sh.material.emissiveIntensity = .8; sh.position.y = 5.75; g.add(sh);
+    const l = new THREE.PointLight(0xffc78a, 6, 12, 2); l.position.y = 5.5; g.add(l);
+    return g;
+  }
+  function picture(w, h, seed, frameMat){
+    const g = new THREE.Group();
+    g.add(box(w + .3, h + .3, .12, frameMat, 0, 0, 0));
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({map:ctex(paintingCanvas(seed)), roughness:.7}));
+    p.position.z = .065; g.add(p);
+    return g;
+  }
+  /* 吊燈：桌子上方一盞寬罩——遊戲那盞頂燈的形體。鏡頭看不到它，翻王牌時燈亮一下牆上會有它的影子 */
+  function pendant(){
+    const g = new THREE.Group();
+    const out = new THREE.Mesh(new THREE.ConeGeometry(1.9, 1.25, 48, 1, true), new THREE.MeshStandardMaterial({color:0x2c231a, metalness:.55, roughness:.45}));
+    const inn = new THREE.Mesh(new THREE.ConeGeometry(1.86, 1.22, 48, 1, true), new THREE.MeshStandardMaterial({color:0xffe6c4, emissive:0xffd9a8, emissiveIntensity:1.6, side:THREE.BackSide}));
+    out.position.y = inn.position.y = 6.75; g.add(out, inn);
+    g.add(cyl(.09, .09, .6, BRASS_DARK, 0, 7.6, 0, 16), cyl(.025, .025, CEIL_Y - 7.9, BRASS_DARK, 0, (CEIL_Y + 7.9)/2, 0, 8));
+    g.position.set(-.3, 0, 1.0);
+    return g;
+  }
+  /* 壁爐：石砌門框與爐膛、爐台、柴與火。火是三片相加混色的火焰貼圖，tick() 讓它一直呼吸 */
+  function fireplace(){
+    const g = new THREE.Group(), D = .95, OW = 3.8, OH = 3.1;
+    g.add(box(.9, OH + .7, D, STONE, -OW/2 - .45, (OH + .7)/2, 0), box(.9, OH + .7, D, STONE, OW/2 + .45, (OH + .7)/2, 0));
+    g.add(box(OW + 1.8, .75, D, STONE, 0, OH + .7 + .375, 0));
+    g.add(box(OW + 2.4, .18, D + .3, woodMat("dark"), 0, OH + 1.45 + .09, .12));
+    g.add(box(OW + 2.4, .5, D + .2, STONE, 0, -.23, .1));
+    const inner = new THREE.MeshStandardMaterial({color:0x17110e, roughness:1});
+    g.add(box(OW, OH, .1, inner, 0, OH/2, -D/2 + .05), box(OW, .1, D, inner, 0, .05, 0));
+    const logMat = new THREE.MeshStandardMaterial({color:0x3a2416, roughness:.95});
+    const l1 = cyl(.19, .19, 2.4, logMat, 0, .3, -.15, 12); l1.rotation.z = Math.PI/2; g.add(l1);
+    const l2 = cyl(.17, .17, 2.2, logMat, .2, .62, -.05, 12); l2.rotation.z = Math.PI/2 + .12; l2.rotation.y = .25; g.add(l2);
+    const ember = new THREE.Mesh(new THREE.PlaneGeometry(2.2, .5), new THREE.MeshBasicMaterial({color:new THREE.Color(0xff5a1a).multiplyScalar(2.5), transparent:true, opacity:.9, blending:THREE.AdditiveBlending, depthWrite:false}));
+    ember.rotation.x = -Math.PI/2; ember.position.set(0, .12, -.1); g.add(ember);
+    const FT = flameTex(), flames = [];
+    for(let i = 0; i < 3; i++){
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.65), new THREE.MeshBasicMaterial({map:FT, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
+      f.position.set((i - 1) * .55, .95, (i - 1) * .12); f.rotation.y = (i - 1) * .35; g.add(f); flames.push(f);
+    }
+    /* 火光要照得到桌邊：距離 26、強度 110（decay 2 之下到桌心約剩 0.6） */
+    const light = new THREE.PointLight(0xff8c3a, 110, 26, 2); light.position.set(0, 1.5, 1.4); g.add(light);
+    g.userData.tick = function(t){
+      const s = t / 1000;
+      light.intensity = 110 * (1 + .16 * Math.sin(s * 9.1) + .10 * Math.sin(s * 23.7 + 1) + .06 * Math.sin(s * 41.3));
+      flames.forEach((f, i) => { f.scale.y = 1 + .14 * Math.sin(s * (7 + i * 2.3) + i); f.scale.x = 1 + .08 * Math.sin(s * (11 + i) + i * 2); f.material.opacity = .78 + .2 * Math.sin(s * (13 + i * 3) + i); });
+      ember.material.opacity = .75 + .2 * Math.sin(s * 5.3);
+    };
+    return g;
+  }
+
+  /* ---- 拼房間 ---- */
+  const g = new THREE.Group();
+  const dark = woodMat("dark", [2, 1]);
+  const planks = ctex(plankFloor(WOOD.dark, 128), {repeat:[2 * RX / 11, (ZF - ZB) / 11]});
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(2 * RX, ZF - ZB),
+    new THREE.MeshPhysicalMaterial({map:planks, roughness:.62, metalness:0, bumpMap:planks, bumpScale:.002, clearcoat:.12, clearcoatRoughness:.5}));
+  floor.rotation.x = -Math.PI/2; floor.position.set(0, FLOOR_Y, (ZF + ZB)/2); floor.receiveShadow = true; g.add(floor);
+  const H = CEIL_Y - FLOOR_Y, ym = (CEIL_Y + FLOOR_Y)/2, zc = (ZF + ZB)/2;
+  const panelT = ctex(panelCanvas(), {repeat:[2 * RX / 6, 1]});
+  const panelMat = new THREE.MeshPhysicalMaterial({map:panelT, roughness:.5, metalness:0, bumpMap:panelT, bumpScale:.01, clearcoat:.2, clearcoatRoughness:.5});
+  const panelSideT = panelT.clone(); panelSideT.repeat.set((ZF - ZB) / 6, 1); panelSideT.needsUpdate = true;
+  const panelSide = panelMat.clone(); panelSide.map = panelSideT; panelSide.bumpMap = panelSideT;
+  const wall = (w, mat) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, H), mat); m.receiveShadow = true; return m; };
+  const back = wall(2 * RX, panelMat); back.position.set(0, ym, ZB); g.add(back);
+  const front = wall(2 * RX, panelMat); front.position.set(0, ym, ZF); front.rotation.y = Math.PI; g.add(front);
+  const left = wall(ZF - ZB, panelSide); left.position.set(-RX, ym, zc); left.rotation.y = Math.PI/2; g.add(left);
+  const right = wall(ZF - ZB, panelSide); right.position.set(RX, ym, zc); right.rotation.y = -Math.PI/2; g.add(right);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(2 * RX, ZF - ZB), new THREE.MeshStandardMaterial({color:0x8f7d64, roughness:1}));
+  ceil.rotation.x = Math.PI/2; ceil.position.set(0, CEIL_Y, zc); g.add(ceil);
+  g.add(box(2 * RX, .5, .08, dark, 0, FLOOR_Y + .25, ZB + .04), box(.08, .5, ZF - ZB, dark, -RX + .04, FLOOR_Y + .25, zc), box(.08, .5, ZF - ZB, dark, RX - .04, FLOOR_Y + .25, zc), box(2 * RX, .5, .08, dark, 0, FLOOR_Y + .25, ZF - .04));
+  /* 地毯 */
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(19, 14.25), new THREE.MeshPhysicalMaterial({map:ctex(persianRug()), transparent:true, roughness:1, metalness:0,
+    bumpMap:weaveBump(1024, 768), bumpScale:.012, sheen:.35, sheenRoughness:.8, sheenColor:new THREE.Color(0x3a2a1a)}));
+  rug.rotation.x = -Math.PI/2; rug.position.y = FLOOR_Y + .012; rug.receiveShadow = true; g.add(rug);
+  /* 對面：嵌牆書櫃、兩盞壁燈 */
+  g.add(bookcase({w:20.4, h:8.6, d:1.25, shelves:6, mat:dark, x:0, y:FLOOR_Y, z:ZB + .65, fill:.95}));
+  for(const sx of [-1, 1]){ const sc = sconce(); sc.position.set(sx * 11.9, FLOOR_Y + 4.4, ZB + .08); g.add(sc); }
+  /* 右手邊：石砌壁爐、爐台上的蠟燭與鐘 */
+  const fp = fireplace(); fp.position.set(RX - .5, FLOOR_Y, -2.2); fp.rotation.y = -Math.PI/2; g.add(fp);
+  const candleMat = new THREE.MeshStandardMaterial({color:0xefe3c8, roughness:.7});
+  for(const dz of [-2.1, -1.7]){
+    g.add(cyl(.08, .08, .7, candleMat, RX - .95, FLOOR_Y + 5.3, -2.2 + dz, 10));
+    const fl = new THREE.Mesh(new THREE.SphereGeometry(.06, 8, 8), new THREE.MeshBasicMaterial({color:new THREE.Color(0xffc060).multiplyScalar(6)})); fl.position.set(RX - .95, FLOOR_Y + 5.75, -2.2 + dz); g.add(fl);
+  }
+  const cl = new THREE.PointLight(0xffc070, 1.2, 5, 2); cl.position.set(RX - 1.2, FLOOR_Y + 5.9, -4.1); g.add(cl);
+  g.add(box(.9, 1.1, .35, BRASS_DARK, RX - .95, FLOOR_Y + 5.55, -.3));
+  /* 左手邊：窄書櫃、一幅畫、落地燈 */
+  g.add(bookcase({w:6.2, h:8.6, d:1.2, shelves:6, mat:dark, x:-RX + .62, y:FLOOR_Y, z:-6.5, ry:Math.PI/2}));
+  const pic = picture(5.2, 3.8, 3, woodMat("walnut")); pic.position.set(-RX + .1, FLOOR_Y + 5.4, 2.2); pic.rotation.y = Math.PI/2; g.add(pic);
+  const lamp2 = floorLamp(); lamp2.position.set(-RX + 2.6, FLOOR_Y, 6.0); g.add(lamp2);
+  g.add(pendant());
+  g.add(buildBooks());
+  scene.add(g);
+  return {g:g, floor:floor, tick:fp.userData.tick, chair:chair, last:0};
+}
+/* 每個座位一張椅子：人數、換座位、直式壓扁都會動到，所以每次 sync() 都擺一遍（便宜） */
+function placeChairs(){
+  if(!S || !S.room || !UD.G) return;
+  const n = UD.G.cfg.n, list = S.chairs || (S.chairs = []);
+  while(list.length < n){ const c = S.room.chair(); S.scene.add(c); list.push(c); }
+  list.forEach(function(c, i){
+    c.visible = i < n;
+    if(i >= n) return;
+    const a = ang(i), p = polar(R_CHAIR, a);
+    c.position.set(p.x, -TABLE_H, p.z);
+    c.rotation.y = a + Math.PI;
+  });
+}
+
+let AO_GEO = null, AO_MAT = null;
 function build(){
   const r = new THREE.WebGLRenderer({canvas:CANVAS, antialias:true, powerPreference:"high-performance"});
   r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   r.shadowMap.enabled = true;
   r.shadowMap.type = THREE.PCFShadowMap;
-  r.toneMapping = THREE.ACESFilmicToneMapping;
-  r.toneMappingExposure = .94;
+  r.toneMapping = THREE.AgXToneMapping;      /* 比 ACES 溫和：亮部慢慢收，不把牌面燒成白紙 */
+  r.toneMappingExposure = .98;                /* 夜讀的房間：整體壓暗一點，牌面靠頂燈 */
 
   const scene = new THREE.Scene();
-  const bg = new THREE.Color().setRGB(.012, .014, .020, THREE.LinearSRGBColorSpace);
-  scene.background = bg;
-  scene.fog = new THREE.Fog(bg, 17, 34);   /* 只吃掉桌沿外的空氣，不准碰到對面的人 */
+  scene.background = new THREE.Color(0x07050a);  /* 四面都是牆，背景色與霧都用不上了 */
+  scene.environment = makeEnv(r);
+  scene.environmentIntensity = .42;
 
-  const camera = new THREE.PerspectiveCamera(42, 1, .1, 60);
+  const camera = new THREE.PerspectiveCamera(42, 1, .1, 80);
 
-  /* 桌布：中央亮、邊緣暗，燈罩下的感覺由這張圖給，不是靠燈算 */
-  const vg = document.createElement("canvas");
-  vg.width = vg.height = 512;
-  const vc = vg.getContext("2d");
-  const rg = vc.createRadialGradient(256, 256, 10, 256, 256, 250);
-  rg.addColorStop(0, "#f2f2f2"); rg.addColorStop(.62, "#d2d2d2");
-  rg.addColorStop(1, "#8f8f8f");
-  vc.fillStyle = rg; vc.fillRect(0, 0, 512, 512);
-  const vig = new THREE.CanvasTexture(vg);
-  vig.colorSpace = THREE.SRGBColorSpace;
-
-  const feltMat = new THREE.MeshStandardMaterial({map:vig, roughness:.99, metalness:0});
   const table = new THREE.Group();
   scene.add(table);
 
-  const felt = new THREE.Mesh(new THREE.CircleGeometry(FELT_R, 96), feltMat);
+  /* 桌布：絨。sheen 給布料在側光下那層淡淡的回光；細雜訊當絨面的顆粒 */
+  const nap = fieldTex(noiseField(256, 64, 2, 3), 256, {repeat:16});
+  const feltMat = new THREE.MeshPhysicalMaterial({map:feltTex(), roughness:1, metalness:0,
+    bumpMap:nap, bumpScale:.0035, sheen:.22, sheenRoughness:.9, sheenColor:new THREE.Color(0x000000)});
+  const felt = new THREE.Mesh(new THREE.CircleGeometry(FELT_R, 128), feltMat);
   felt.rotation.x = -Math.PI/2;
   felt.receiveShadow = true;
   table.add(felt);
 
-  const rim = new THREE.Mesh(new THREE.RingGeometry(FELT_R, FELT_R + .34, 96),
-    new THREE.MeshStandardMaterial({color:0x1d1610, roughness:.72, metalness:.1}));
-  rim.rotation.x = -Math.PI/2; rim.position.y = -.002;
-  rim.receiveShadow = true;
+  /* 桌沿：胡桃木、圓弧收邊、整塊有厚度，上了一層薄漆。桌布比木沿低一點，交界處有一道細細的邊。
+     LatheGeometry 的法線跟走向有關：由外底往上、沿頂面往內、再下到桌布，法線才朝外。 */
+  const LIP = .016, EDGE = .46, DEPTH = .30, R0 = .13;
+  const prof = [];
+  prof.push(new THREE.Vector2(FELT_R - .30, -DEPTH));
+  prof.push(new THREE.Vector2(FELT_R + EDGE - .04, -DEPTH));
+  prof.push(new THREE.Vector2(FELT_R + EDGE, -DEPTH + .04));
+  for(let i = 7; i >= 0; i--){
+    const a = i / 7 * Math.PI / 2;
+    prof.push(new THREE.Vector2(FELT_R + EDGE - R0 + Math.sin(a) * R0, LIP + .004 - R0 + Math.cos(a) * R0));
+  }
+  prof.push(new THREE.Vector2(FELT_R + .06, LIP + .004));
+  prof.push(new THREE.Vector2(FELT_R - .01, LIP));
+  prof.push(new THREE.Vector2(FELT_R - .01, -.02));
+  const wood = woodTex();
+  wood.anisotropy = r.capabilities.getMaxAnisotropy();
+  const woodMat = new THREE.MeshPhysicalMaterial({map:wood, roughness:.52, metalness:0,
+    bumpMap:wood, bumpScale:.0012, clearcoat:.38, clearcoatRoughness:.32});
+  const rim = new THREE.Mesh(new THREE.LatheGeometry(prof, 160), woodMat);
+  rim.receiveShadow = true; rim.castShadow = true;
   table.add(rim);
 
-  const brass = new THREE.Mesh(new THREE.RingGeometry(FELT_R - .028, FELT_R + .008, 96),
-    new THREE.MeshStandardMaterial({color:0x8f6b33, roughness:.42, metalness:.8}));
-  brass.rotation.x = -Math.PI/2; brass.position.y = .001;
-  table.add(brass);
+  /* 桌腳：一根粗矮的深色圓柱，藏在桌子底下，為了在地板上留一塊影子 */
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.7, TABLE_H - DEPTH, 48),
+    new THREE.MeshStandardMaterial({color:0x17140f, roughness:.85, metalness:0}));
+  leg.position.y = -DEPTH - (TABLE_H - DEPTH) / 2;
+  leg.castShadow = true; leg.receiveShadow = true;
+  table.add(leg);
 
-  scene.add(new THREE.HemisphereLight(0x93a8c4, 0x0a0c12, .78));
+  /* 房間：地板、牆、書櫃、壁爐……都在 buildRoom 裡。不在 table 群組裡，直式壓扁桌子時它不跟著變形 */
+  const room = buildRoom(r, scene);
+  const floor = room.floor;
 
-  const lamp = new THREE.SpotLight(0xffe6c4, 168, 26, 1.16, .92, 1.1);
-  lamp.position.set(-.35, 7.6, .9);
-  lamp.target.position.set(0, 0, .3);
+  /* 燈：一盞暖色頂燈給方向與影子，環境光給均勻的底（暖木的房間，底光也暖），
+     一點冷色補光從鏡頭這邊帶出牌的厚度；壁爐、壁燈、落地燈都在房間裡 */
+  scene.add(new THREE.HemisphereLight(0x3a2a1c, 0x0e0906, .26));
+
+  const lamp = new THREE.SpotLight(0xfff0dc, 88, 30, 1.02, .9, 2);
+  lamp.position.set(-.3, 7.4, 1.0);
+  lamp.target.position.set(0, 0, .35);
   lamp.castShadow = true;
   lamp.shadow.mapSize.set(2048, 2048);
-  lamp.shadow.camera.near = 1.5;
-  lamp.shadow.camera.far = 14;
-  lamp.shadow.bias = -.0007;
-  lamp.shadow.normalBias = .022;
+  lamp.shadow.camera.near = 2;
+  lamp.shadow.camera.far = 16;
+  lamp.shadow.bias = -.0005;
+  lamp.shadow.normalBias = .012;
+  lamp.shadow.radius = 3;                    /* 影子邊緣柔一點 */
   scene.add(lamp, lamp.target);
 
-  const fill = new THREE.DirectionalLight(0xa8bcd8, .55);
-  fill.position.set(2.2, 3.6, 6.2);
+  const fill = new THREE.DirectionalLight(0xbcc8dc, .14);
+  fill.position.set(2.4, 3.2, 6.5);
   scene.add(fill);
 
-  return {r, scene, camera, table, felt, feltMat, rim, brass, lamp, fill, xs:1, handSpan:3.15, handDx:.56, plateY:.46, plateBack:0, mePile:2.52,
-          mePlate:[-3.15,.50,2.85], portrait:false,
+  /* 贏的那張牌上的小聚光燈：平常關著，一墩打完亮起、定格、收墩時暗掉。不投影，很輕 */
+  const spot = new THREE.SpotLight(0xfff6ea, 0, 12, .34, .8, 2);
+  spot.position.set(0, 4, 1);
+  scene.add(spot, spot.target);
+
+  AO_GEO = new THREE.PlaneGeometry(1.16, 1.60);
+  AO_MAT = new THREE.MeshBasicMaterial({map:aoTex(), transparent:true, depthWrite:false, opacity:AO_OP});
+
+  return {r, scene, camera, table, felt, feltMat, rim, woodMat, floor, room, chairs:[], lamp, fill, spot, spotPeak:21, spotCue:null,
+          xs:1, handSpan:3.15, handDx:.56, plateY:.46, plateBack:0,
+          mePlate:[3.15,.50,2.85], portrait:false,
           maxAniso: r.capabilities.getMaxAnisotropy(),
           cards:new Map(), me:0, round:-2, playedN:-1, sweep:null,
-          dirty:6, lampBase:168, atlas:null, backTex:null, mats:new Map(),
+          dirty:6, lampBase:88, atlas:null, backTex:null, mats:new Map(),
           backMat:null, edgeMat:null, hover:null, ray:new THREE.Raycaster(),
           ptr:new THREE.Vector2(), minRank:null};
 }
@@ -2599,9 +4777,15 @@ function faceMat(rank, suit){
   t.repeat.set(1 / a.cols, 1 / a.rows);
   t.offset.set(c.c / a.cols, 1 - (c.r + 1) / a.rows);
   t.needsUpdate = true;
-  const m = new THREE.MeshStandardMaterial({map:t, roughness:.86, metalness:0});
+  const m = paper(t);
   S.mats.set(k, m);
   return m;
+}
+/* 紙：粗糙、幾乎沒有鏡面反射。關鍵是把 specularIntensity 壓低——
+   一般材質的介電質反射固定是 4%，頂燈一打，牌面就泛一層白光，點數讀不清 */
+function paper(map, o){
+  return new THREE.MeshPhysicalMaterial(Object.assign(
+    {map:map, roughness:.88, metalness:0, specularIntensity:.26, envMapIntensity:.9}, o || {}));
 }
 
 /* ================= 牌 ================= */
@@ -2616,14 +4800,18 @@ function spawn(key, card, depth, own){
   const holder = new THREE.Object3D();
   holder.rotation.order = "YXZ";
   holder.add(mesh);
+  /* 接觸陰影貼在牌底下（holder 的 -z 那面）。翻面轉的是 mesh，這片不跟著翻，永遠在下面 */
+  const ao = new THREE.Mesh(AO_GEO, AO_MAT.clone());
+  ao.position.z = -((depth || THICK) / 2 + .0006);
+  holder.add(ao);
   S.scene.add(holder);
-  const c = {key, holder, mesh, card, ownMat:!!own, shade:1,
+  const c = {key, holder, mesh, ao, card, ownMat:!!own, shade:1,
              t:{x:0, y:0, z:0, rx:-Math.PI/2, ry:0, rz:0, flip:0, s:1}, slot:""};
   if(card) mesh.userData.cardId = card.id;
   S.cards.set(key, c);
   return c;
 }
-/* 1＝可以出；.70＝還沒輪到你；.38＝輪到你但這張不合跟牌花色。
+/* 1＝可以出、或還沒輪到你（誰的回合由狀態列說，牌面不必變髒）；.38＝輪到你但這張不合跟牌花色。
    平面版是 opacity + 去飽和，這裡改用材質顏色乘上去，讀起來一樣。 */
 function shade(c, k){
   if(c.shade === k) return;
@@ -2636,15 +4824,27 @@ function applyCard(c){
   c.holder.rotation.set(t.rx, t.ry, t.rz);
   c.holder.scale.setScalar(t.s);
   c.mesh.rotation.y = t.flip;
+  /* 接觸陰影：貼著桌面最深，離桌面越高越淡；半空的牌沒有。
+     手上的牌例外——那片影子落在下面那張牌上，就是真牌扇開時每張之間那道暗線，
+     沒有它相鄰兩張同色的紙會黏成一片，看起來像被切開的一張大牌 */
+  const hand = c.slot.indexOf("hand:") === 0;
+  c.ao.material.opacity = hand ? AO_OP * .62 : AO_OP * Math.max(0, 1 - (t.y - Y0) / .09);
 }
-function kill(c, to, dur){
+function kill(c, to, dur, o){
+  o = o || {};
   S.cards.delete(c.key);
   const end = () => {
     S.scene.remove(c.holder);
     if(c.ownMat) c.mesh.material[0].dispose();
+    c.ao.material.dispose();
   };
-  if(!to){ end(); return; }
-  tween(c.t, Object.assign({s:.28}, to), {dur:dur || 300, ease:easeIO, onEnd:end});
+  if(!to || UD.REDUCED){
+    for(let i = tweens.length - 1; i >= 0; i--) if(tweens[i].target === c.t) tweens.splice(i, 1);
+    end(); return;
+  }
+  /* 沒指定大小就邊飛邊縮成一點；指定了（例如收進墩堆）就維持牌的樣子飛到位才消失 */
+  tween(c.t, Object.assign({s:.28}, to), {dur:dur || 300, delay:o.delay || 0, ease:o.ease || easeIO,
+    eases:o.eases, bump:o.bump, onEnd:end});
   c.dying = true;
   S.dead.push(c);
 }
@@ -2673,18 +4873,341 @@ function rebuildAtlas(minRank){
 /* 牌的 key 帶著局數：同一副牌每局重洗，牌 id 會重複出現 */
 const cardKey = id => "c:" + (UD.G ? UD.G.ri : 0) + ":" + id;
 
-function deckTop(){
+function deckTop(stack){
   const d = deckSpot();
-  return {x:d.x, y:.16, z:d.z, rx:-Math.PI/2, ry:d.ry, rz:0, flip:Math.PI, s:1};
+  return {x:d.x, y:Y0 + THICK/2 + (stack == null ? 12 : stack) * THICK + .004, z:d.z, rx:-Math.PI/2, ry:d.ry, rz:0, flip:Math.PI, s:1};
+}
+
+/* ================= 叫墩：骰子計數環 =================
+   每個人叫的墩數是一顆丟進桌子中央的骰子。桌布上刻一圈環、分成本局墩數那麼多格：
+   骰子落定，環上亮起他叫的格數，中央的總數跟著一格一格跳。最後一顆落定——
+   整圈亮滿＝剛好；沒亮的格子轉冷＝保守局；多出來的往外圈溢成紅色＝搶墩局。
+   判詞停一下就收：環縮回桌布，對手的骰子滑到各自手牌前面留整局（誰叫幾一直看得到），
+   我的那顆跟著環一起收——狀態列與座位牌上都有我叫的數。
+   環與骰子是 WebGL；中央讀數與判詞是 DOM，讀數投影到環心。 */
+const BID_R0 = .92, BID_R1 = 1.06, BID_Z = -.72, BID_STEP = 95;
+const BID_GOLD = 0xE3BF6A, BID_DARK = 0x4b3d23, BID_RED = 0xE27A5E, BID_COOL = 0x8C96C8, BID_COOL_BG = 0x3a3f5c;
+let bidDom = null, dieGeo = null, dieDecal = null, dieBody = null;
+const dieFaceMats = {};
+function bidEls(){
+  if(bidDom) return bidDom;
+  const host = CANVAS.parentNode;
+  const hub = document.createElement("div"); hub.className = "bidhub"; hub.hidden = true;
+  const ver = document.createElement("div"); ver.className = "bidverdict"; ver.hidden = true;
+  host.appendChild(hub); host.appendChild(ver);
+  return bidDom = {hub, ver};
+}
+function bidState(){
+  return S.bid || (S.bid = {ri:-2, state:"idle", seg:[], outer:[], hubRing:null, dice:new Map(), dying:[],
+                            sum:0, shown:0, hubAt:0, doneAt:0, goneAt:0, hold:1500});
+}
+/* 骰面只畫墨：1～6 用點、0 與 7 以上寫數字，跟座位牌上那顆 2D 骰子同一個規矩。底色是骰子本體 */
+function dieFaceMat(v){
+  if(dieFaceMats[v]) return dieFaceMats[v];
+  const cv = document.createElement("canvas"); cv.width = cv.height = 128;
+  const g = cv.getContext("2d");
+  g.fillStyle = "#1A1714";
+  if(v >= 1 && v <= 6){
+    const P = {1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[v];
+    for(const i of P){ g.beginPath(); g.arc(32 + (i % 3) * 32, 32 + Math.floor(i / 3) * 32, 10.5, 0, Math.PI * 2); g.fill(); }
+  }else{
+    g.font = '700 84px "Bodoni Moda",Georgia,serif'; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(String(v), 64, 70);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = S.maxAniso;
+  return dieFaceMats[v] = new THREE.MeshStandardMaterial({map:tex, roughness:.5, metalness:0, alphaTest:.4,
+    polygonOffset:true, polygonOffsetFactor:-2});
+}
+/* 骰子本體：圓角正方形擠出再加斜角，十二條邊都是圓的；點數是貼在六個面上的薄片 */
+function dieMesh(v){
+  if(!dieGeo){
+    const a = .25, r = .05, bv = .045, x = -a/2, y = -a/2;     /* .25 加兩邊斜角 .045：一顆 .34 的骰子 */
+    const sh = new THREE.Shape();
+    sh.moveTo(x + r, y);
+    sh.lineTo(x + a - r, y); sh.quadraticCurveTo(x + a, y, x + a, y + r);
+    sh.lineTo(x + a, y + a - r); sh.quadraticCurveTo(x + a, y + a, x + a - r, y + a);
+    sh.lineTo(x + r, y + a); sh.quadraticCurveTo(x, y + a, x, y + a - r);
+    sh.lineTo(x, y + r); sh.quadraticCurveTo(x, y, x + r, y);
+    dieGeo = new THREE.ExtrudeGeometry(sh, {depth:a, bevelEnabled:true, bevelThickness:bv, bevelSize:bv, bevelSegments:3, curveSegments:4});
+    dieGeo.translate(0, 0, -a/2);
+    dieDecal = new THREE.PlaneGeometry(.235, .235);
+    dieBody = new THREE.MeshStandardMaterial({color:0xF5F0E1, roughness:.34, metalness:0});
+  }
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(dieGeo, dieBody);
+  body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+  const opp = (v >= 1 && v <= 6) ? 7 - v : (v === 0 ? 6 : 1);
+  /* +y 那一面就是叫的數；其餘照一般骰子擺 */
+  const F = [[v, 0, 1, 0, -Math.PI/2, 0], [opp, 0, -1, 0, Math.PI/2, 0], [3, 1, 0, 0, 0, Math.PI/2],
+             [4, -1, 0, 0, 0, -Math.PI/2], [2, 0, 0, 1, 0, 0], [5, 0, 0, -1, 0, Math.PI]];
+  for(const f of F){
+    const m = new THREE.Mesh(dieDecal, dieFaceMat(f[0]));
+    m.position.set(f[1] * .1712, f[2] * .1712, f[3] * .1712);
+    m.rotation.set(f[4], f[5], 0);
+    g.add(m);
+  }
+  return g;
+}
+function bidRing(r0, r1, th0, len, segs, col, em, emI){
+  const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, segs, 1, th0, len),
+    new THREE.MeshStandardMaterial({color:col, emissive:em, emissiveIntensity:emI, roughness:.5, metalness:.55}));
+  m.rotation.x = -Math.PI/2; m.position.set(0, .003, BID_Z);
+  S.scene.add(m);
+  return m;
+}
+/* 刻環：一格一格從遠端十二點鐘順時鐘長出來，最後中央那圈細線 */
+function bidBuild(hs, delay){
+  const B = bidState();
+  const gap = hs > 1 ? .04 : 0, per = Math.PI * 2 / hs;
+  for(let i = 0; i < hs; i++){
+    const th0 = Math.PI/2 - (i + 1) * per + gap/2;
+    const s = {mesh:bidRing(BID_R0, BID_R1, th0, per - gap, 28, BID_DARK, BID_GOLD, .05),
+               st:{sc:.001, lit:0, fl:0, rd:0, cool:0}, applied:"", base:.05, pulsed:false};
+    if(UD.REDUCED) s.st.sc = 1;
+    else tween(s.st, {sc:1}, {dur:560, delay:delay + i * 55, ease:easeBack});
+    B.seg.push(s);
+    const o = {mesh:bidRing(1.11, 1.19, th0, per - gap, 28, BID_RED, BID_RED, 1.1), st:{sc:.001}};
+    o.mesh.visible = false;
+    B.outer.push(o);
+  }
+  const hub = bidRing(.36, .374, 0, Math.PI * 2, 64, BID_GOLD, BID_GOLD, .25);
+  B.hubRing = {mesh:hub, st:{sc:.001, fl:0}};
+  if(UD.REDUCED) B.hubRing.st.sc = 1;
+  else tween(B.hubRing.st, {sc:1}, {dur:600, delay:delay + hs * 55, ease:easeBack});
+  B.hubAt = nowMs() + (UD.REDUCED ? 0 : delay + hs * 55);
+}
+function bidLight(idx){
+  const B = S.bid, hs = B.seg.length;
+  if(idx < hs) tween(B.seg[idx].st, {lit:1}, {dur:240});
+  else{ const o = B.outer[(idx - hs) % hs]; o.mesh.visible = true; tween(o.st, {sc:1}, {dur:380, ease:easeBack}); }
+}
+/* 叫完之後骰子留在哪：那個人手牌前面、往桌心一點，兩顆的話沿桌沿方向並排。
+   墩堆排在他與右手邊那位之間的空檔，不會撞到 */
+function bidMark(i, cnt){
+  const a = ang(i), p = polar(R_FAN - .85, a), sd = side(a), out = [];
+  for(let j = 0; j < cnt; j++){ const off = (j - (cnt - 1) / 2) * .40; out.push({x:p.x + sd.x * off, z:p.z + sd.z * off}); }
+  return out;
+}
+/* 叫 7 以上用兩顆：一顆 6 加一顆餘數，跟座位牌上那對骰子同一個規矩 */
+const bidSplit = v => v >= 7 ? [6, v - 6] : [v];
+/* 丟骰子：從他手牌前面拋出，翻滾著落進環裡、彈一下；兩顆的話第二顆慢一拍。
+   落定那一刻起 bidFrame 才開始亮格。每顆骰子是 d.parts 裡的一個狀態物件，補間都在它身上 */
+function bidThrow(i, v, n, delay, instant){
+  const B = bidState();
+  const a = ang(i), p = polarR(n >= 8 ? .70 : .63, a), sd = {x:Math.cos(a), z:-Math.sin(a)};
+  const faces = bidSplit(v), two = faces.length > 1;
+  const d = {seat:i, v, before:B.sum, lit:0, land:0, at:0, parts:[]};
+  faces.forEach((f, k) => {
+    const mesh = dieMesh(f); S.scene.add(mesh);
+    const off = two ? (k ? .2 : -.2) : 0;
+    d.parts.push({mesh, s:1, x:p.x + sd.x * off, y:.17, z:p.z + BID_Z + sd.z * off, rx:0, ry:a + (Math.random() - .5) * .6, rz:0});
+  });
+  B.sum += v;
+  B.dice.set(i, d);
+  if(instant || S.snap || UD.REDUCED){ d.land = nowMs() - BID_STEP * 12; return d; }   /* 不演：直接落定、格子一次亮完 */
+  d.at = nowMs() + (delay || 0);   /* 環還沒刻好的話先等著：丟出那一刻才現身 */
+  const from = i === S.me ? {x:.55 * S.xs, y:.85, z:2.65} : Object.assign(polar(R_FAN - .35, a), {y:.38});
+  const dur = Math.min(620, Math.max(380, UD.SPEED * .9));
+  d.parts.forEach((q, k) => {
+    q.mesh.visible = false;
+    const to = {x:q.x, y:.17, z:q.z, rx:0, ry:q.ry, rz:0};
+    Object.assign(q, from, {x:from.x + sd.x * (two ? (k ? .12 : -.12) : 0),
+      rx:-Math.PI * 3, ry:q.ry - Math.PI * 2 * (k ? 1.5 : 1), rz:Math.PI * .75});
+    tween(q, to, {dur, delay:(delay || 0) + k * 70, ease:easeIO, bump:{y:1.05 + k * .1},
+      onEnd:() => { if(k === d.parts.length - 1) d.land = nowMs(); tween(q, {y:.17}, {dur:170, ease:t => t, bump:{y:.05}}); }});
+  });
+  return d;
+}
+/* 環心的讀數：已亮幾格／本局幾墩，下面一行說剩幾、剛好、還是超了 */
+function bidHub(pop){
+  const B = S.bid, G = UD.G, els = bidEls();
+  if(!B || !B.seg.length || !G) return;
+  const hs = B.seg.length, n = B.shown, left = hs - n;
+  els.hub.innerHTML = '<span class="big">' + n + '<small> / ' + hs + '</small></span><span class="sub">' +
+    (n === 0 ? "本局 " + hs + " 墩" : left > 0 ? "剩 " + left : left === 0 ? "剛好" : "超 " + (-left)) + '</span>';
+  const settled = B.state === "verdict" || B.state === "gone";
+  els.hub.className = "bidhub " + (settled ? (left === 0 ? "exact" : left > 0 ? "under" : "over")
+    : (G.phase === "bid" && G.turn === UD.mySeat() ? "wait" : ""));
+  if(pop){ void els.hub.offsetWidth; els.hub.classList.add("pop"); }
+}
+/* 最後一顆落定、格子亮完：下判詞。環的收場——剛好整圈閃金光；保守局沒亮的格子轉冷；搶墩局整圈先泛紅再回來 */
+function bidVerdict(){
+  const B = S.bid, G = UD.G, els = bidEls();
+  const hs = B.seg.length, sum = B.sum, d = sum - hs;
+  const kind = d === 0 ? "exact" : d < 0 ? "under" : "over";
+  els.hub.hidden = true;
+  els.ver.className = "bidverdict " + kind; els.ver.hidden = false;
+  els.ver.innerHTML = '<span class="k">' + G.cfg.n + ' 人共叫 ' + sum + ' · 桌上 ' + hs + ' 墩</span>' +
+    '<span class="big"><span class="sg">' + (d > 0 ? "+" : d < 0 ? "−" : "") + '</span>' + Math.abs(d) + '</span>' +
+    '<span class="word">' + (kind === "exact" ? "剛好" : kind === "under" ? "保守局" : "搶墩局") + '</span>';
+  for(let i = 0; i < Math.min(hs, sum); i++) B.seg[i].st.lit = 1;   /* 最後幾格可能還在亮，先定住 */
+  for(const s of B.seg){
+    if(kind === "exact"){ s.st.fl = 1; tween(s.st, {fl:0}, {dur:1000}); }
+    else if(kind === "under"){ if(s.st.lit < .5) tween(s.st, {cool:1}, {dur:500}); }
+    else { s.st.rd = 1; tween(s.st, {rd:0}, {dur:900}); }
+  }
+  if(kind === "exact"){ B.hubRing.st.fl = 1; tween(B.hubRing.st, {fl:0}, {dur:700}); }
+  /* 骰子這時就滑開：對手的到各自手牌前面留整局，我的縮掉——環心留給判詞 */
+  let k = 0;
+  for(const d of B.dice.values()){
+    if(d.seat === S.me){ for(const q of d.parts) tween(q, {s:.001, y:.3}, {dur:320, delay:260, ease:easeIO}); continue; }
+    const m = bidMark(d.seat, d.parts.length);
+    d.parts.forEach((q, j) => tween(q, {x:m[j].x, y:.17, z:m[j].z, ry:q.ry + (Math.random() - .5) * 1.2},
+      {dur:560, delay:120 + k * 60 + j * 40, ease:easeIO, bump:{y:.25}}));
+    k++;
+  }
+  /* 搶墩局：骰子滑開前先抖一下 */
+  if(kind === "over") for(const x of B.dice.values()) for(const q of x.parts) tween(q, {rz:0}, {dur:110, ease:t => t, bump:{rz:.07}});
+  B.hold = UD.REDUCED ? 900 : Math.max(1400, Math.min(2600, UD.SPEED * 3.4));
+}
+/* 收場：判詞讀完，環一格一格縮回桌布 */
+function bidRetreat(){
+  const B = S.bid, els = bidEls();
+  els.ver.classList.add("out");
+  setTimeout(function(){ if(B.state === "gone") els.ver.hidden = true; }, 400);
+  B.seg.forEach((s, i) => tween(s.st, {sc:.001}, {dur:380, delay:i * 40, ease:easeIO}));
+  for(const o of B.outer) if(o.mesh.visible) tween(o.st, {sc:.001}, {dur:380, ease:easeIO});
+  tween(B.hubRing.st, {sc:.001}, {dur:380, ease:easeIO});
+  B.goneAt = nowMs() + 1000;
+}
+/* 拆掉環（all：連骰子一起，換局用） */
+function bidDrop(all){
+  const B = S.bid; if(!B) return;
+  const gone = o => { S.scene.remove(o.mesh); o.mesh.geometry.dispose(); o.mesh.material.dispose(); jump(o.st, {}); };
+  B.seg.forEach(gone); B.outer.forEach(gone); if(B.hubRing) gone(B.hubRing);
+  B.seg = []; B.outer = []; B.hubRing = null;
+  const els = bidEls(); els.hub.hidden = true;
+  if(all){
+    els.ver.hidden = true;
+    for(const d of B.dice.values()) for(const q of d.parts){
+      jump(q, {});
+      if(UD.REDUCED || q.s < .01){ S.scene.remove(q.mesh); continue; }
+      B.dying.push(q);
+      tween(q, {s:.001, y:.4}, {dur:260, ease:easeIO});
+    }
+    B.dice = new Map();
+  }
+}
+/* 每一局 sync() 結尾來一次：換局就重刻、有人叫了就丟骰子、都叫完了就準備下判詞 */
+function bidSync(G, fresh, lastDeal){
+  const B = bidState();
+  if(B.ri !== G.ri){ bidDrop(true); B.ri = G.ri; B.state = "idle"; B.sum = 0; B.shown = 0; B.hubAt = 0; B.doneAt = 0; B.goneAt = 0; }
+  if(G.ri < 0 || G.phase === "lobby" || G.phase === "over" || B.state === "gone") return;
+  const n = G.cfg.n;
+  const all = G.bids.every(v => v !== null && v !== undefined);
+  if(B.state === "idle"){
+    if(all){
+      /* 叫墩早就結束了（叫完才切進立體、或重排）：不演，對手的骰子直接放到記號位 */
+      for(let i = 0; i < n; i++){
+        if(i === S.me) continue;
+        const d = bidThrow(i, G.bids[i], n, 0, true), m = bidMark(i, d.parts.length);
+        d.parts.forEach((q, j) => { q.x = m[j].x; q.z = m[j].z; });
+        d.lit = d.v;
+      }
+      B.state = "gone";
+      return;
+    }
+    const delay = (S.snap || UD.REDUCED || !fresh) ? 0 : Math.min(lastDeal, 900);   /* 牌開始發了一會兒就刻環：AI 的第一顆骰子約一秒後就來 */
+    bidBuild(G.hs, delay);
+    B.state = "live";
+  }
+  for(let i = 0; i < n; i++){
+    const v = G.bids[i];
+    if(v === null || v === undefined || B.dice.has(i)) continue;
+    bidThrow(i, v, n, Math.max(0, B.hubAt - nowMs()));   /* 環還沒刻好就有人叫了：骰子等一下 */
+  }
+  if(B.state === "live" && all) B.state = "closing";
+  bidHub();
+}
+/* 每一格：把補間過的數字套到網格上、按時間亮格、推進狀態。回傳「還在動」，frame() 據此決定要不要重畫 */
+function bidFrame(t){
+  const B = S.bid;
+  if(!B || (B.state === "idle" && !B.dying.length)) return false;
+  const G = UD.G;
+  let moving = false;
+  const C = bidFrame.c || (bidFrame.c = [new THREE.Color(), new THREE.Color()]);
+  const pulse = !!G && G.phase === "bid" && G.turn === UD.mySeat() && B.state === "live";
+  for(const s of B.seg){
+    const st = s.st, m = s.mesh;
+    m.scale.setScalar(st.sc);
+    const key = st.lit + "|" + st.fl + "|" + st.rd + "|" + st.cool;
+    if(key !== s.applied){
+      s.applied = key;
+      C[0].setHex(BID_DARK).lerp(C[1].setHex(BID_GOLD), st.lit);
+      if(st.cool > 0) C[0].lerp(C[1].setHex(BID_COOL_BG), st.cool);
+      m.material.color.copy(C[0]);
+      C[0].setHex(BID_GOLD).lerp(C[1].setHex(BID_RED), st.rd);
+      if(st.cool > 0) C[0].lerp(C[1].setHex(BID_COOL), st.cool);
+      m.material.emissive.copy(C[0]);
+      s.base = (.05 + .9 * st.lit + 1.5 * st.fl + .6 * st.rd) * (1 - st.cool) + .45 * st.cool;
+      m.material.emissiveIntensity = s.base;
+    }
+    /* 輪到我叫：沒亮的格子呼吸，提醒還剩幾墩沒人要 */
+    const breathe = pulse && st.lit < .5;
+    if(breathe){ m.material.emissiveIntensity = .12 + .3 * (.5 + .5 * Math.sin(t / 240)); moving = true; }
+    else if(s.pulsed) m.material.emissiveIntensity = s.base;
+    s.pulsed = breathe;
+  }
+  for(const o of B.outer) if(o.mesh.visible) o.mesh.scale.setScalar(o.st.sc);
+  if(B.hubRing){
+    const h = B.hubRing;
+    h.mesh.scale.setScalar(h.st.sc * (1 + .12 * Math.sin(h.st.fl * Math.PI)));
+    h.mesh.material.emissiveIntensity = .25 + 1.3 * h.st.fl;
+  }
+  for(const d of B.dice.values()){
+    if(t < d.at){ moving = true; continue; }          /* 還在等環刻好：先不現身 */
+    for(const q of d.parts){
+      q.mesh.visible = true;
+      q.mesh.position.set(q.x, q.y, q.z); q.mesh.rotation.set(q.rx, q.ry, q.rz); q.mesh.scale.setScalar(q.s);
+    }
+    if(d.land && d.lit < d.v && B.seg.length){
+      const want = Math.min(d.v, Math.floor((t - d.land) / BID_STEP) + 1);
+      while(d.lit < want){ bidLight(d.before + d.lit); d.lit++; B.shown++; bidHub(true); }
+      moving = true;
+    }
+  }
+  for(let i = B.dying.length - 1; i >= 0; i--){
+    const d = B.dying[i];
+    d.mesh.position.set(d.x, d.y, d.z); d.mesh.scale.setScalar(d.s);
+    if(d.s <= .002){ S.scene.remove(d.mesh); B.dying.splice(i, 1); }
+  }
+  const els = bidEls();
+  if(B.state === "live" && B.hubAt && t >= B.hubAt && els.hub.hidden){ els.hub.hidden = false; bidHub(); }
+  if(!els.hub.hidden || !els.ver.hidden){
+    const host = CANVAS.parentNode;
+    const q = toScreen(0, 0, BID_Z, host.clientWidth, host.clientHeight);
+    const el = els.hub.hidden ? els.ver : els.hub;
+    el.style.left = Math.round(q.x) + "px"; el.style.top = Math.round(q.y) + "px";
+  }
+  if(B.state === "closing"){
+    let done = true;
+    for(const d of B.dice.values()) if(!d.land || d.lit < d.v) done = false;
+    if(done){ B.state = "verdict"; B.doneAt = t; bidVerdict(); }
+    moving = true;
+  }else if(B.state === "verdict"){
+    if(t - B.doneAt > B.hold){ B.state = "gone"; bidRetreat(); }
+    moving = true;
+  }else if(B.goneAt && t > B.goneAt){ B.goneAt = 0; bidDrop(false); }
+  return moving;
 }
 
 function sync(){
   const G = UD.G;
-  if(!S || !G || !document.body.classList.contains("is3d")) return;
+  if(!S || !G || !document.body.classList.contains("is3d")){ if(S) S.snap = false; return; }
   const n = G.cfg.n;
   const seat = UD.mySeat();
   S.me = seat < 0 ? 0 : seat;
   rebuildAtlas(G.cfg.minRank);
+  /* 人數變了、或我換了座位：桌上每樣東西該在哪都跟著變，
+     但 slot 字串可能一個字都沒動（"deck:3"、"fan:1:1:0"），place() 會以為沒事發生 */
+  const lay = n + ":" + S.me;
+  if(S.lay !== lay){ S.lay = lay; relayout(); }
+  {
+    const host = CANVAS.parentNode;
+    if(host.clientWidth !== S.boxW || host.clientHeight !== S.boxH) resize();
+  }
 
   const fresh = S.round !== G.ri;
   const swept = S.playedN >= 0 && S.playedN !== G.played;
@@ -2696,7 +5219,14 @@ function sync(){
   const fly = Math.min(480, Math.max(230, sp * .62));
   const ds = deckSpot();
   const live = new Set();
-  let order = 0;
+  /* 發牌照桌上的規矩：從我左手邊那位開始繞一圈、一次一張，我永遠拿每一輪的最後一張。
+     換局時桌上還有上一局的牌（墩堆、對手的牌），先讓它們飛回牌庫，再開始發 */
+  const step = Math.min(95, Math.max(38, sp * .11));
+  const dealAt = (i, k) => (k * n + (((S.me - i - 1) % n) + n) % n) * step;
+  let ret0 = 0;
+  if(fresh) for(const c of S.cards.values()) if(c.slot.indexOf("deck:") !== 0) ret0++;
+  const base = fresh && ret0 ? 420 + ret0 * 14 : 0;
+  let lastDeal = 0;
 
   function place(key, card, spec, o){
     live.add(key);
@@ -2711,8 +5241,8 @@ function sync(){
     }
     if(c.slot === o.slot) return c;
     c.slot = o.slot;
-    if(UD.REDUCED) jump(c.t, spec);
-    else tween(c.t, spec, {dur:o.dur || fly, delay:o.delay || 0, arc:o.arc || 0, ease:o.ease});
+    if(UD.REDUCED || S.snap) jump(c.t, spec);   /* 重排不是牌局裡發生的事，不演給人看 */
+    else tween(c.t, spec, {dur:o.dur || fly, delay:o.delay || 0, arc:o.arc || 0, ease:o.ease, eases:o.eases, bump:o.bump});
     return c;
   }
 
@@ -2721,7 +5251,7 @@ function sync(){
   const left = started ? Math.max(0, G.deckSize - n * G.hs - (G.trumpCard ? 1 : 0)) : 10;
   const stack = Math.min(left, 18);
   for(let k = 0; k < stack; k++)
-    place("dk:" + k, null, {x:ds.x, y:.006 + k * THICK, z:ds.z,
+    place("dk:" + k, null, {x:ds.x, y:Y0 + THICK/2 + k * THICK, z:ds.z,
       rx:-Math.PI/2, ry:ds.ry, rz:0, flip:Math.PI, s:1}, {slot:"deck:" + k});
   /* ---- 我的手牌 ---- */
   const hand = (seat >= 0 && G.hands[seat]) || [];
@@ -2733,37 +5263,44 @@ function sync(){
     const ok = !!(b && !b.disabled);
     const spec = handSlot(k, hand.length);
     if(ok){ spec.y += .055; spec.z += .045; }        /* 能出的往前浮起一點 */
+    const dl = fresh ? base + dealAt(seat, k) : 0;
+    lastDeal = Math.max(lastDeal, dl);
     const c = place(cardKey(card.id), card, spec, {
       slot:"hand:" + hand.length + ":" + k + ":" + (ok ? 1 : 0),
       own:true,
-      from: fresh ? deckTop() : null,
-      delay: fresh ? (order++ * Math.min(64, Math.max(26, sp * .09))) : 0,
-      dur: fresh ? 430 : fly, arc: fresh ? .30 : 0
+      from: fresh ? deckTop(stack) : null,
+      delay: dl,
+      dur: fresh ? 470 : fly, arc: fresh ? .36 : 0,
+      eases: fresh ? {flip:easeFlip} : null          /* 從牌庫飛過來的路上翻正 */
     });
-    if(c) shade(c, ok ? 1 : (myTurn ? .38 : .70));
+    if(c) shade(c, ok || !myTurn ? 1 : .38);      /* 只有「輪到你、但這張不能出」才壓暗；別人的回合整把牌保持乾淨 */
   });
 
   /* ---- 別人手上的牌：只有張數是公開的，所以永遠背面朝上 ---- */
   for(let i = 0; i < n; i++){
     if(i === seat) continue;
     const cnt = started ? UD.handCount(i) : 0;
-    for(let k = 0; k < cnt; k++)
+    for(let k = 0; k < cnt; k++){
+      const dl = fresh ? base + dealAt(i, k) : 0;
+      lastDeal = Math.max(lastDeal, dl);
       place("f:" + i + ":" + k, null, fanSlot(i, k, cnt), {
         slot:"fan:" + i + ":" + cnt + ":" + k,
-        from: fresh ? deckTop() : null,
-        delay: fresh ? (order++ * Math.min(64, Math.max(26, sp * .09))) : 0,
-        dur: fresh ? 430 : Math.min(300, fly), arc: fresh ? .30 : 0
+        from: fresh ? deckTop(stack) : null,
+        delay: dl,
+        dur: fresh ? 470 : Math.min(300, fly), arc: fresh ? .36 : 0
       });
+    }
   }
 
   /* ---- 王牌：發完才翻，翻的是牌庫最上面那一張 ---- */
+  /* 牌庫最上面那張抬起來、在半空翻正、再整整齊齊放回牌庫頂端，正面朝上 */
   if(G.trumpCard){
-    const sd2 = side(ds.a);
-    const base = {x:ds.x + sd2.x * .46, y:.006 + stack * THICK, z:ds.z + sd2.z * .46,
-                  rx:-Math.PI/2, ry:ds.ry + .22, rz:0, s:1};
-    place("tc", G.trumpCard, Object.assign({flip:0}, base), {
-      slot:"trump:" + G.ri, from:Object.assign({flip:Math.PI}, base),
-      dur:640, delay:fresh ? Math.min(900, order * 22 + 200) : 0, ease:easeIO
+    const top = {x:ds.x, y:Y0 + THICK/2 + stack * THICK, z:ds.z, rx:-Math.PI/2, ry:ds.ry, rz:0, s:1};
+    place("tc", G.trumpCard, Object.assign({flip:0}, top), {
+      slot:"trump:" + G.ri,
+      from:Object.assign({flip:Math.PI}, top),
+      dur:760, delay:fresh ? lastDeal + 420 : 0, ease:easeIO,
+      eases:{flip:easeFlip}, bump:{y:.66}
     });
   }
 
@@ -2773,68 +5310,94 @@ function sync(){
      時間到才聚成一疊（贏的那張在最上面），交給下面的 sweep 收進墩堆。 */
   const gathering = G.phase === "trickend" && G.trick.length;
   const bi = gathering ? UD.trickBest(G) : -1;
-  const gdur = Math.min(400, Math.max(190, sp * .48));
-  const PUSH = 300;
-  const hold = Math.max(240, UD.trickGap() - fly - PUSH - gdur - 160);
+  const bt = UD.trickBeats();                     /* 亮多久、定格多久、收多久：跟 2D 同一份 TUNE */
+  const placed = [];
   G.trick.forEach(function(t, k){
     const key = cardKey(t.card.id);
-    const flew = place(key, t.card, playSlot(t.p, k), {
-      slot:"play:" + t.p + ":" + k, dur:fly, arc:.34,
+    place(key, t.card, playSlot(t.p, k), {
+      slot:"play:" + t.p + ":" + k, dur:fly, bump:{y:.38},
+      eases:{s:easeBack, flip:easeFlip},          /* 對手的牌在半空翻正；落地時微微拍一下 */
       from: t.p === seat ? null : (function(){
         const f = fanSlot(t.p, UD.handCount(t.p), UD.handCount(t.p) + 1);
         f.s = .96; return f;
       })()
     });
-    if(!gathering || UD.REDUCED) return;
-    const c = S.cards.get(key);
-    if(!c || c.endAt === G.at) return;              /* 收尾動作一墩只排一次 */
-    c.endAt = G.at;
-    const lead = flew ? 0 : fly;                    /* 剛出的那張已經在飛，排在它後面就好 */
-    const heap = {x:0, y:.006 + (k === bi ? G.trick.length : k) * (THICK + .002), z:.03,
-      rx:-Math.PI/2, ry:ang(t.p) * .22 + (((k * 53) % 11) - 5) * .028, rz:0, flip:0, s:1};
-    if(k !== bi){
-      tween(c.t, heap, {queue:true, delay:lead + PUSH + hold, dur:gdur, ease:easeIO});
-      return;
-    }
-    const a = ang(t.p), p = polar(R_PLAY + .60, a);
-    tween(c.t, {x:p.x, y:.085, z:p.z, rx:-Math.PI/2, ry:Math.sin(a) * .5, rz:0, flip:0, s:1.06},
-      {queue:true, delay:lead, dur:PUSH, ease:easeIO});
-    tween(c.t, heap, {queue:true, delay:hold, dur:gdur, ease:easeIO});
+    if(gathering && k === bi) S.last = {win:t.card.id, card:t.card};   /* 收墩時要從這張接手 */
+    placed.push(S.cards.get(key));
   });
+  /* 一墩打完：等最後一張落定 → 贏的那張上面亮起一盞小燈 → 定格 → 整墩聚成一疊（贏的在最上面）
+     → 交給下面的 sweep 收進墩堆。牌不推、不動；光說話。一墩只排一次 */
+  if(gathering && !UD.REDUCED && S.gatherAt !== G.at && placed[bi]){
+    S.gatherAt = G.at;
+    let wait = 0;
+    for(const c of placed) if(c) wait = Math.max(wait, remaining(c.t));
+    G.trick.forEach(function(t, k){
+      const c = placed[k]; if(!c) return;
+      const heap = {x:0, y:Y0 + THICK/2 + (k === bi ? G.trick.length : k) * (THICK + .0015), z:.03,
+        rx:-Math.PI/2, ry:ang(t.p) * .22 + (((k * 53) % 11) - 5) * .028, rz:0, flip:0, s:1};
+      tween(c.t, heap, {queue:true, delay:(wait - remaining(c.t)) + bt.push + bt.hold, dur:bt.sweep, ease:easeIO});
+    });
+    const ps = playSlot(G.trick[bi].p, bi);
+    S.spotCue = {t0:nowMs() + wait, up:bt.push, hold:bt.hold, down:bt.sweep, x:ps.x, z:ps.z};
+  }
 
   /* ---- 收進來的墩 ---- */
+  /* 剛收的那一墩：贏的那張牌就地變成墩堆最上面那一疊——從它現在的位置接手
+     （推出去的地方、或還在半空），跟其餘幾張一起翻背、飛向贏家；落定時其餘幾張消失 */
   for(let i = 0; i < n; i++){
     const got = (started && G.won[i]) || 0;
-    for(let k = 0; k < got; k++)
-      place("p:" + i + ":" + k, null, pileSlot(i, k, n), {
+    for(let k = 0; k < got; k++){
+      const isNew = swept && i === G.leader && k === got - 1;
+      let from = null, card = null;
+      if(isNew){
+        const old = S.last && S.cards.get(cardKey(S.last.win));
+        if(old){ from = Object.assign({}, old.t); card = old.card; kill(old, null); }
+        else from = {x:0, y:Y0 + .22, z:.03, rx:-Math.PI/2, ry:0, rz:0, flip:Math.PI, s:1};
+      }
+      place("p:" + i + ":" + k, card, pileSlot(i, k, n), {
         slot:"pile:" + i + ":" + k, depth:THICK * n,
-        from: (k === got - 1 && swept) ? {x:0, y:.22, z:.03,
-          rx:-Math.PI/2, ry:0, rz:0, flip:Math.PI, s:1} : null,
-        dur:Math.min(520, Math.max(280, sp * .7)), arc:.18, ease:easeIO
+        from:from, dur:bt.sweep, bump:{y:.24}, ease:easeIO, eases:{flip:easeFlip}
       });
+    }
   }
 
   /* ---- 不該在桌上的，送走 ---- */
+  let ret = 0;
   for(const c of Array.from(S.cards.values())){
     if(live.has(c.key)) continue;
-    let to = null;
-    if(fresh) to = {x:ds.x, y:.10, z:ds.z};                       /* 換局：整桌收回牌庫 */
-    else if(S.sweep && /^(gather|play)/.test(c.slot))            /* 收墩：跟著那一疊走，順路翻面 */
-      to = {x:S.sweep.x, y:S.sweep.y + .10, z:S.sweep.z, flip:Math.PI};
-    kill(c, to, to ? 340 : 0);
+    if(fresh){
+      /* 換局：一張張翻背飛回牌庫頂端，到了才消失——牌庫本來就在那裡，看不出接縫 */
+      kill(c, {x:ds.x, y:Y0 + THICK/2 + stack * THICK, z:ds.z, rx:-Math.PI/2, ry:ds.ry, rz:0, flip:Math.PI, s:1},
+        380, {delay:(ret++) * 14, bump:{y:.26}, eases:{flip:easeFlip}});
+    }else if(S.sweep && /^(gather|play)/.test(c.slot)){
+      /* 收墩：其餘幾張跟贏的那張走同一條路、同一個節奏，落定即消失 */
+      const w = S.sweep;
+      kill(c, {x:w.x, y:Math.max(.004, w.y - .01), z:w.z, rx:w.rx, ry:w.ry, rz:w.rz, flip:Math.PI, s:w.s},
+        bt.sweep, {bump:{y:.24}, eases:{flip:easeFlip}});
+    }else kill(c, null);
   }
+  S.sweep = null;
 
-  /* ---- 桌色跟著王牌走 ---- */
+  /* ---- 桌布跟著王牌走；房間是木頭與石頭，不變色 ---- */
   const fc = feltColor();
-  const want = new THREE.Color().setRGB(fc[0] * .92, fc[1] * .92, fc[2] * .92, THREE.LinearSRGBColorSpace);
-  if(!S.feltMat.color.equals(want)){
-    if(UD.REDUCED) S.feltMat.color.copy(want);
-    else { S.feltFrom = S.feltMat.color.clone(); S.feltTo = want; S.feltT0 = nowMs(); }
-  }
-  if(fresh && G.trumpCard) S.flash = nowMs();                     /* 翻王牌時桌上亮一下 */
+  fade(S.feltMat.color, [fc[0] * .92, fc[1] * .92, fc[2] * .92]);
+  fade(S.feltMat.sheenColor, [fc[0] * 1.6, fc[1] * 1.6, fc[2] * 1.6]);   /* 絨的回光帶著布的染色 */
+  placeChairs();
+  if(fresh && G.trumpCard) S.flash = nowMs() + (UD.REDUCED ? 0 : lastDeal + 420 + 360);   /* 翻到一半時燈亮一下 */
 
+  /* ---- 叫墩：中央的計數環與骰子 ---- */
+  bidSync(G, fresh, lastDeal);
+
+  S.snap = false;
   S.dirty = 4;
   placeOverlays();
+}
+/* 版面換了（人數、換座位、轉向、視窗大小）就把所有 slot 清掉，逼 sync() 重排一次；
+   歸位是瞬間的，重排不是牌局裡發生的事 */
+function relayout(){
+  if(!S) return;
+  S.snap = true;
+  for(const c of S.cards.values()) c.slot = "";
 }
 
 /* ================= 每一格 ================= */
@@ -2862,19 +5425,43 @@ function frame(t){
     if(!c.holder.parent) S.dead.splice(i, 1); else applyCard(c);
   }
 
-  /* 桌色過場 */
-  if(S.feltTo){
-    const k = Math.min(1, (t - S.feltT0) / 700);
-    S.feltMat.color.lerpColors(S.feltFrom, S.feltTo, easeOut(k));
-    if(k >= 1) S.feltTo = null;
+  /* 顏色過場：桌布、背景、霧 */
+  for(let i = fades.length - 1; i >= 0; i--){
+    const f = fades[i], k = Math.min(1, (t - f.t0) / 900);
+    f.col.lerpColors(f.from, f.to, easeOut(k));
+    if(k >= 1) fades.splice(i, 1);
     moving = true;
   }
-  /* 翻王牌的那一下打光 */
+  /* 贏的那張牌上的小燈：亮起 → 停住 → 暗掉 */
+  if(S.spotCue){
+    const q = S.spotCue, dt = t - q.t0;
+    let k = 0;
+    if(dt >= 0){
+      if(dt < q.up) k = easeIO(dt / q.up);
+      else if(dt < q.up + q.hold) k = 1;
+      else if(dt < q.up + q.hold + q.down) k = 1 - easeIO((dt - q.up - q.hold) / q.down);
+      else S.spotCue = null;
+    }
+    S.spot.intensity = S.spotPeak * k;
+    S.spot.position.set(q.x + .1, 4.0, q.z + .8);
+    S.spot.target.position.set(q.x, 0, q.z);
+    moving = true;
+  }
+  /* 翻王牌的那一下，燈稍微亮一點再回來 */
   if(S.flash){
     const k = (t - S.flash) / 900;
-    S.lamp.intensity = S.lampBase * (k >= 1 ? 1 : 1 + Math.sin(Math.min(1, k) * Math.PI) * .55);
+    if(k >= 0) S.lamp.intensity = S.lampBase * (k >= 1 ? 1 : 1 + Math.sin(Math.min(1, k) * Math.PI) * .30);
     if(k >= 1) S.flash = 0;
     moving = true;
+  }
+
+  /* 叫墩的環與骰子：亮格、呼吸、判詞是照時間走的，不在補間清單裡 */
+  if(bidFrame(t)) moving = true;
+
+  /* 壁爐的火：每 90ms（手機 150ms）抖一下就夠像在燒，不必每格都重畫；動畫減量時就靜靜燒著 */
+  if(S.room && !UD.REDUCED && t - S.room.last > (S.boxW > 900 ? 90 : 150)){
+    S.room.last = t; S.room.tick(t);
+    if(S.dirty < 1) S.dirty = 1;
   }
 
   if(moving) S.dirty = 3;
@@ -2898,19 +5485,41 @@ function placeOverlays(){
   if(!w || !h || !UD.G) return;
   S.scene.updateMatrixWorld();
 
+  const plates = [];
   document.querySelectorAll("#seats .seat").forEach(function(el){
     const i = +el.dataset.seat;
     const a = seatAnchor(i);
     const bw = el.offsetWidth / 2 + 6, bh = el.offsetHeight / 2 + 6;
-    /* 直式螢幕上自己那塊釘在左下角：自己坐哪裡不需要空間提示，
-       投影出來反而會壓在手牌或狀態列上 */
+    /* 直式螢幕上自己那塊釘在右下角：自己坐哪裡不需要空間提示，
+       投影出來反而會壓在手牌或狀態列上。釘右邊是因為左邊那塊放了牌庫 */
     const q = (S.portrait && i === S.me)
-      ? {x:bw, y:h - bh}
+      ? {x:w - bw, y:h - bh}
       : toScreen(a.x, a.y, a.z, w, h);
     /* 夾回畫面內：窄螢幕上兩側的座位牌本來會被切掉半塊 */
-    el.style.left = Math.round(Math.max(bw, Math.min(w - bw, q.x))) + "px";
-    el.style.top  = Math.round(Math.max(bh, Math.min(h - bh, q.y))) + "px";
+    plates.push({el:el, bw:bw, bh:bh,
+      x:Math.max(bw, Math.min(w - bw, q.x)), y:Math.max(bh, Math.min(h - bh, q.y))});
   });
+  /* 再把疊在一起的名牌推開。座位排得再開，遠端那幾張投影後本來就靠得近，
+     名字一長就會互相蓋住——夾回畫面內也會把兩張擠到同一個角落。
+     往重疊比較少的那一軸推，各退一半，順序不會亂掉。 */
+  for(let pass = 0; pass < 4; pass++){
+    let moved = false;
+    for(let i = 0; i < plates.length; i++) for(let j = i + 1; j < plates.length; j++){
+      const A = plates[i], B = plates[j];
+      const ox = (A.bw + B.bw) - Math.abs(A.x - B.x), oy = (A.bh + B.bh) - Math.abs(A.y - B.y);
+      if(ox <= 0 || oy <= 0) continue;
+      moved = true;
+      if(ox < oy){ const d = (A.x <= B.x ? 1 : -1) * ox / 2; A.x -= d; B.x += d; }
+      else       { const d = (A.y <= B.y ? 1 : -1) * oy / 2; A.y -= d; B.y += d; }
+      A.x = Math.max(A.bw, Math.min(w - A.bw, A.x)); A.y = Math.max(A.bh, Math.min(h - A.bh, A.y));
+      B.x = Math.max(B.bw, Math.min(w - B.bw, B.x)); B.y = Math.max(B.bh, Math.min(h - B.bh, B.y));
+    }
+    if(!moved) break;
+  }
+  for(const q of plates){
+    q.el.style.left = Math.round(q.x) + "px";
+    q.el.style.top  = Math.round(q.y) + "px";
+  }
 
   /* 手牌的透明按鈕貼著投影後的牌面：焦點框會正好框在那張牌上 */
   let top = null;
@@ -2945,6 +5554,7 @@ function placeOverlays(){
 /* 每個點是 [x, y, z, core]。core 的一定要進畫面；
    非 core 的（兩側的座位牌、對手的牌背）在窄螢幕上允許被切掉——
    它們的資訊在夾回畫面內的名牌上，切掉不會讓人看不懂牌局。 */
+let fitTmp = null;
 function fitPoints(){
   const G = UD.G;
   if(!G) return [[-4,0,-4,1],[4,0,-4,1],[-4,0,4,1],[4,0,4,1]];
@@ -2959,13 +5569,23 @@ function fitPoints(){
     pts.push([pl.x, .02, pl.z, 1]);
   }
   const d = deckSpot();
-  pts.push([d.x, .18, d.z, 1]);
-  /* 手牌是離鏡頭最近的東西，四個角都要算進去 */
-  const hh = .7073 * HAND_S * 1.16, hx = S.handSpan / 2 + .5 * HAND_S + .12;
-  const uy = Math.cos(HAND_PITCH) * hh, uz = Math.sin(HAND_PITCH) * hh;
-  for(const sx of [-hx, hx]){
-    pts.push([sx, HAND_Y + uy, HAND_Z + uz, 1]);
-    pts.push([sx, HAND_Y - uy, HAND_Z - uz, 1]);
+  pts.push([d.x, .20, d.z, 1]);
+  /* 手牌是離鏡頭最近的東西：拿最多張那一局的兩端與中間那張，
+     連傾斜、扇形的轉角、「能出的牌會浮起」一起算，四個角都得進畫面 */
+  const peak = Math.max.apply(null, G.ladder);
+  const tmp = fitTmp || (fitTmp = new THREE.Object3D());
+  tmp.rotation.order = "YXZ";
+  for(const k of [0, (peak - 1) >> 1, peak - 1]){
+    const h = handSlot(k, peak);
+    tmp.position.set(h.x, h.y + .06, h.z + .05);
+    tmp.rotation.set(h.rx, h.ry, h.rz);
+    tmp.scale.setScalar(h.s);
+    tmp.updateMatrixWorld(true);
+    for(const p of CORNERS){
+      /* 下緣多留一截：手牌是最靠鏡頭的東西，切到一點就很明顯 */
+      const v = new THREE.Vector3(p[0], p[1] < 0 ? p[1] - .22 : p[1], p[2]).applyMatrix4(tmp.matrixWorld);
+      pts.push([v.x, v.y, v.z, 1]);
+    }
   }
   return pts;
 }
@@ -3026,6 +5646,7 @@ function resize(){
   if(!w || !h) return;
   const asp = w / h, portrait = asp < 1.06;
   S.portrait = portrait;
+  S.boxW = w; S.boxH = h;
   /* 直式：桌子壓成橢圓、手牌收窄、名牌抬高，讓內容的長寬比接近畫面的長寬比。
      不這樣做的話一定有一邊留下大片空桌。 */
   S.xs       = portrait ? Math.max(.62, Math.min(1, asp * 1.20)) : 1;
@@ -3033,8 +5654,8 @@ function resize(){
   S.handDx   = portrait ? .44 : .56;
   S.plateY   = portrait ? 1.18 : .46;
   S.plateBack= portrait ? .85 : 0;
-  S.mePile   = portrait ? 1.95 : 2.52;
-  S.mePlate  = [-3.15, .50, 2.85];
+  /* 自己的名牌擺右手邊：左手邊那塊留給牌庫 */
+  S.mePlate  = [3.15, .50, 2.85];
   S.table.scale.x = S.xs;
   const fov = portrait ? 48 : 40;
   const el = (portrait ? 50 : 42) * Math.PI / 180;
@@ -3050,9 +5671,18 @@ function resize(){
   S.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, w > 1400 ? 1.75 : 2));
   S.lamp.shadow.mapSize.set(w > 900 ? 2048 : 1024, w > 900 ? 2048 : 1024);
   S.dirty = 4;
+  /* 取景變了，桌上每張牌該在哪也跟著變。resize() 可能是視窗或計分表引起的，
+     不一定有 sync() 跟在後面，所以自己排一次 */
+  relayout();
+  sync();
   placeOverlays();
 }
 window.addEventListener("resize", function(){ if(S) resize(); });
+/* 畫布的框不只在視窗改變時會變：字型載好讓頂列換行、計分表開關、開發者工具……
+   任何原因讓框變了都要重新取景，不然鏡頭的長寬比會是舊的 */
+if(window.ResizeObserver){
+  new ResizeObserver(function(){ if(S && !CANVAS.hidden) resize(); }).observe(CANVAS.parentNode);
+}
 
 function hitTest(ev){
   const host = CANVAS.parentNode, r = host.getBoundingClientRect();
@@ -3091,10 +5721,8 @@ CANVAS.addEventListener("click", function(ev){
 async function fontsReady(){
   try{
     if(!document.fonts) return;
-    await Promise.all([
-      document.fonts.load('700 30px "Bodoni Moda"'),
-      document.fonts.load('700 17px "Bodoni Moda"')
-    ]);
+    const d = UD.deck();
+    await Promise.all(d.font.load.concat(['600 12px "Archivo"', '700 12px "Archivo"']).map(f => document.fonts.load(f)));
     await document.fonts.ready;
   }catch(e){}
 }
@@ -3104,17 +5732,32 @@ async function boot(){
     THREE = await import("https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js");
     S = build();
     S.dead = [];
+    S.edgeMat = paper(null, {color:0xE9E1CC, roughness:.96});
+    await Promise.all([fontsReady(), artReady()]);   /* 字型與人像圖都到齊才畫貼圖 */
     S.backTex = buildBack();
     S.backTex.anisotropy = S.maxAniso;
-    S.backMat = new THREE.MeshStandardMaterial({map:S.backTex, roughness:.78, metalness:.03});
-    S.edgeMat = new THREE.MeshStandardMaterial({color:0xE9E1CC, roughness:.96, metalness:0});
-    await fontsReady();
+    S.backMat = paper(S.backTex, {roughness:.84, specularIntensity:.30});
     rebuildAtlas(UD.G ? UD.G.cfg.minRank : 7);
     resize();
     S.r.setAnimationLoop(frame);
     UD.sync3d = sync;
+    UD.onDeck = redeck;
   })();
   return booting;
+}
+/* 換牌面：字型與圖重載後，牌背貼圖換掉、牌面圖集整張重畫。桌上已有的牌由 rebuildAtlas 換材質 */
+async function redeck(){
+  if(!S || !S.backMat) return;
+  const id = UD.deck().id;
+  await Promise.all([fontsReady(), artReady()]);
+  if(UD.deck().id !== id) return;   /* 等的期間又換了一次，讓後面那次來做 */
+  const old = S.backTex;
+  S.backTex = buildBack();
+  S.backTex.anisotropy = S.maxAniso;
+  S.backMat.map = S.backTex; S.backMat.needsUpdate = true;
+  if(old) old.dispose();
+  S.minRank = null;
+  rebuildAtlas(UD.G ? UD.G.cfg.minRank : 7);
 }
 
 const seg = $("dim");
@@ -3169,7 +5812,7 @@ seg.addEventListener("click", function(e){
 if(!webglOK()) seg.querySelector('[data-dim="3"]').disabled = true;
 else{
   let saved = "2";
-  try{ saved = localStorage.getItem("ud.dim") || "2"; }catch(e){}
+  try{ saved = new URLSearchParams(location.search).get("dim") || localStorage.getItem("ud.dim") || "2"; }catch(e){}
   if(saved === "3") setDim(true);
 }
 
