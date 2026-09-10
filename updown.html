@@ -281,7 +281,10 @@ input{font:inherit}
 }
 .die.empty .num{color:var(--ink-3);font-size:12px;font-family:"Archivo",sans-serif;font-weight:400}
 /* 放下骰子：翻滾後定住 */
-.die.is-cast{animation:cast .42s var(--e-out) both}
+/* 叫 7 以上是兩顆並排；第二顆晚一點落 */
+.dice{display:flex;gap:3px;flex:none}
+.die.is-cast,.dice.is-cast .die{animation:cast .42s var(--e-out) both}
+.dice.is-cast .die + .die{animation-delay:.09s}
 @keyframes cast{
   0%  {transform:translateY(-16px) rotate(-52deg) scale(.72);opacity:0}
   55% {transform:translateY(2px)  rotate(9deg)   scale(1.06);opacity:1}
@@ -462,11 +465,19 @@ input{font:inherit}
 }
 .bidbtn{
   min-width:36px;padding:6px 10px;border-radius:99px;
+  display:flex;flex-direction:column;align-items:center;
   font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:500;
   font-variant-numeric:tabular-nums;color:var(--ink-2);
   transition:background-color .16s, color .16s, transform .16s var(--e-out);
 }
 .bidbtn:hover{background:var(--brass);color:oklch(.22 .04 84);font-weight:600;transform:translateY(-1px)}
+/* 最後一位叫墩的人看得到後果：每顆數字下面標「欠／剛好／超」，不必心算 */
+.bidbtn.fc{min-width:44px;padding:5px 8px 4px}
+.bidbtn.fc b{font-weight:500;line-height:1.2}
+.bidbtn.fc i{font-style:normal;font-size:9.5px;line-height:1.3;letter-spacing:.04em;color:var(--ink-3)}
+.bidbtn.ex i{color:var(--brass)} .bidbtn.un i{color:oklch(.70 .06 275)} .bidbtn.ov i{color:var(--bad)}
+.bidbtn.ex{box-shadow:inset 0 0 0 1px var(--brass-soft)}
+.bidbtn:hover i{color:inherit}
 
 /* 下一局自己會開始：用一條走完的線代替倒數字 */
 .autonext{flex:none;display:block;width:120px;height:2px;border-radius:2px;background:var(--hair-2);overflow:hidden}
@@ -699,7 +710,7 @@ table.score tr.now .sz span{color:var(--brass)}
     transition-duration:.01ms !important;
   }
   html{transition:--felt 400ms linear, --felt-deep 400ms linear, --glow 400ms linear !important}
-  .card.is-dealt,.play.is-new,.play.is-new.from-hand,.die.is-cast,
+  .card.is-dealt,.play.is-new,.play.is-new.from-hand,.die.is-cast,.dice.is-cast .die,
   .deck .trumpcard.is-flip,.tricks .pack.is-land{animation:fade-in .28s ease both !important}
   .autonext i{animation:none !important;transform:scaleX(1)}
   .trick.is-collecting .play{animation:fade-out .22s ease both !important}
@@ -2289,10 +2300,13 @@ function dieHTML(v, seat){
   const a = ' data-die="' + seat + '"';
   if(v === null || v === undefined) return '<div class="die empty"' + a + '><span class="num">?</span></div>';
   if(v === 0) return '<div class="die"' + a + ' aria-label="叫 0 墩"><span class="num">0</span></div>';
-  if(v > 6) return '<div class="die"' + a + ' aria-label="叫 ' + v + ' 墩"><span class="num">' + v + '</span></div>';
-  return '<div class="die"' + a + ' aria-label="叫 ' + v + ' 墩">' + PIPS[v].map(i =>
+  const pips = n => PIPS[n].map(i =>
     '<span class="pip" style="grid-row:' + Math.ceil(i/3) + ';grid-column:' + (((i-1)%3)+1) + '"></span>'
-  ).join("") + '</div>';
+  ).join("");
+  /* 叫 7 以上：兩顆骰子，一顆 6 加一顆餘數 */
+  if(v > 6) return '<span class="dice"' + a + ' role="img" aria-label="叫 ' + v + ' 墩">' +
+    '<div class="die">' + pips(6) + '</div><div class="die">' + pips(v - 6) + '</div></span>';
+  return '<div class="die"' + a + ' aria-label="叫 ' + v + ' 墩">' + pips(v) + '</div>';
 }
 function seatLabel(i){
   const s = G.seats[i];
@@ -2646,6 +2660,14 @@ function tallyScores(){
   document.querySelectorAll(".tot").forEach(function(el){ el.classList.add("up"); });
 }
 
+/* 這一局全桌一共叫了幾墩、比桌上多還是少。出牌時一直帶著：
+   這局是在搶還是在讓，決定每一張牌要不要拿 */
+function bidClimate(sep){
+  if(!G.bids || !G.bids.length || G.bids.some(b => b === null || b === undefined)) return "";
+  const sum = G.bids.reduce((a, b) => a + b, 0), d = sum - G.hs;
+  return (sep ? '<span class="sep"> · </span>' : '') + '叫 ' + sum + '/' + G.hs +
+    (d === 0 ? ' 剛好' : d < 0 ? ' 保守局' : ' 搶墩局');
+}
 function renderStatus(me){
   const el = $("status");
   if(NET.err){ setHTML(el, '<span class="msg" style="color:var(--bad)">' + NET.err + '</span>'); return; }
@@ -2666,12 +2688,23 @@ function renderStatus(me){
   if(G.phase === "bid"){
     let sum = 0, placed = 0;
     for(let i=0;i<G.cfg.n;i++) if(G.bids[i] !== null && G.bids[i] !== undefined){ sum += G.bids[i]; placed++; }
+    const left = G.hs - sum;
+    /* 叫到一半就報「剩幾墩沒人要」：最後一位看一眼就知道自己叫幾會剛好 */
     const tally = '<span class="hint">已叫 ' + sum + ' / 共 ' + G.hs + ' 墩' +
-      (placed === G.cfg.n ? (sum > G.hs ? '<span class="sep"> · </span>超叫 ' + (sum-G.hs)
-        : sum < G.hs ? '<span class="sep"> · </span>欠叫 ' + (G.hs-sum) : '<span class="sep"> · </span>剛好') : '') + '</span>';
+      (placed ? '<span class="sep"> · </span>' + (placed === G.cfg.n
+        ? (left < 0 ? '超叫 ' + (-left) + '，搶墩局' : left > 0 ? '欠叫 ' + left + '，保守局' : '剛好')
+        : (left < 0 ? '已經超 ' + (-left) : left > 0 ? '剩 ' + left : '已經剛好')) : '') + '</span>';
     if(G.turn === me){
+      /* 我是最後一位：每顆數字下面直接標出叫了之後全桌會多要或少要幾墩 */
+      const last = placed === G.cfg.n - 1;
       let b = "";
-      for(let v=0;v<=G.hs;v++) b += '<button class="bidbtn" data-bid="' + v + '">' + v + '</button>';
+      for(let v=0;v<=G.hs;v++){
+        const d = sum + v - G.hs;
+        b += last
+          ? '<button class="bidbtn fc ' + (d === 0 ? "ex" : d < 0 ? "un" : "ov") + '" data-bid="' + v + '"><b>' + v + '</b><i>' +
+            (d === 0 ? "剛好" : d < 0 ? "欠 " + (-d) : "超 " + d) + '</i></button>'
+          : '<button class="bidbtn" data-bid="' + v + '">' + v + '</button>';
+      }
       setHTML(el, '<span class="msg">你要叫幾墩？</span>' + tally +
         '<span class="bidrow"><span class="pill">' + b + '</span></span>');
     }else setHTML(el, '<span class="msg"><b>' + who + '</b> 正在放骰子…</span>' + tally);
@@ -2685,9 +2718,9 @@ function renderStatus(me){
       setHTML(el, '<span class="msg">輪到<b>你</b>出牌</span><span class="hint">' +
         (G.led === null || G.led === undefined ? "你先出，這墩由你決定花色"
           : must ? "必須跟出 " + pip(G.led) + " " + SUITS[G.led].name
-                 : "手上沒有 " + pip(G.led) + "，可出任意牌") + '</span>');
+                 : "手上沒有 " + pip(G.led) + "，可出任意牌") + bidClimate(true) + '</span>');
     }else setHTML(el, '<span class="msg"><b>' + who + '</b> 出牌中…</span><span class="hint">' +
-      (G.led === null || G.led === undefined ? "" : "跟牌花色 " + pip(G.led)) + '</span>');
+      (G.led === null || G.led === undefined ? bidClimate(false) : "跟牌花色 " + pip(G.led) + bidClimate(true)) + '</span>');
     return;
   }
 

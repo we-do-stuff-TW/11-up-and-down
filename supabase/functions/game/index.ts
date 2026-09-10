@@ -377,11 +377,14 @@ Deno.serve(async (req) => {
         const rawGap = (body as { gap?: number }).gap ?? 0;
         const gap = Math.max(2000, sp * 1.9, Math.min(12000, rawGap));
         const since = Date.now() - (R.step_at || 0);
+        // 叫完到第一張牌之間多停一下：客端立體桌上叫墩的收場判詞要讀得完，牌才飛進來
+        const firstPlay = R.phase === "play" && R.played === 0 && !R.trick.length;
+        const playWait = firstPlay ? Math.max(sp * 0.9, 2800) : sp * 0.9;
         let moved = false;
         if (R.phase === "bid" && aiSeat(R, R.turn) && since > sp * 0.8) {
           const h = await readHand(sb, code, R.ri, R.turn);
           moved = applyBid(R, R.turn, aiBid(h, R.trump, R.hs, R.cfg.n));
-        } else if (R.phase === "play" && aiSeat(R, R.turn) && since > sp * 0.9) {
+        } else if (R.phase === "play" && aiSeat(R, R.turn) && since > playWait) {
           const h = await readHand(sb, code, R.ri, R.turn);
           const need = (R.bids[R.turn] as number) - R.won[R.turn];
           moved = await applyPlay(sb, R, R.turn, aiCard(h, R.trick, R.led, R.trump, need).id);
