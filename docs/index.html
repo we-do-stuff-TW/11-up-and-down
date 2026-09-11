@@ -3358,10 +3358,12 @@ async function authBoot(){
   offerReturn();
 }
 
-/* 上次是關掉分頁走的？先確認那一桌還在、位子還是你的，大廳才改口問「要不要回去」。
+/* 上次是關掉分頁走的？先確認那一桌還在、位子還是你的，然後直接回去——不問。
+   重新整理不是「離開」：位子還在、牌局還在跑，中間插一句「要不要回去」等於
+   每刷新一次就要再按一次，而且那幾秒整桌都在等你。真的回不去了才退回去問。
    這一趟直接讀 rooms（那張表本來就公開讀，realtime 訂的也是它），不走 state——
    state 會順手蓋一次 seen，等於還沒回去就先告訴那一桌「他在線上」，
-   輪到你的時候整桌會停在那裡等一個根本沒打開牌桌的人。 */
+   確認位子的那一下就會讓整桌停在那裡等一個根本還沒打開牌桌的人。 */
 async function offerReturn(){
   const code = savedRoom();
   if(!code || MODE === "net" || !NET.sb) return;
@@ -3378,8 +3380,13 @@ async function offerReturn(){
     });
     if(!seated) forgetRoom();          /* 房間沒了，或位子已經讓出去了：不必問 */
   }catch(e){}                          /* 讀不到就照問，最壞是按下去才知道回不去 */
-  if(seated && MODE !== "net" && !$("lobby").hidden)
-    setResume(code, row && row.phase);
+  if(!seated || MODE === "net" || $("lobby").hidden) return;
+  /* 回得去就直接回去。join 對已經在座的人是冪等的（伺服器看到 seatOf >= 0 就原樣回
+     那一列與手牌），所以牌局中途刷新也是直接接回原本那一手。 */
+  try{ await joinRoom(code); enterRoom(); return; }
+  catch(e){}
+  /* 房間散了、位子被收走、又開了新的一場：這時候才問，讓人看得到發生什麼事 */
+  if(MODE !== "net" && !$("lobby").hidden) setResume(code, row && row.phase);
 }
 
 async function createRoom(cfg){
