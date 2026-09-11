@@ -756,7 +756,8 @@ body.in-lobby .app{display:none}
 @keyframes lbIn{from{opacity:0}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.lobby{animation:none}}
 
-.lb-mark{position:absolute;top:30px;left:32px;display:flex;align-items:baseline;gap:13px;line-height:1}
+.lb-mark{position:absolute;top:30px;left:50%;translate:-50% 0;
+  display:flex;align-items:baseline;gap:13px;line-height:1}
 .lb-mark b{font-family:"Bodoni Moda",Georgia,serif;font-size:30px;font-weight:700;letter-spacing:.005em}
 .lb-mark u{text-decoration:none;font-size:9px;font-weight:600;letter-spacing:.36em;color:var(--ink-3);padding-left:.36em}
 
@@ -834,7 +835,7 @@ body.in-lobby .app{display:none}
 
 @media (max-width:760px){
   .lobby{justify-content:flex-start;padding:18px 16px 26px}
-  .lb-mark{position:static;align-self:flex-start;margin-bottom:2px}
+  .lb-mark{position:static;align-self:center;margin-bottom:2px}
   .lb-me{position:static;order:9;width:100%;min-width:0;align-items:flex-start;margin-top:34px;gap:8px}
   .lb-row{flex-direction:row-reverse}
   .lb-ft{order:10;margin-top:16px}
@@ -4168,8 +4169,13 @@ function paintRules(){
 }
 $("btnRules").onclick = function(){ paintRules(); $("rulesOv").hidden = false; };
 $("rulesClose").onclick = function(){ $("rulesOv").hidden = true; };
-/* 單人在桌上時這顆＝回大廳；已經在房間裡就還是開房間面板 */
-$("btnRoom").onclick = function(){ if(MODE === "net") openNet(); else openLobby(); };
+/* 單人在桌上時這顆＝回大廳；已經在房間裡就還是開房間面板。
+   回大廳要重建一張空桌：沒有王牌桌子才會退回石板灰（paintTable 的 TABLE_NONE），
+   「還沒發牌就還沒有顏色」這件事兩條路都要成立。單人局本來就不記戰績，丟掉沒有損失。 */
+$("btnRoom").onclick = function(){
+  if(MODE === "net"){ openNet(); return; }
+  buildIdleTable(); openLobby();
+};
 $("btnSetup").onclick = function(){ openSetup(); };
 $("setupCancel").onclick = function(){ $("setupOv").hidden = true; };
 $("btnMe").onclick = openMe;
