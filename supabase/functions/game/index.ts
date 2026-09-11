@@ -10,6 +10,7 @@
 // 座位與房主身分才不會斷（見 resolvePid）。
 
 import { createClient, SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { verifyLocal } from "./auth.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -210,16 +211,33 @@ function canDirect(R: Room, pid: string): boolean {
 }
 
 /* ════════════ 手牌（只有這裡碰得到）════════════ */
-async function readHand(sb: SupabaseClient, code: string, ri: number, seat: number): Promise<Card[]> {
+/* 這一回合的手牌，進來的時候跟房間同一趟並行抓齊。之後誰要用就從這裡拿——
+   同一個請求裡讀第二次，不該再飛一趟新加坡。
+   只有「拿得到」才算數：裡面沒有的座位一律回去查資料庫。這樣萬一抓手牌的時候
+   剛好有人在發下一局（ri 對不上），最壞也只是慢一趟，不會把空手牌當成真的。 */
+type Hands = { ri: number; rows: Map<number, Card[]> };
+
+async function readHand(
+  sb: SupabaseClient, code: string, ri: number, seat: number, H?: Hands,
+): Promise<Card[]> {
+  if (H && H.ri === ri) {
+    const hit = H.rows.get(seat);
+    if (hit) return hit;
+  }
   const { data } = await sb.from("hands").select("cards")
     .eq("code", code).eq("ri", ri).eq("seat", seat).maybeSingle();
-  return (data?.cards as Card[]) ?? [];
+  const cards = (data?.cards as Card[]) ?? [];
+  if (H && H.ri === ri && data) H.rows.set(seat, cards);
+  return cards;
 }
-async function writeHand(sb: SupabaseClient, code: string, ri: number, seat: number, cards: Card[]) {
+async function writeHand(
+  sb: SupabaseClient, code: string, ri: number, seat: number, cards: Card[], H?: Hands,
+) {
+  if (H && H.ri === ri) H.rows.set(seat, cards);
   await sb.from("hands").upsert({ code, ri, seat, cards }, { onConflict: "code,ri,seat" });
 }
 
-async function deal(sb: SupabaseClient, R: Room) {
+async function deal(sb: SupabaseClient, R: Room, H?: Hands) {
   R.ri++;
   if (R.ri >= R.ladder.length) { R.phase = "over"; return; }
   const n = R.ladder[R.ri];
@@ -241,6 +259,8 @@ async function deal(sb: SupabaseClient, R: Room) {
   await sb.from("hands").insert(
     hands.map((cards, seat) => ({ code: R.code, ri: R.ri, seat, cards })),
   );
+  // 剛發的這份就是現在的手牌，進來時抓的那份作廢
+  if (H) { H.ri = R.ri; H.rows = new Map(hands.map((cards, seat) => [seat, cards])); }
 }
 
 async function applyBid(sb: SupabaseClient, R: Room, seat: number, v: number): Promise<boolean> {
@@ -287,14 +307,16 @@ function reseat(R: Room) {
   R.bids = R.seats.map(() => null);
   R.won = R.seats.map(() => 0);
 }
-async function applyPlay(sb: SupabaseClient, R: Room, seat: number, cardId: string): Promise<boolean> {
+async function applyPlay(
+  sb: SupabaseClient, R: Room, seat: number, cardId: string, H?: Hands,
+): Promise<boolean> {
   if (R.phase !== "play" || R.turn !== seat) return false;
-  const hand = await readHand(sb, R.code, R.ri, seat);
+  const hand = (await readHand(sb, R.code, R.ri, seat, H)).slice();
   const i = hand.findIndex((c) => c.id === cardId);
   if (i < 0) return false;
   if (!legalCards(hand, R.led).some((c) => c.id === cardId)) return false;
   const card = hand.splice(i, 1)[0];
-  await writeHand(sb, R.code, R.ri, seat, hand);
+  await writeHand(sb, R.code, R.ri, seat, hand, H);
   if (R.trick.length === 0) R.led = card.s;
   R.trick.push({ p: seat, card });
   if (R.trick.length === R.cfg.n) R.phase = "trickend";
@@ -340,10 +362,19 @@ async function sha256(s: string): Promise<string> {
 /* ════════════ 身分 ════════════ */
 type Profile = { name: string; avatar: string | null; email: string | null };
 
+/* uid → pid 這件事一旦成立就不會再變，但以前每一個動作都回頭問一次資料庫。
+   isolate 還活著就記著（它本來就會被重複用到）。fresh 的那幾個動作要順便更新
+   名字與頭像，所以照樣走完整條路。 */
+const PID = new Map<string, string>();
+
 /** auth.users.id → players.pid。第一次登入時認領這台裝置原本的匿名玩家。 */
 async function resolvePid(
   sb: SupabaseClient, uid: string, legacyToken: string | undefined, prof: Profile, fresh: boolean,
 ): Promise<string | null> {
+  if (!fresh) {
+    const hit = PID.get(uid);
+    if (hit) return hit;
+  }
   const got = await sb.from("players").select("pid").eq("user_id", uid).maybeSingle();
   let pid = got.data?.pid as string | undefined;
 
@@ -363,6 +394,7 @@ async function resolvePid(
       .insert({ user_id: uid, name: prof.name, avatar: prof.avatar, email: prof.email })
       .select("pid").single();
     if (error || !data) return null;
+    remember(uid, data.pid);
     return data.pid;
   }
 
@@ -373,7 +405,12 @@ async function resolvePid(
       .update({ name: prof.name, avatar: prof.avatar, email: prof.email })
       .eq("pid", pid);
   }
+  remember(uid, pid);
   return pid;
+}
+function remember(uid: string, pid: string) {
+  if (PID.size > 500) PID.clear();   // isolate 活很久的話不要無限長大
+  PID.set(uid, pid);
 }
 
 /* ════════════ 戰績 ════════════ */
@@ -425,20 +462,41 @@ Deno.serve(async (req) => {
     if (!action) return json({ error: "no action" }, 400);
 
     // Authorization 必須是使用者自己的 access token。anon key 也是一個合法 JWT，
-    // 但它沒有 user，getUser 會直接空手回來——所以這一關同時擋掉「只帶 anon key」。
+    // 但它的 role 是 anon、沒有 user——兩條路都會把它擋在外面。
+    // 先自己驗簽（純運算，見 auth.ts），驗不了才問 Auth 伺服器（那一趟 0.23 秒）。
     const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
-    const { data: au } = await sb.auth.getUser(jwt);
-    const user = au?.user;
-    if (!user) return json({ error: "請先登入", signin: true }, 401);
+    const base = Deno.env.get("SUPABASE_URL")!;
+    const claims = await verifyLocal(jwt, base, Deno.env.get("SUPABASE_ANON_KEY") ?? "");
+    let uid = claims?.sub ?? null;
+    let email = claims?.email ?? null;
+    let meta = (claims?.user_metadata ?? {}) as Record<string, unknown>;
+    if (!uid) {
+      const { data: au } = await sb.auth.getUser(jwt);
+      if (au?.user) {
+        uid = au.user.id;
+        email = au.user.email ?? null;
+        meta = (au.user.user_metadata ?? {}) as Record<string, unknown>;
+      }
+    }
+    if (!uid) return json({ error: "請先登入", signin: true }, 401);
 
-    const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
     const prof: Profile = {
-      name: String(meta.full_name ?? meta.name ?? (user.email ?? "").split("@")[0] ?? "玩家").slice(0, 40),
+      name: String(meta.full_name ?? meta.name ?? (email ?? "").split("@")[0] ?? "玩家").slice(0, 40),
       avatar: (String(meta.avatar_url ?? meta.picture ?? "").slice(0, 500) || null),
-      email: user.email ?? null,
+      email: email,
     };
     const fresh = action === "hello" || action === "create" || action === "sit";
-    const pid = await resolvePid(sb, user.id, token, prof, fresh);
+
+    /* 身分、房間、手牌，三件事誰也不等誰——以前是一趟等一趟等一趟。
+       函式在東京、資料庫在新加坡，每一趟都是 0.07～0.09 秒。 */
+    const code = String((body as { code?: string }).code || "").toUpperCase();
+    const needRoom = action !== "hello" && action !== "create";
+    if (needRoom && !/^[A-Z0-9]{4}$/.test(code)) return json({ error: "房號格式不對" }, 400);
+    const [pid, roomRes, handRes] = await Promise.all([
+      resolvePid(sb, uid, token, prof, fresh),
+      needRoom ? sb.from("rooms").select("*").eq("code", code).maybeSingle() : null,
+      needRoom ? sb.from("hands").select("ri,seat,cards").eq("code", code) : null,
+    ]);
     if (!pid) return json({ error: "身分建立失敗，請重新整理" }, 500);
 
     if (action === "hello") return json({ ok: true, pid, profile: prof });
@@ -464,18 +522,23 @@ Deno.serve(async (req) => {
       return json({ error: "房號產生失敗，請再試一次" }, 500);
     }
 
-    /* ---- 以下都需要房間 ---- */
-    const code = String((body as { code?: string }).code || "").toUpperCase();
-    if (!/^[A-Z0-9]{4}$/.test(code)) return json({ error: "房號格式不對" }, 400);
-    const { data: row } = await sb.from("rooms").select("*").eq("code", code).maybeSingle();
+    /* ---- 以下都需要房間（上面那一趟已經抓好了）---- */
+    const row = roomRes?.data;
     if (!row) return json({ error: `找不到房號 ${code}` }, 404);
     const R = row as Room;
     R.seen = R.seen || {};
     R.seen[pid] = Date.now();
 
+    /* 剛剛順便抓回來的手牌。只收得上這一回合的——抓的當下要是有人在發下一局，
+       ri 就對不上，那些座位一律回去查資料庫（readHand 自己會處理）。 */
+    const H: Hands = { ri: R.ri, rows: new Map() };
+    for (const h of (handRes?.data ?? []) as { ri: number; seat: number; cards: Card[] }[]) {
+      if (h.ri === R.ri) H.rows.set(h.seat, h.cards);
+    }
+
     const mine = async () => {
       const s = seatOf(R, pid);
-      return s < 0 || R.ri < 0 ? [] : await readHand(sb, code, R.ri, s);
+      return s < 0 || R.ri < 0 ? [] : await readHand(sb, code, R.ri, s, H);
     };
     const ok = async (room: Room | null) =>
       json({ ok: true, pid, room: room ?? R, hand: await mine() });
@@ -539,7 +602,7 @@ Deno.serve(async (req) => {
           s.kind === "human" ? s : { name: s.name || `AI ${i + 1}`, kind: "ai" as const, pid: null, av: null });
         reseat(R);
         R.score = Array(R.cfg.n).fill(0);
-        await deal(sb, R);
+        await deal(sb, R, H);
         return await ok(await persist(sb, R));
       }
 
@@ -555,7 +618,7 @@ Deno.serve(async (req) => {
         const seat = seatOf(R, pid);
         if (seat < 0) return json({ error: "你不在座位上" }, 403);
         const cid = String((body as { card?: string }).card || "");
-        if (!await applyPlay(sb, R, seat, cid)) return json({ error: "這張牌不能出" }, 409);
+        if (!await applyPlay(sb, R, seat, cid, H)) return json({ error: "這張牌不能出" }, 409);
         return await ok(await persist(sb, R));
       }
 
@@ -568,7 +631,7 @@ Deno.serve(async (req) => {
           await saveResults(sb, R);
           return await ok(await persist(sb, R));
         }
-        await deal(sb, R);
+        await deal(sb, R, H);
         if (R.phase === "over") await saveResults(sb, R);
         return await ok(await persist(sb, R));
       }
@@ -592,13 +655,13 @@ Deno.serve(async (req) => {
             ? R.seats.findIndex((_, i) => aiSeat(R, i) && (R.bids[i] === null || R.bids[i] === undefined))
             : (aiSeat(R, R.turn) ? R.turn : -1);
           if (seat >= 0) {
-            const h = await readHand(sb, code, R.ri, seat);
+            const h = await readHand(sb, code, R.ri, seat, H);
             moved = await applyBid(sb, R, seat, aiBid(h, R.trump, R.hs, R.cfg.n, hookBlocked(R, seat)));
           }
         } else if (R.phase === "play" && aiSeat(R, R.turn) && since > playWait) {
-          const h = await readHand(sb, code, R.ri, R.turn);
+          const h = await readHand(sb, code, R.ri, R.turn, H);
           const need = (R.bids[R.turn] as number) - R.won[R.turn];
-          moved = await applyPlay(sb, R, R.turn, aiCard(h, R.trick, R.led, R.trump, need).id);
+          moved = await applyPlay(sb, R, R.turn, aiCard(h, R.trick, R.led, R.trump, need).id, H);
         } else if (R.phase === "trickend" && since > gap) {
           // 贏的那張推出來停在檯面上，定格夠久了才收
           resolveTrick(R); moved = true;
