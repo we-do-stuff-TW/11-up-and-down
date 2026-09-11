@@ -176,12 +176,14 @@ type Room = {
   bids: (number | null)[]; won: number[]; score: number[];
   log: unknown[]; host_pid: string | null;
   seen: Record<string, number>; step_at: number;
+  // 同一間房打第幾場。打完可以回到等待房間再開一場，戰績要分得出是哪一場。
+  match: number;
 };
 
 const PERSIST = [
   "cfg", "ladder", "seats", "phase", "ri", "hs", "starter", "trump", "trump_card",
   "leader", "turn", "led", "played", "trick", "bids", "won", "score", "log",
-  "host_pid", "seen", "step_at",
+  "host_pid", "seen", "step_at", "match",
 ] as const;
 
 function trickBest(R: Room): number {
@@ -431,7 +433,7 @@ async function saveResults(sb: SupabaseClient, R: Room) {
     let hits = 0;
     for (const row of log) if (row?.cells?.[i]?.hit) hits++;
     rows.push({
-      user_id: uid, code: R.code, players: R.cfg.n, seat: i,
+      user_id: uid, code: R.code, match: R.match ?? 1, players: R.cfg.n, seat: i,
       score: R.score[i] ?? 0,
       rank: 1 + R.score.filter((v) => v > (R.score[i] ?? 0)).length,   // 同分同名次
       hits, rounds: log.length,
@@ -439,7 +441,7 @@ async function saveResults(sb: SupabaseClient, R: Room) {
     });
   }
   if (rows.length) {
-    await sb.from("results").upsert(rows, { onConflict: "code,user_id", ignoreDuplicates: true });
+    await sb.from("results").upsert(rows, { onConflict: "code,user_id,match", ignoreDuplicates: true });
   }
 }
 
@@ -637,6 +639,24 @@ Deno.serve(async (req) => {
       }
 
       // AI 的節奏：任何一個 client 都能敲，rev 樂觀鎖讓重複的那些自然落空
+      // 打完了要回到等待房間再開一場。座位、規則、房主都留著，牌局的東西全部歸零。
+      // 誰都可以按（跟 next 一樣）——最先按到的那個人讓整桌回到等待狀態。
+      case "again": {
+        if (R.phase !== "over") return json({ error: "這一場還沒打完" }, 409);
+        if (seatOf(R, pid) < 0) return json({ error: "你不在座位上" }, 403);
+        R.phase = "lobby";
+        R.ri = -1;              // 下一次 deal() 會 ++ 成 0，跟剛開房時一樣
+        R.hs = 0; R.starter = 0;
+        R.trump = null; R.trump_card = null;
+        R.leader = 0; R.turn = 0; R.led = null; R.played = 0;
+        R.trick = []; R.log = [];
+        R.score = R.seats.map(() => 0);   // 先歸零再 reseat：reseat 會沿用 score
+        R.match = (R.match ?? 1) + 1;
+        reseat(R);
+        await sb.from("hands").delete().eq("code", R.code);
+        return await ok(await persist(sb, R));
+      }
+
       case "tick": {
         const raw = (body as { speed?: number }).speed ?? 520;
         const sp = Math.max(200, Math.min(1200, raw));

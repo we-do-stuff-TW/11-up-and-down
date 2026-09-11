@@ -252,20 +252,6 @@ input{font:inherit}
 .hist .rank.win{color:var(--brass)}
 .hist .vs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hist .pts{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
-.seg{display:flex;gap:2px;padding:2px;border:1px solid var(--hair);border-radius:99px}
-.seg button{
-  padding:4px 11px;border-radius:99px;font-size:12px;color:var(--ink-3);
-  transition:color .18s, background-color .18s;
-}
-.seg button:hover{color:var(--ink-2)}
-.seg button[aria-pressed="true"]{background:var(--glass);color:var(--ink)}
-
-/* 音效開關：關掉的時候把字劃掉——一眼看得出是關著的，不用另外找圖示 */
-#btnSfx[aria-pressed="false"]{
-  color:var(--ink-3);border-color:var(--hair-2);
-  text-decoration:line-through;text-decoration-thickness:1px;
-}
-
 /* ================= 版面 ================= */
 .main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) clamp(306px,25vw,374px);min-height:0}
 @media (max-width:960px){ .main{grid-template-columns:minmax(0,1fr)} }
@@ -857,8 +843,6 @@ body.in-lobby .app{display:none}
 @keyframes sheet{from{transform:translateY(14px) scale(.985);opacity:0}to{transform:none;opacity:1}}
 .sheet h2{font-family:"Bodoni Moda",Georgia,serif;font-size:27px;font-weight:700;margin-bottom:5px;letter-spacing:-.01em}
 .sheet .sub{color:var(--ink-3);font-size:13px;margin-bottom:20px;max-width:62ch}
-.field{display:grid;gap:7px;margin-bottom:16px}
-.field > label{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3)}
 .opts{display:flex;gap:5px;flex-wrap:wrap}
 .opt{
   padding:7px 14px;border-radius:99px;border:1px solid var(--hair);
@@ -867,14 +851,6 @@ body.in-lobby .app{display:none}
 }
 .opt:hover{color:var(--ink-2);border-color:var(--glass-edge)}
 .opt[aria-pressed="true"]{border-color:var(--brass);color:var(--brass);background:var(--brass-soft)}
-.readout{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin:6px 0 18px}
-.readout .k{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
-.readout .v{font-family:"IBM Plex Mono",monospace;font-size:26px;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1}
-.warn{
-  padding:12px 0;border-top:1px solid oklch(.735 .135 32 / .3);border-bottom:1px solid oklch(.735 .135 32 / .3);
-  font-size:12.5px;color:var(--ink-2);margin-bottom:18px;max-width:62ch;
-}
-.warn b{color:var(--bad);font-weight:600}
 .sheet-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
 /* 設定裡的牌面預覽：同一套 cardHTML／.back，只是縮成手牌尺寸 */
 .preview{display:flex;gap:10px;align-items:flex-end;--cw:62px;--ch:88px;margin:2px 0 12px;padding:14px 16px;border-radius:14px;background:oklch(.16 .03 168 / .55)}
@@ -938,8 +914,6 @@ body.in-lobby .app{display:none}
   .roomcode{font-size:44px}
   .sheet{padding:22px 20px 20px;border-radius:18px}
   .sheet h2{font-size:23px}
-  .readout{gap:14px}
-  .readout .v{font-size:22px}
 }
 
 /* ================= 開房頁 =================
@@ -996,6 +970,8 @@ body.in-room .app{display:none}
   color:var(--ink-3);padding:7px 13px;border-radius:99px;transition:color .18s,background .18s}
 .rm-copy:hover{background:oklch(1 0 0/.05);color:var(--ink-2)}
 .rm-copy i{width:3px;height:3px;border-radius:99px;background:var(--foil-2);display:block;flex:none}
+/* 一個人打：中央那個數字是這一桌會打幾局，底下一行說明它是什麼 */
+.rm-midn{font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
 
 /* 坐了人的位子：一個頭像加兩行字，不做框 */
 .rm-p,.rm-slot{position:absolute;left:50%;top:50%;
@@ -1456,22 +1432,13 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
     </div>
     <div class="ladder" id="ladder" role="img" aria-label="局數階梯"></div>
     <div class="meta" id="meta"></div>
+    <!-- 頂列只放「這一桌」的事。平面／立體、速度、音效是你這台裝置的偏好，
+         它們的家在設定頁（和牌面、鏡頭擺在一起），不在牌桌上。 -->
     <div class="tools">
-      <div class="seg" id="dim">
-        <button data-dim="2" aria-pressed="true">平面</button>
-        <button data-dim="3" aria-pressed="false">立體</button>
-      </div>
-      <div class="seg" id="speed">
-        <button data-sp="slow" aria-pressed="false">慢</button>
-        <button data-sp="mid" aria-pressed="true">中</button>
-        <button data-sp="fast" aria-pressed="false">快</button>
-      </div>
-      <button class="btn" id="btnSfx" aria-pressed="true">音效</button>
       <button class="btn" id="btnScore">計分</button>
       <button class="btn" id="btnPref">設定</button>
       <button class="btn" id="btnRules">規則</button>
-      <button class="btn" id="btnRoom">和朋友玩</button>
-      <button class="btn" id="btnSetup">新局</button>
+      <button class="btn" id="btnRoom">房間</button>
       <button class="btn me bare" id="btnMe" aria-label="你的帳號">
         <img class="av" id="meAvS" alt="" referrerpolicy="no-referrer" hidden>
         <span id="meNameS">帳號</span>
@@ -1550,7 +1517,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   <header class="rm-top">
     <div class="rm-mk"><b>11</b><u>UP &amp; DOWN</u></div>
     <div class="rm-right">
-      <button class="rm-ghost" data-net="leave">離開房間</button>
+      <button class="rm-ghost" data-net="leave" id="rmLeave">離開房間</button>
       <button class="rm-id" id="rmMe"></button>
     </div>
   </header>
@@ -1564,19 +1531,6 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   </div>
 
   <div class="rm-edit" id="rmEdit" hidden></div>
-</div>
-
-<div class="overlay" id="setupOv" hidden>
-  <div class="sheet">
-    <h2>牌桌設定</h2>
-    <p class="sub">局數階梯由牌數決定：每局要發「人數 × 張數 + 1（翻王牌）」張。</p>
-    <div class="field"><label>人數</label><div class="opts" id="optPlayers"></div></div>
-    <div id="setupRules"></div>
-    <div class="sheet-actions">
-      <button class="btn" id="setupCancel">取消</button>
-      <button class="btn primary" id="setupStart">開始</button>
-    </div>
-  </div>
 </div>
 
 <!-- ================= 帳號 · 設定 · 規則 =================
@@ -1639,6 +1593,14 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
         </div>
 
         <div class="pg-f">
+          <label>牌桌</label>
+          <div class="bd">
+            <div class="opts" id="optDim"></div>
+            <p class="pg-n" id="dimNote"></p>
+          </div>
+        </div>
+
+        <div class="pg-f">
           <label>立體鏡頭</label>
           <div class="bd">
             <div class="opts" id="optCam"></div>
@@ -1650,7 +1612,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
           <label>出牌速度</label>
           <div class="bd">
             <div class="opts" id="optSpeed"></div>
-            <p class="pg-n">AI 想多久、牌飛多快。跟牌桌頂列那排「慢 中 快」是同一個開關。</p>
+            <p class="pg-n">AI 想多久、牌飛多快。改了立刻生效，牌局中也可以調。</p>
           </div>
         </div>
 
@@ -1662,7 +1624,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
           </div>
         </div>
 
-        <p class="pg-n pg-tail">這幾項記在這台裝置上，換一台要再選一次。<br>牌桌要平面還是立體，在牌桌頂列切。</p>
+        <p class="pg-n pg-tail">這幾項記在這台裝置上，換一台要再選一次。<br>這一桌的規則（叫墩方式、牌組、計分）不在這裡，在房間裡調。</p>
       </section>
 
       <!-- ---- 規則：一份印出來的說明，兩欄中間一條線 ---- -->
@@ -1710,7 +1672,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
             </ul>
 
             <h3>改規則</h3>
-            <p>叫墩方式、末位限制、鬼牌、牌組、三段計分都在<strong>等待房間</strong>裡調，只有房主按得動，全桌都看得到。開打之後鎖住，整場不變。單人局在頂列的「新局」裡調。</p>
+            <p>叫墩方式、末位限制、鬼牌、牌組、三段計分都在<strong>等待房間</strong>裡調，只有房主按得動，全桌都看得到。開打之後鎖住，整場不變。一個人打也一樣，在你自己那間房間裡調。</p>
           </div>
         </div>
       </section>
@@ -1726,8 +1688,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
     <table class="final" id="endTable"></table>
     <div class="sheet-actions">
       <button class="btn" id="endClose">看計分表</button>
-      <button class="btn" id="endLobby">回大廳</button>
-      <button class="btn primary" id="endAgain">再來一局</button>
+      <button class="btn primary" id="endBack">回到房間</button>
     </div>
   </div>
 </div>
@@ -2510,21 +2471,21 @@ SFX.frame = function(G, me, best, o){
 
 /* ---------------- 介面的聲音 ----------------
    用事件委派，不去改任何一個 onclick——那些 handler 是別人的地盤。 */
-var OPENERS = {btnRules:1, btnPref:1, btnRoom:1, btnSetup:1, btnFinal:1, btnLobby:1,
-               endAgain:1, setupStart:1, btnMe:1, rmMe:1, lbMe:1, lbRules:1, lbPref:1};
-var CLOSERS = {pgX:1, setupCancel:1, endClose:1, scoreClose:1};
+var OPENERS = {btnRules:1, btnPref:1, btnRoom:1, btnFinal:1, btnLobby:1,
+               btnMe:1, rmMe:1, lbMe:1, lbRules:1, lbPref:1};
+var CLOSERS = {pgX:1, endClose:1, endBack:1, scoreClose:1};
 document.addEventListener("click", function(e){
   var el = e.target.closest ? e.target.closest("button, .opt, .bidbtn, [data-net]") : null;
   if(!el) return;
   if(el.closest("[data-nosfx]")) return;      /* 想自己管聲音的地方掛這個屬性 */
   if(el.id && OPENERS[el.id]) return SFX.open();
   if(el.id && CLOSERS[el.id]) return SFX.close();
-  if(el.id === "btnSfx") return;                             /* 開關自己會出聲 */
+  if(el.closest("#optSfx")) return;                          /* 開關自己會出聲 */
   if(el.id === "btnScore")
     return setTimeout(function(){
       document.body.classList.contains("score-open") ? SFX.open() : SFX.close();
     }, 0);
-  if(el.closest("#dim")) return SFX.toggle();
+  if(el.closest("#optDim")) return SFX.toggle();
   if(el.dataset && el.dataset.net) return el.dataset.net === "close" ? SFX.close() : SFX.tap();
   if(el.hasAttribute && el.hasAttribute("data-card")){
     if(el.disabled) return SFX.no();
@@ -2587,19 +2548,6 @@ SFX.bounce = function(name, arg, sec){
     return b;
   });
 };
-
-/* 頂列那顆開關。按鈕的行為歸這一層自己管，
-   不去動 classic script 裡那一片 onclick 綁定。 */
-(function(){
-  var b = document.getElementById("btnSfx");
-  if(!b) return;
-  var paint = function(){
-    b.setAttribute("aria-pressed", PREF.on ? "true" : "false");
-    b.setAttribute("aria-label", PREF.on ? "音效開著，點一下關掉" : "音效關著，點一下打開");
-  };
-  paint();
-  b.addEventListener("click", function(){ SFX.set(!PREF.on); paint(); });
-})();
 
 /* console 裡想單獨試某一顆：SFX.demo("round", true) */
 SFX.demo = function(name, a){ unlock(); if(typeof SFX[name] === "function") SFX[name](a); };
@@ -2929,6 +2877,13 @@ const NET = {code:null, chan:null, sb:null, state:"ok", err:"", busy:false, queu
 /* 登入用的 access token 存一份在記憶體裡，快過期了才回去換（見 accessToken） */
 const TOK = {v:null, exp:0};
 let G = null, MODE = "solo", SPEED_KEY = "mid", SPEED = TUNE.speeds.mid, applying = false;
+/* 出牌速度的家在設定頁。狀態只有這一份，選了就記在這台裝置上。 */
+function setSpeed(k){
+  SPEED_KEY = TUNE.speeds[k] ? k : "mid";
+  SPEED = TUNE.speeds[SPEED_KEY];
+  try{ localStorage.setItem("ud.speed", SPEED_KEY); }catch(e){}
+}
+try{ setSpeed(localStorage.getItem("ud.speed") || "mid"); }catch(e){}
 let MYHAND = [], MYHAND_RI = -1;
 
 const SEEN = {round:-1, phase:"", bids:{}, keys:{}, scores:[], flip:-1, won:0};
@@ -3486,11 +3441,19 @@ function loadCourts(){
   return COURT.ready;
 }
 function courtPalette(deck, s){ return typeof deck.court === "function" ? deck.court(s) : deck.court; }
+/* 原圖是整張牌，人像會畫到牌緣；viewBox 只是「取這一塊」，不保證裁掉外面的。
+   symbol 照規矩該把 viewBox 外面切掉（算出來的 overflow 也確實是 hidden），
+   但實際畫出來沒切——人像的肩膀、權杖、白色鋸齒就這樣越過畫框，
+   落在旁邊那片空白紙上，看起來像上一張牌沒擦乾淨的殘筆。
+   所以自己切：clipPath 跟著 symbol 一起走，用到它的兩邊（2D 的 <use>、3D 的獨立 SVG）
+   什麼都不用改，也不可能忘記帶。 */
 function courtSymbol(key, pal){
   const cols = [pal.ci, pal.cr, pal.cg, pal.cs, pal.cw];
   let t = COURT.txt[key];
   COURT_SRC_COLORS.forEach(function(c, i){ t = t.split(c).join(cols[i]); });
-  return '<symbol id="court-' + key + '" viewBox="30 30 300 480">' + t + '</symbol>';
+  return '<symbol id="court-' + key + '" viewBox="30 30 300 480">' +
+    '<clipPath id="courtclip-' + key + '"><rect x="30" y="30" width="300" height="480"/></clipPath>' +
+    '<g clip-path="url(#courtclip-' + key + ')">' + t + '</g></symbol>';
 }
 function courtUse(key, standalone){
   if(COURT.txt || standalone)
@@ -4079,7 +4042,7 @@ function render(){
   const handChanged = renderHand(me);
   const pileGrew = renderTricks(me);
   renderLedger();
-  $("btnRoom").textContent = MODE === "net" ? "房間 " + NET.code : "和朋友玩";
+  $("btnRoom").textContent = MODE === "net" ? "房間 " + NET.code : "房間";
 
   /* ---- 一次性動畫：全部在 DOM 寫完之後才補上 ---- */
   if(freshRound && G.phase !== "lobby"){
@@ -4524,6 +4487,9 @@ function openRoom(auto){
 function closeRoom(){
   document.body.classList.remove("in-room");
   $("room").hidden = true;
+  /* 牌桌剛才是 display:none，畫布量起來是 0×0；一露臉就得補量一次，
+     不然立體桌會停在錯的尺寸（或根本沒開始畫）。 */
+  if(UD.onShow) UD.onShow();
 }
 
 /* 你永遠坐在正下方，下一位在你左手邊——跟出牌方向一致。
@@ -4561,8 +4527,12 @@ function roomFace(name, av){
 }
 
 function paintRoom(){
-  if($("room").hidden || !G || MODE !== "net" || !NET.code) return;
-  const me = mySeat(), host = amHost(), live = liveCids();
+  if($("room").hidden || !G) return;
+  if(MODE === "net" && !NET.code) return;
+  /* 一個人打也有房間：同一張座位表、同一份規則欄，只是桌邊坐的是 AI，
+     而且不必問伺服器——人數與規則就是本機那份 draft。 */
+  const solo = MODE !== "net";
+  const me = mySeat(), host = amHost(), live = solo ? {} : liveCids();
   const lobby = G.phase === "lobby";
   const n = G.seats.length;
   const ghost = lobby && n < 10;             /* 還能再進來的話，桌邊留一個空位 */
@@ -4574,25 +4544,33 @@ function paintRoom(){
     h += '<span class="rm-tick' + (k >= n ? " open" : "") + '" style="--x:' + p.tx +
       'px;--y:' + p.ty + 'px;--r:' + p.deg + 'deg"></span>';
   });
-  h += '<div class="rm-mid"><span class="cap">房號</span>' +
-    '<span class="rm-code">' + esc(NET.code) + '</span>' +
-    '<button class="rm-copy" data-room="copy"><i></i><span id="rmCopy">按一下複製，貼給朋友</span></button></div>';
+  /* 桌子中央：連線局放房號（要貼給朋友的東西），單人局放這一桌會打幾局
+     ——那是調人數、換牌組時唯一會動的數字。 */
+  h += solo
+    ? '<div class="rm-mid"><span class="cap">一個人打</span>' +
+      '<span class="rm-code">' + roomNumbers(rules(G.cfg)).rounds + '</span>' +
+      '<span class="rm-midn">局 · 對 AI，不記戰績</span></div>'
+    : '<div class="rm-mid"><span class="cap">房號</span>' +
+      '<span class="rm-code">' + esc(NET.code) + '</span>' +
+      '<button class="rm-copy" data-room="copy"><i></i><span id="rmCopy">按一下複製，貼給朋友</span></button></div>';
 
   G.seats.forEach(function(s, i){
     const p = pts[(i - base + n) % n];
     if(!p) return;
-    const isMe = s.cid && s.cid === MY.pid, ai = s.kind !== "human";
+    const isMe = solo ? i === 0 : (s.cid && s.cid === MY.pid), ai = s.kind !== "human";
+    /* 單人局的座位名只是「你 / B / C」，房間這一頁跟連線局一樣要顯示真名 */
+    const who = (solo && isMe) ? (MY.name || MY.gname || "你") : s.name;
     const tag = [];
-    if(G.host === s.cid) tag.push("房主");
+    if(!solo && G.host === s.cid) tag.push("房主");
     if(isMe) tag.push("你");
     if(ai) tag.push("AI");
-    else if(!live[s.cid]) tag.push("離線");
+    else if(!solo && !live[s.cid]) tag.push("離線");
     else if(!tag.length) tag.push("在線上");
     h += '<div class="rm-p' + (isMe ? " is-me" : "") + (p.left ? " l" : "") +
       '" style="--x:' + p.x + 'px;--y:' + p.y + 'px">' +
-      roomFace(s.name, !ai && s.av) +
-      '<span class="t"><b>' + (esc(s.name) || ("座位 " + (i+1))) + '</b><span>' + tag.join(" · ") +
-      (host && lobby && s.cid !== G.host
+      roomFace(who, !ai && s.av) +
+      '<span class="t"><b>' + (esc(who) || ("座位 " + (i+1))) + '</b><span>' + tag.join(" · ") +
+      ((host && lobby && (solo ? ai && n > 2 : s.cid !== G.host))
         ? '<button class="rm-kick" data-unseat="' + i + '">移除</button>' : "") +
       '</span></span></div>';
   });
@@ -4602,15 +4580,18 @@ function paintRoom(){
     h += '<' + tagName + ' class="rm-slot' + (p.left ? " l" : "") +
       '" style="--x:' + p.x + 'px;--y:' + p.y + 'px"' + (host ? ' data-net="addai"' : "") + '>' +
       '<span class="ph"></span><span class="t"><b>空位</b><span>' +
-      '<span class="wait">等人進來</span>' +
+      (solo ? '<span class="wait">再一個對手</span>' : '<span class="wait">等人進來</span>') +
       (host ? '<span class="ai">放一個 AI</span>' : "") +
       '</span></span></' + tagName + '>';
   }
 
   setHTML($("rmDia"), h);
-  $("rmFoot").textContent = lobby
-    ? "誰進來誰就是一位，最多十個人 · 開打之後這桌就鎖起來"
-    : "牌局進行中，這桌已經鎖起來了";
+  $("rmFoot").textContent = !lobby
+    ? "牌局進行中，這桌已經鎖起來了"
+    : solo
+      ? "點空位加一個 AI，最多十個人 · 滑到座位上可以移掉"
+      : "誰進來誰就是一位，最多十個人 · 開打之後這桌就鎖起來";
+  $("rmLeave").textContent = solo ? "回大廳" : "離開房間";
   paintRoomMe();
   paintRoomSheet();
   paintRoomEdit();
@@ -4641,15 +4622,17 @@ function roomNumbers(C){
 }
 function paintRoomSheet(){
   const C = rules(G.cfg), host = amHost(), lobby = G.phase === "lobby";
+  const solo = MODE !== "net";
   const N = roomNumbers(C), hs = G.hs || 5;
   let h = '<div class="rm-hd"><h2>這一桌的規則</h2>' +
     (host && lobby
       ? '<button class="rm-lnk" data-room="rules">設定</button>'
       : '<span class="rm-by">' + (lobby ? "房主決定" : "開打了，鎖住") + '</span>') +
     '</div><p class="rm-sub">' +
-    (host && lobby ? "你是房主，只有你改得動。"
-      : lobby ? "房主可以改，改了你這邊會即時跟著變。"
-              : "牌局進行中，規則不能再動。") + '</p>';
+    (!lobby ? "牌局進行中，規則不能再動。"
+      : solo ? "一個人打，規則隨你調，開始之後這一場就定了。"
+      : host ? "你是房主，只有你改得動。"
+             : "房主可以改，改了你這邊會即時跟著變。") + '</p>';
   RM_GROUPS.forEach(function(g){
     h += '<div class="rm-sect"><span class="cap">' + g[0] + '</span>' +
       g[1].map(function(k){
@@ -4671,7 +4654,8 @@ function paintRoomSheet(){
   if(lobby && host)
     h += '<button class="rm-go" data-net="begin"' + (G.seats.length < 2 ? " disabled" : "") + '>開始</button>' +
       '<p class="rm-note">' +
-      (G.seats.length < 2 ? "至少要兩個人，人不夠就放 AI 湊" : "兩人以上隨時可以開") + '</p>';
+      (G.seats.length < 2 ? "至少要兩個人，人不夠就放 AI 湊"
+        : solo ? "按下去就發牌" : "兩人以上隨時可以開") + '</p>';
   else if(lobby)
     h += '<div class="rm-waitfor"><i></i>等房主按開始<span>你已經入座了，牌一發就開始</span></div>';
   else
@@ -4681,6 +4665,7 @@ function paintRoomSheet(){
 }
 function paintRoomEdit(){
   const C = rules(G.cfg), N = roomNumbers(C), hs = G.hs || 5;
+  const solo = MODE !== "net";
   const field = function(k){
     const f = ruleField(k);
     if(!f) return "";
@@ -4695,9 +4680,10 @@ function paintRoomEdit(){
   };
   setHTML($("rmEdit"),
     '<div class="rm-ehd"><div><h2>這一桌的規則</h2>' +
-      '<p class="rm-meta">房號 <b>' + esc(NET.code) + '</b> · ' + G.seats.length + ' 人就座 · ' +
-      N.size + ' 張牌</p></div>' +
-      '<div class="rm-doneline"><span class="rm-sub" style="margin:0">改了桌上每個人都會即時看到</span>' +
+      '<p class="rm-meta">' + (solo ? '一個人打' : '房號 <b>' + esc(NET.code) + '</b>') + ' · ' +
+      G.seats.length + ' 人就座 · ' + N.size + ' 張牌</p></div>' +
+      '<div class="rm-doneline"><span class="rm-sub" style="margin:0">' +
+      (solo ? '改了這一桌馬上跟著變' : '改了桌上每個人都會即時看到') + '</span>' +
       '<button class="rm-done" data-room="seats">完成</button></div></div>' +
     '<div class="rm-cols"><section>' +
       '<span class="cap">叫墩</span>' + field("bidMode") + field("hook") +
@@ -4774,29 +4760,40 @@ document.addEventListener("click", function(e){
   const rule = e.target.closest("[data-rule]");
   if(rule){ onRulePick(rule, rule.dataset.rule, rule.dataset.v); return; }
   const un = e.target.closest("[data-unseat]");
-  if(un && un.tagName === "BUTTON"){ api("unseat", {code:NET.code, seat:+un.dataset.unseat}); return; }
+  if(un && un.tagName === "BUTTON"){
+    if(MODE !== "net"){ soloSeats(-1); return; }   /* AI 不是「誰」，移掉就是人數少一個 */
+    api("unseat", {code:NET.code, seat:+un.dataset.unseat}); return;
+  }
   if(e.target.id === "btnNext"){ nextRound(); return; }
   if(e.target.id === "btnFinal"){ showFinal(); return; }
-  /* 這顆在連線時是「看座位」、單人時是「回大廳」，跟頂列那顆走同一條路 */
-  if(e.target.id === "btnLobby"){ if(MODE === "net") openRoom(false); else openLobby(); return; }
-  const sp = e.target.closest("#speed button");
-  if(sp){
-    SPEED_KEY = sp.dataset.sp;
-    SPEED = TUNE.speeds[SPEED_KEY] || TUNE.speeds.mid;
-    document.querySelectorAll("#speed button").forEach(function(b){
-      b.setAttribute("aria-pressed", b === sp ? "true" : "false");
-    });
-    return;
-  }
+  /* 這顆跟頂列那顆走同一條路：回到這一桌的房間。大廳要從房間的「離開」出去 */
+  if(e.target.id === "btnLobby"){ openRoom(false); return; }
   const rm = e.target.closest("[data-room]");
   if(rm){ handleRoom(rm.dataset.room); return; }
   const na = e.target.closest("[data-net]");
   if(na) handleNet(na.dataset.net);
 });
 
+/* 一個人打的房間裡加／減一個 AI：人數就是 draft.n，桌子照著重擺一次。
+   還沒發牌，重擺沒有任何損失。 */
+function soloSeats(d){
+  const want = Math.max(2, Math.min(10, draft.n + d));
+  if(want === draft.n) return;
+  draft.n = want;
+  buildIdleTable();
+  paintRoom();
+}
+
 /* 房間裡的三個動作。開一桌／用房號加入已經是大廳的事，這裡不再管。 */
 async function handleNet(a){
   roomErr = "";
+  /* 單人局的房間：同樣三顆按鈕，只是沒有伺服器那一趟 */
+  if(MODE !== "net"){
+    if(a === "addai") soloSeats(1);
+    else if(a === "begin"){ closeRoom(); startSolo(); }
+    else if(a === "leave"){ closeRoom(); buildIdleTable(); openLobby(); }
+    return;
+  }
   try{
     if(a === "addai"){
       await api("addai", {code:NET.code});
@@ -4913,15 +4910,9 @@ $("pgTabs").onclick = function(e){
 };
 $("pgX").onclick = closePg;
 $("btnRules").onclick = function(){ openPg("rules"); };
-/* 單人在桌上時這顆＝回大廳；已經在房間裡就還是開房間面板。
-   回大廳要重建一張空桌：沒有王牌桌子才會退回石板灰（paintTable 的 TABLE_NONE），
-   「還沒發牌就還沒有顏色」這件事兩條路都要成立。單人局本來就不記戰績，丟掉沒有損失。 */
-$("btnRoom").onclick = function(){
-  if(MODE === "net"){ openRoom(false); return; }
-  buildIdleTable(); openLobby();
-};
-$("btnSetup").onclick = function(){ openSetup(); };
-$("setupCancel").onclick = function(){ $("setupOv").hidden = true; };
+/* 牌桌上唯一的出口就是這一桌的房間。要回大廳得從房間裡的「回大廳」出去——
+   那條路才會 buildIdleTable()，桌子才退得回石板灰（paintTable 的 TABLE_NONE）。 */
+$("btnRoom").onclick = function(){ openRoom(false); };
 $("btnMe").onclick = function(){ openPg("me"); };
 $("rmMe").onclick = function(){ openPg("me"); };
 $("btnSignOut").onclick = async function(){
@@ -4934,16 +4925,25 @@ $("btnSignOut").onclick = async function(){
 };
 $("btnPref").onclick = function(){ openPg("pref"); };
 $("endClose").onclick = function(){ $("endOv").hidden = true; };
-$("endAgain").onclick = function(){ $("endOv").hidden = true; openSetup(); };
-$("endLobby").onclick = function(){
+/* 打完就是回到原本那間房間——座位、規則、房主都還在，再按一次「開始」就是下一場。
+   連線局要請伺服器把房間退回等待狀態（again）；單人局自己把桌子重擺一次就好
+   （不重擺的話 G.trump 還留著上一局的花色，桌子不會退回石板灰）。 */
+$("endBack").onclick = function(){
   $("endOv").hidden = true;
-  unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
-  buildIdleTable(); openLobby();
-  loadLobbyStats(true);   /* 剛打完一場，數字要重讀 */
+  if(MODE === "net" && NET.code){
+    openRoom(false);
+    loadLobbyStats(true);   /* 剛打完一場，大廳那三個數字要重讀 */
+    api("again", {code:NET.code}).then(function(d){
+      if(!d) roomErr = NET.err || "這一桌回不到等待狀態，再試一次";
+      paintRoom();
+    });
+    return;
+  }
+  buildIdleTable(); openRoom(false);
 };
 document.addEventListener("keydown", function(e){
   if(e.key === "Escape"){
-    closePg(); $("setupOv").hidden = true; setScore(false);
+    closePg(); setScore(false);
     /* 開房頁沒有 Esc 可關——那是「離開房間」才做的事；設定頁 Esc 退回座位表 */
     if(!$("room").hidden && roomView === "rules"){ roomView = "seats"; paintRoom(); }
   }
@@ -4980,40 +4980,17 @@ const RULE_UI = [
 const RULE_NUM = {decks:1, minRank:1, jokers:1, hook:1, n:1};
 const ruleCast = (k, v) => (RULE_NUM[k] ? +v : v);
 
-function ruleBlock(cfg, editable){
-  const C = rules(cfg);
-  return RULE_UI.map(function(f){
-    const cur = String(C[f.k]);
-    const hit = f.opts.filter(o => String(o.v) === cur)[0];
-    const body = editable
-      ? '<div class="opts">' + f.opts.map(o =>
-          '<button class="opt" data-rule="' + f.k + '" data-v="' + o.v + '" aria-pressed="' +
-          (String(o.v) === cur ? "true" : "false") + '">' + o.t + '</button>').join("") + '</div>'
-      : '<div class="ruleval">' + ((hit && hit.t) || cur) + '</div>';
-    const note = f.note && f.note[C[f.k]];
-    return '<div class="field"><label>' + f.label + '</label>' + body +
-      (note ? '<p class="sub">' + note + '</p>' : "") + '</div>';
-  }).join("");
-}
-/* 這套規則配這些人，牌夠不夠、階梯走得到哪 */
-function ruleReadout(cfg, n){
-  const C = rules(cfg);
-  const size = deckSizeOf(C.decks, C.minRank, C.jokers);
-  const peak = maxHand(size, Math.max(1, n)), rounds = peak*2 - 1;
-  return '<div class="readout">' +
-    '<div><div class="k">牌數</div><div class="v">' + size + '</div></div>' +
-    '<div><div class="k">最多每人</div><div class="v">' + peak + '</div></div>' +
-    '<div><div class="k">總局數</div><div class="v">' + rounds + '</div></div></div>' +
-    (peak < PEAK_CAP
-      ? '<div class="warn">這副牌走不到 11 張。' + n + ' 人要打完 1→11→1，至少需要 <b>' +
-        (n*PEAK_CAP + 1) + ' 張</b>（' + n + ' × 11 加 1 張翻王牌），目前只有 ' + size +
-        ' 張，階梯頂點會降到 ' + peak + ' 張、共 ' + rounds + ' 局。</div>'
-      : '');
-}
-/* 規則按鈕有兩個家：牌桌設定（單人，改本機的 draft）與等待房間（連線，送給伺服器） */
+/* 規則按鈕只有一個家：房間。單人改本機的 draft、把桌子重擺一次（還沒發牌，重擺沒有損失）；
+   連線的送給伺服器，房主按的才算數。 */
 function onRulePick(el, k, v){
-  if(el.closest("#setupOv")){ draft[k] = ruleCast(k, v); paintSetup(); return; }
-  if(MODE === "net" && NET.code && amHost() && G && G.phase === "lobby"){
+  if(MODE !== "net"){
+    if(!G || G.phase !== "lobby") return;        /* 開打之後這一場就定了 */
+    draft[k] = ruleCast(k, v);
+    buildIdleTable();
+    paintRoom();
+    return;
+  }
+  if(NET.code && amHost() && G && G.phase === "lobby"){
     const cfg = Object.assign(rules(G.cfg), {[k]:ruleCast(k, v)});
     const was = G.cfg;
     /* 先在本機改：規則是房主自己按的，等伺服器繞一圈回來才動會慢半拍。
@@ -5040,15 +5017,9 @@ function optRow(host, items, current, onPick){
   host.onclick = function(e){
     const b = e.target.closest(".opt");
     if(!b) return;
-    onPick(b.dataset.v); paintSetup();
+    onPick(b.dataset.v);
   };
 }
-function paintSetup(){
-  /* 單人局的人數還是要選——沒有人會進來。連線的房間就不必了。 */
-  optRow($("optPlayers"), [2,3,4,5,6,7,8,9,10].map(v => ({v:v, t:v + " 人"})), draft.n, v => draft.n = +v);
-  setHTML($("setupRules"), ruleBlock(draft, true) + ruleReadout(draft, draft.n));
-}
-function openSetup(){ paintSetup(); $("setupOv").hidden = false; }
 
 /* ================= 設定 ================= */
 const DECK_DESC = {
@@ -5065,39 +5036,42 @@ const CAM_DESC = {
 };
 function camPref(){ let v = "game"; try{ v = localStorage.getItem("ud.cam") || "game"; }catch(e){} return v === "study" ? "study" : "game"; }
 function setCam(v){ try{ localStorage.setItem("ud.cam", v); }catch(e){} if(UD.onCam) UD.onCam(v); }
-/* 速度與音效那兩顆只有牌桌頂列有，大廳跟開房頁看不到——設定裡放一份。
-   狀態與行為都還是那兩顆按鈕的，這裡只是轉接：不另外記一份，兩邊就不可能各說各話。 */
-function topOn(sel){ const b = document.querySelector(sel); return !!b && b.getAttribute("aria-pressed") === "true"; }
-function topTap(sel){
-  const b = document.querySelector(sel);
-  if(!b || b.disabled) return;
-  /* 聲音由使用者真的按到的那顆負責，轉接這一下不要再響一次 */
-  b.setAttribute("data-nosfx", "");
-  b.click();
-  b.removeAttribute("data-nosfx");
-}
+/* 平面／立體：狀態住在底下那層 3D 呈現層（它才知道 WebGL 行不行、桌子鋪好了沒），
+   這裡只是它的開關。沒有那一層（載入失敗）就只剩平面。 */
+const DIM_DESC = {
+  "2":"平的牌桌：一排座位、中間一墩牌。最省電，手機上最順。",
+  "3":"立體牌桌：真的一張桌子、真的一圈人，牌會飛過去。第一次切過去要鋪一下桌子。"
+};
+function dimOn(){ return !!(UD.dim && UD.dim()); }
+function can3d(){ return !!(UD.webglOK && UD.webglOK()); }
+
 function paintPref(){
   optRow($("optDeck"), DECK_ORDER.map(id => ({v:id, t:DECKS[id].name})), DECK.id, function(v){ setDeck(v); paintPref(); });
   $("deckNote").textContent = DECK_DESC[DECK.id] || "";
+
+  optRow($("optDim"), [{v:"2", t:"平面"}, {v:"3", t:"立體"}], dimOn() ? "3" : "2",
+    function(v){ if(UD.setDim) UD.setDim(v === "3"); paintPref(); });
+  if(!can3d()){
+    const b3 = $("optDim").querySelector('[data-v="3"]');
+    if(b3) b3.disabled = true;
+  }
+  $("dimNote").textContent = can3d() ? DIM_DESC[dimOn() ? "3" : "2"]
+                                     : "這個裝置沒有 WebGL，只有平面牌桌。";
+
   optRow($("optCam"), [{v:"game", t:"牌局"}, {v:"study", t:"書房"}], camPref(), function(v){ setCam(v); paintPref(); });
   $("camNote").textContent = CAM_DESC[camPref()];
-  const sp = document.querySelector("#speed button[aria-pressed='true']");
-  optRow($("optSpeed"), [{v:"slow", t:"慢"}, {v:"mid", t:"中"}, {v:"fast", t:"快"}],
-    (sp && sp.dataset.sp) || "mid",
-    function(v){ topTap('#speed button[data-sp="' + v + '"]'); paintPref(); });
-  optRow($("optSfx"), [{v:"1", t:"開"}, {v:"0", t:"關"}], topOn("#btnSfx") ? "1" : "0",
-    function(v){ if((v === "1") !== topOn("#btnSfx")) topTap("#btnSfx"); paintPref(); });
+  optRow($("optSpeed"), [{v:"slow", t:"慢"}, {v:"mid", t:"中"}, {v:"fast", t:"快"}], SPEED_KEY,
+    function(v){ setSpeed(v); paintPref(); });
+  optRow($("optSfx"), [{v:"1", t:"開"}, {v:"0", t:"關"}],
+    (window.SFX && SFX.enabled()) ? "1" : "0",
+    function(v){ if(window.SFX) SFX.set(v === "1"); paintPref(); });
   $("deckPreview").innerHTML =
     [[14,0],[13,1],[12,0],[7,2]].map(p => cardHTML({r:p[0], s:p[1], id:"pv" + p[0] + p[1]})).join("") +
     '<div class="pvback"><div class="back"></div></div>';
 }
 
-$("setupStart").onclick = function(){
-  $("setupOv").hidden = true; $("endOv").hidden = true;
-  unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
-  startSolo();
-};
 function startSolo(){
+  $("endOv").hidden = true;
   G = newGame(Object.assign(rules(draft), {n:draft.n}));
   G.seats[0] = {name:"你", kind:"human", cid:"me", av:MY.av};
   for(let i=1;i<G.cfg.n;i++) G.seats[i] = {name:String.fromCharCode(65+i), kind:"ai", cid:null};
@@ -5119,6 +5093,11 @@ const UD = window.UD = {
   DECKS:DECKS, DECK_ORDER:DECK_ORDER, deck:function(){ return DECK; }, setDeck:setDeck,
   faceSpec:faceSpec, faceArtSVG:faceArtSVG, backArt:function(){ return DECK.back.art(); },
   courtsReady:function(){ return COURT.ready; }, onDeck:null,
+  /* 平面／立體：狀態在 3D 那一層，設定頁只是開關。
+     dim()／setDim()／webglOK()／onShow() 由那一層掛上來（沒掛＝這台裝置只有平面）。
+     onDim 是反方向：立體桌是非同步鋪起來的，切過去不會馬上成功，
+     那一層每次真的改變狀態就叫這裡一次，設定頁那一排才不會停在按下去的樣子。 */
+  onDim:function(){ if(!$("pg").hidden && pgTab === "pref") paintPref(); },
   get G(){ return G; },
   get MODE(){ return MODE; },
   get SPEED(){ return SPEED; },
@@ -5167,6 +5146,7 @@ function closeLobby(){
   document.body.classList.remove("in-lobby");
   $("lobby").hidden = true;
   lbErr("");
+  if(UD.onShow) UD.onShow();
 }
 function lbErr(msg){
   const el = $("lbErr");
@@ -5253,11 +5233,13 @@ $("lbHost").onclick = async function(){
   catch(e){ lbErr(NET.err || "開房失敗"); }
   lbLock(false);
 };
+/* 一個人打也先進房間：人數與規則在那裡調，按「開始」才發牌。
+   跟連線局同一條路，打完也回到同一頁。 */
 $("lbSolo").onclick = function(){
   if(lbBusy) return;
-  closeLobby();
   unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
-  startSolo();
+  buildIdleTable();
+  closeLobby(); openRoom(true);
 };
 /* 這幾個直接借用工具列那幾顆，peer session 之後改那邊的行為也跟著變 */
 $("lbMe").onclick    = function(){ openPg("me"); };
@@ -7591,7 +7573,9 @@ async function redeck(){
   rebuildAtlas(UD.G ? UD.G.cfg.minRank : 7, UD.G && UD.G.cfg.jokers);
 }
 
-const seg = $("dim");
+/* 平面／立體的狀態住在這一層——只有這裡知道 WebGL 行不行、桌子鋪好了沒。
+   設定頁那一排只是開關：UD.setDim() 進來、UD.onDim() 出去，兩邊不各記一份。 */
+let dim3 = false;
 function note(txt){
   let el = document.querySelector(".stage-note");
   if(!txt){ if(el) el.remove(); return; }
@@ -7599,9 +7583,8 @@ function note(txt){
   el.textContent = txt;
 }
 function mark(on){
-  seg.querySelectorAll("button").forEach(function(b){
-    b.setAttribute("aria-pressed", (b.dataset.dim === "3") === on ? "true" : "false");
-  });
+  dim3 = !!on;
+  if(UD.onDim) UD.onDim(dim3);
 }
 async function setDim(on){
   if(on && !webglOK()){ note("這個裝置沒有 WebGL"); mark(false); return; }
@@ -7630,18 +7613,29 @@ async function setDim(on){
     return;
   }
   note("");
-  S.r.setAnimationLoop(frame);
   S.round = -2; S.playedN = -1;
   for(const c of Array.from(S.cards.values())) kill(c, null);
+  start3d();
+}
+/* 量畫布、開動畫圈。畫布現在可能是 0×0——人還在大廳或房間，.app 是 display:none，
+   這時候 resize() 會直接 return、S.boxW 永遠沒設，畫出來就是空的。
+   所以沒有尺寸就先不開，等牌桌露臉時 UD.onShow 再叫一次。 */
+function start3d(){
+  const host = CANVAS.parentNode;
+  if(!host.clientWidth || !host.clientHeight) return;
   resize();
   sync();
+  S.r.setAnimationLoop(frame);
 }
-seg.addEventListener("click", function(e){
-  const b = e.target.closest("button[data-dim]");
-  if(b) setDim(b.dataset.dim === "3");
-});
-if(!webglOK()) seg.querySelector('[data-dim="3"]').disabled = true;
-else{
+
+UD.dim = function(){ return dim3; };
+UD.setDim = setDim;
+UD.webglOK = webglOK;
+UD.onShow = function(){
+  if(!dim3 || !S) return;
+  requestAnimationFrame(start3d);
+};
+if(webglOK()){
   let saved = "2";
   try{ saved = new URLSearchParams(location.search).get("dim") || localStorage.getItem("ud.dim") || "2"; }catch(e){}
   if(saved === "3") setDim(true);
