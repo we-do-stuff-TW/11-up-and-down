@@ -5,22 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>11 Up &amp; Down</title>
 <meta name="description" content="叫墩撲克。1→11→1 共 21 局，手牌由伺服器發，誰都偷看不到。">
-<meta name="theme-color" content="#16332c">
+<meta name="theme-color" content="#1e2126">
 <meta property="og:title" content="11 Up &amp; Down">
 <meta property="og:description" content="叫墩撲克。用 Google 登入，跟朋友同桌打 21 局。">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Libre+Baskerville:wght@700&family=Barlow+Semi+Condensed:wght@700&family=Cormorant+Garamond:wght@700&family=Shippori+Mincho+B1:wght@800&display=swap">
-<style>
-/* artifact 平台本來會補這幾條，自架就得自己來。
-   [hidden] 那條特別重要：.overlay 設了 display:flex，會蓋掉瀏覽器預設的
-   hidden 行為，少了這條三個浮層會全部黏在畫面上。 */
-html,body{margin:0;padding:0}
-img{max-width:100%}
-[hidden]{display:none!important}
-</style>
 <script>
-/* 門禁。刻意寫在 head，而且不等 supabase-js：
+/* 門禁。刻意寫在 head 的最前面——連字型那條 <link> 都在它後面：
+   等待中的 stylesheet 會擋住後面每一支 inline script 執行，排在字型後面的話，
+   這段要等 fonts.googleapis.com 回來才跑得到，慢的網路上就是一段白等。
+   而且不等 supabase-js：
    等那支 CDN 載完再判斷，使用者已經先看過一整張空牌桌閃一下了。
    Supabase 的 session 就放在 localStorage 這個鍵底下，同步讀得到，夠判斷「有沒有登入過」；
    真正的驗證還是在下面 authBoot() 與伺服器那邊，這裡只負責不要閃。 */
@@ -37,6 +29,23 @@ img{max-width:100%}
     encodeURIComponent(location.pathname + location.search + location.hash));
 })();
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Libre+Baskerville:wght@700&family=Barlow+Semi+Condensed:wght@700&family=Cormorant+Garamond:wght@700&family=Shippori+Mincho+B1:wght@800&display=swap">
+<style>
+/* artifact 平台本來會補這幾條，自架就得自己來。
+   [hidden] 那條特別重要：.overlay 與 .pg 都設了 display:flex，會蓋掉瀏覽器預設的
+   hidden 行為，少了這條那幾層會全部黏在畫面上。 */
+html,body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+/* 第一格就先上色。真正的配色寫在 <body> 裡那個大 <style>——那要等 HTML 串到
+   一半才解析得到，慢的網路上中間會露出一格白底，深色的頁面閃一格白比什麼都刺眼。
+   顏色掛在 body 不是 html：html 只要有背景，body 的背景就不再往上傳給畫布，
+   底下那張 body::before 的七層光暈（z-index:-1）會被 body 自己的底色蓋掉。 */
+html{color-scheme:dark}
+body{background:#131619}
+</style>
 </head>
 <body>
 <style>
@@ -47,16 +56,26 @@ img{max-width:100%}
    ============================================================ */
 
 /* 註冊成可動畫的色彩型別，換王牌時桌面在 oklab 內插、不出色斷層 */
-@property --felt      { syntax:'<color>'; inherits:true; initial-value:#16332c; }
-@property --felt-deep { syntax:'<color>'; inherits:true; initial-value:#0c1f1a; }
-@property --glow      { syntax:'<color>'; inherits:true; initial-value:#255045; }
+@property --felt      { syntax:'<color>'; inherits:true; initial-value:#272b2f; }
+@property --felt-deep { syntax:'<color>'; inherits:true; initial-value:#131619; }
+@property --glow      { syntax:'<color>'; inherits:true; initial-value:#42484f; }
 
 :root{
   color-scheme:dark;
 
-  --felt:      oklch(.245 .042 168);
-  --felt-deep: oklch(.165 .034 168);
-  --glow:      oklch(.375 .058 168);
+  /* 開機第一格畫的是這個色。故意設成「空桌」的石板灰（paintTable 的 TABLE_NONE，
+     h250、局數深度 0），跟 login.html 完全同一組值——所以不管接下來是轉去登入頁、
+     停在大廳、還是進牌桌，第一次上色都不會先閃一下綠絨布再改。
+     真正的桌色一律由 paintTable() 依王牌與局數覆寫，這裡只負責「還沒有顏色」的那一刻。 */
+  --felt:      oklch(.285 .0098 250);
+  --felt-deep: oklch(.197 .0078 250);
+  --glow:      oklch(.400 .0137 250);
+
+  /* 頁面（登入、大廳、開房、帳號／設定／規則）的地：永遠石板灰，不跟著王牌走。
+     牌桌是酒紅的時候翻到設定，那一頁不該跟著變色。 */
+  --page:      oklch(.285 .0098 250);
+  --page-deep: oklch(.197 .0078 250);
+  --page-glow: oklch(.400 .0137 250);
 
   --ink:    oklch(.965 .014 92);
   --ink-2:  oklch(.805 .017 92);
@@ -216,13 +235,6 @@ input{font:inherit}
 .btn.me .av{width:24px;height:24px}
 .btn.me span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .btn.me.bare{padding:7px 13px}
-
-/* 你是誰 */
-.mecard{display:flex;align-items:center;gap:13px;margin-bottom:20px}
-.mecard .av{width:46px;height:46px;box-shadow:0 0 0 1px var(--hair),0 2px 8px rgba(0,0,0,.3)}
-.mecard .who{min-width:0}
-.mecard .n{font-size:15px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mecard .e{font-size:12px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* 戰績。用線分隔，不用面 */
 .recap{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:4px 0 16px}
@@ -1137,6 +1149,139 @@ button.rm-slot:hover .ai{opacity:1}
   .rm-eft .tail{text-align:left}
 }
 
+/* ================= 帳號 · 設定 · 規則 =================
+   跟大廳、開房頁同一個 register：石板灰的地、用線分隔不用面、標題是 Bodoni、
+   選中的東西底下一條銅線。擬真的木頭與絨布留給牌桌本體，這裡是印刷品。
+   三頁共用同一個外框，章節名就是標題——「統一風格」在這裡是字面上的：它們是同一頁。
+   地吃 --page 系列而不是 --felt：牌桌是酒紅的時候翻到設定，這一頁不該跟著變色。 */
+.pg{
+  position:fixed;inset:0;z-index:60;          /* 蓋得過大廳與開房頁的 50 */
+  display:flex;flex-direction:column;color:var(--ink);
+  background:
+    radial-gradient(circle at 18% 6%,  rgba(255,255,255,.050), transparent 9%),
+    radial-gradient(circle at 42% 11%, rgba(255,255,255,.038), transparent 11%),
+    radial-gradient(circle at 24% 27%, rgba(255,255,255,.046), transparent 12%),
+    radial-gradient(circle at 63% 38%, rgba(255,255,255,.042), transparent 15%),
+    radial-gradient(circle at 48% 62%, rgba(255,255,255,.040), transparent 11%),
+    radial-gradient(circle at 89% 78%, rgba(255,255,255,.052), transparent 13%),
+    radial-gradient(circle at 58% 92%, rgba(255,255,255,.062), transparent 18%),
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--page-glow) 0%, var(--page) 58%, var(--page-deep) 100%);
+  animation:lbIn .26s var(--e-out) both;
+}
+@media (prefers-reduced-motion:reduce){.pg{animation:none}}
+
+.pg-top{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-top:22px}
+.pg-mk{display:flex;align-items:baseline;gap:13px;line-height:1}
+.pg-mk b{font-family:"Bodoni Moda",Georgia,serif;font-size:23px;font-weight:700}
+.pg-mk u{text-decoration:none;font-size:8.5px;font-weight:600;letter-spacing:.34em;color:var(--ink-3)}
+/* 負的右邊界：讓「關閉」的字（不是它的 padding）對齊內文欄的右緣 */
+.pg-x{margin-right:-14px;padding:7px 14px;border-radius:99px;font-size:12px;color:var(--ink-3);
+  transition:color .18s,background .18s}
+.pg-x:hover{color:var(--ink);background:oklch(1 0 0/.05)}
+
+.pg-col{width:min(960px,100%);margin:0 auto;padding:0 clamp(18px,3vw,40px)}
+.pg-head{flex:none}
+/* 章節名就是標題：選中的那個是這一頁的 h1，另外兩個是還沒翻到的那幾頁 */
+.pg-tabs{display:flex;gap:clamp(18px,3.2vw,40px);align-items:baseline;flex-wrap:wrap;
+  margin-top:20px;border-bottom:1px solid var(--hair)}
+.pg-tab{font-family:"Bodoni Moda",Georgia,serif;font-size:clamp(26px,3.6vw,34px);font-weight:600;
+  letter-spacing:-.008em;line-height:1.1;color:var(--ink-3);padding:4px 2px 12px;
+  position:relative;transition:color .2s var(--e-out)}
+.pg-tab::after{content:"";position:absolute;left:2px;right:2px;bottom:-1px;height:1px;
+  background:transparent;transition:background .2s var(--e-out)}
+.pg-tab:hover{color:var(--ink-2)}
+.pg-tab[aria-selected="true"]{color:var(--ink)}
+.pg-tab[aria-selected="true"]::after{background:var(--brass)}
+.pg-say{margin:13px 0 0;font-size:12.5px;color:var(--ink-3);letter-spacing:.03em;max-width:66ch}
+
+.pg-scroll{flex:1;min-height:0;overflow:auto;
+  padding-bottom:calc(40px + env(safe-area-inset-bottom))}
+.pg-pane{padding-top:4px;animation:pgIn .24s var(--e-out) both}
+@keyframes pgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.pg-pane{animation:none}}
+
+/* ---- 一排一排：標籤在左，選項在右，中間一個框都沒有 ---- */
+.pg-f{display:flex;align-items:baseline;gap:clamp(14px,2.4vw,30px);
+  padding:20px 0;border-bottom:1px solid var(--hair-2)}
+.pg-f>label{width:92px;flex:none;font-size:12.5px;color:var(--ink-3)}
+.pg-f .bd{flex:1;min-width:0}
+.pg-n{margin:9px 0 0;font-size:11.5px;line-height:1.6;color:var(--ink-3);max-width:62ch}
+.pg-tail{margin-top:22px}
+
+/* 選項不做膠囊也不做框：選中的那個底下一條銅線（跟開房頁的 .rm-ch 同一套） */
+.pg .opts{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4px}
+.pg .opt{padding:4px 6px;border:0;border-radius:0;background:none;font-size:13.5px;
+  color:var(--ink-3);position:relative;transition:color .18s}
+.pg .opt::after{content:"";position:absolute;left:6px;right:6px;bottom:1px;height:1px;
+  background:transparent;transition:background .18s}
+.pg .opt:hover{color:var(--ink-2);border:0;background:none}
+.pg .opt[aria-pressed="true"]{color:var(--ink);border:0;background:none}
+.pg .opt[aria-pressed="true"]::after{background:var(--brass)}
+.pg .opt:disabled{opacity:.32;cursor:default}
+
+/* ---- 帳號 ---- */
+.pg-id{display:flex;align-items:center;gap:14px;padding:24px 0 2px}
+.pg-id img,.pg-id .disc{width:46px;height:46px;border-radius:99px;object-fit:cover;flex:none;
+  font-size:17px;box-shadow:0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.3)}
+.pg-id .t{min-width:0}
+.pg-id .t b{display:block;font-size:16px;font-weight:600;letter-spacing:.01em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pg-id .t span{display:block;margin-top:3px;font-size:12px;color:var(--ink-3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 名字不做輸入框，做一條可以寫字的線 */
+.pg .nameinput{width:100%;max-width:300px;padding:7px 2px;border:0;border-radius:0;background:none;
+  border-bottom:1px solid var(--hair);color:var(--ink);
+  font-size:16px;   /* 小於 16px 的話 iOS Safari 會自己放大整頁 */
+  letter-spacing:.02em;transition:border-color .2s}
+.pg .nameinput:focus{outline:none;border-bottom-color:var(--brass)}
+
+.pg-sect{padding:26px 0 0}
+.pg-cap{display:block;margin-bottom:14px;font-size:9.5px;font-weight:600;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--ink-3)}
+/* 戰績：三個大數字，底下一條一條的紀錄 */
+.pg .recap{display:flex;gap:clamp(28px,6vw,64px);margin:0 0 22px}
+.pg .recap .k{font-size:9.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:6px}
+.pg .recap .v{font-size:30px}
+.pg .recap .v .sub{font-size:14px}
+.pg .hist{max-height:none;overflow:visible;border-top:1px solid var(--hair)}
+.pg .hist li{padding:12px 2px;font-size:13px}
+.pg .hist li:last-child{border-bottom:0}   /* 底下緊接著登出那條線，不要兩條 */
+.pg .fair{margin-top:0;padding-top:0;border-top:0}
+.pg-out{display:flex;justify-content:flex-end;margin-top:32px;padding-top:20px;
+  border-top:1px solid var(--hair)}
+.pg-quiet{padding:8px 16px;border-radius:99px;font-size:12.5px;color:var(--ink-3);
+  transition:color .18s,background .18s}
+.pg-quiet:hover{color:var(--bad);background:oklch(1 0 0/.05)}
+
+/* ---- 設定：牌面預覽直接躺在那一排底下，不另外做一塊面 ---- */
+.pg .preview{background:none;border-radius:0;padding:16px 0 2px;margin:0}
+
+/* ---- 規則：一份印出來的說明，兩欄中間一條線 ---- */
+.pg-two{display:grid;grid-template-columns:1fr 1px 1fr;gap:0 clamp(26px,3.6vw,56px);padding-top:22px}
+.pg-rule{width:1px;background:var(--hair)}
+.pg-two .rules h3:first-child{margin-top:0}
+.pg .sub{color:var(--ink-3);font-size:12px;margin:8px 0 0;max-width:64ch}
+
+@media (max-width:860px){
+  .pg-two{grid-template-columns:1fr;gap:0}
+  .pg-rule{display:none}
+  .pg-two>.rules:last-child h3:first-child{margin-top:26px}
+}
+@media (max-width:760px){
+  .pg-top{padding-top:14px}
+  .pg-col{padding:0 16px}
+  .pg-tabs{gap:17px;margin-top:14px}
+  .pg-tab{font-size:24px;padding-bottom:10px}
+  .pg-f{flex-direction:column;gap:8px;padding:17px 0}
+  .pg-f>label{width:auto}
+  .pg-id{padding-top:18px}
+  .pg .recap{gap:24px}
+  .pg .recap .v{font-size:25px}
+  /* 四欄照排，擠不下的是對手名單——它本來就會用刪節號收尾 */
+  .pg .hist li{gap:9px;font-size:12.5px}
+}
+
 /* ================= 立體模式 ================= */
 /* 牌桌換成一張 WebGL 畫布。座位牌、狀態列、手牌按鈕仍然是 DOM，
    疊在畫布上、由 JS 投影定位——文字保持向量清晰，鍵盤與螢幕閱讀器照常運作。 */
@@ -1434,85 +1579,143 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   </div>
 </div>
 
-<div class="overlay" id="prefOv" hidden>
-  <div class="sheet">
-    <h2>設定</h2>
-    <p class="sub">牌面隨時可換，桌上的牌立刻跟著變，選擇會記住。</p>
-    <div class="field"><label>牌面</label><div class="opts" id="optDeck"></div></div>
-    <div class="preview" id="deckPreview" aria-hidden="true"></div>
-    <p class="sub" id="deckNote"></p>
-    <div class="field"><label>立體鏡頭</label><div class="opts" id="optCam"></div></div>
-    <p class="sub" id="camNote"></p>
-    <div class="sheet-actions">
-      <button class="btn" id="prefClose">關閉</button>
+<!-- ================= 帳號 · 設定 · 規則 =================
+     這三頁講的都不是「這一桌」，是你跟這個遊戲本身，所以它們不是浮在牌桌上的玻璃卡片
+     （那是牌局中的對話框該有的樣子），而是跟登入頁、大廳、開房頁同一張石板灰的紙。
+     三頁其實是同一頁：上面那排章節名就是標題，切換只換底下那一疊。內容由
+     paintMe()／paintPref()／paintRules() 填，全部長自同一份 RULE_UI 與 roundPoints()。 -->
+<div class="pg" id="pg" hidden>
+  <div class="pg-head">
+    <div class="pg-col">
+      <header class="pg-top">
+        <div class="pg-mk"><b>11</b><u>UP &amp; DOWN</u></div>
+        <button class="pg-x" id="pgX">關閉</button>
+      </header>
+      <nav class="pg-tabs" id="pgTabs" role="tablist" aria-label="帳號、設定與規則">
+        <button class="pg-tab" role="tab" data-pg="me"    aria-selected="true">帳號</button>
+        <button class="pg-tab" role="tab" data-pg="pref"  aria-selected="false">設定</button>
+        <button class="pg-tab" role="tab" data-pg="rules" aria-selected="false">規則</button>
+      </nav>
+      <p class="pg-say" id="pgSay"></p>
     </div>
   </div>
-</div>
 
-<div class="overlay" id="meOv" hidden>
-  <div class="sheet">
-    <h2>你的帳號</h2>
-    <p class="sub">登入用的是 Google 帳號；桌上顯示的名字可以另外取。</p>
-    <div class="mecard">
-      <img class="av" id="meAv" alt="" referrerpolicy="no-referrer" hidden>
-      <div class="who"><div class="n" id="meName">—</div><div class="e" id="meEmail"></div></div>
+  <div class="pg-scroll" id="pgScroll">
+    <div class="pg-col">
+
+      <!-- ---- 帳號：你是誰、桌上叫什麼、打過幾場 ---- -->
+      <section class="pg-pane" data-pane="me" role="tabpanel">
+        <div class="pg-id">
+          <img id="meAv" alt="" referrerpolicy="no-referrer" hidden>
+          <span class="disc" id="meDisc" aria-hidden="true" hidden></span>
+          <div class="t"><b id="meName">—</b><span id="meEmail"></span></div>
+        </div>
+
+        <div class="pg-f">
+          <label for="inNameMe">桌上顯示的名字</label>
+          <div class="bd">
+            <input class="nameinput" id="inNameMe" maxlength="10" placeholder="最多 10 個字">
+            <p class="pg-n">Google 帳號的名字通常太長，座位牌放得下 10 個字。改了立刻生效，同桌的人馬上看到。</p>
+          </div>
+        </div>
+
+        <div class="pg-sect">
+          <span class="pg-cap">戰績</span>
+          <div id="histBody"></div>
+        </div>
+
+        <div class="pg-out"><button class="pg-quiet" id="btnSignOut">登出</button></div>
+      </section>
+
+      <!-- ---- 設定：這台裝置上的偏好。頂列那幾顆快速開關在這裡也有一份 ---- -->
+      <section class="pg-pane" data-pane="pref" role="tabpanel" hidden>
+        <div class="pg-f">
+          <label>牌面</label>
+          <div class="bd">
+            <div class="opts" id="optDeck"></div>
+            <div class="preview" id="deckPreview" aria-hidden="true"></div>
+            <p class="pg-n" id="deckNote"></p>
+          </div>
+        </div>
+
+        <div class="pg-f">
+          <label>立體鏡頭</label>
+          <div class="bd">
+            <div class="opts" id="optCam"></div>
+            <p class="pg-n" id="camNote"></p>
+          </div>
+        </div>
+
+        <div class="pg-f">
+          <label>出牌速度</label>
+          <div class="bd">
+            <div class="opts" id="optSpeed"></div>
+            <p class="pg-n">AI 想多久、牌飛多快。跟牌桌頂列那排「慢 中 快」是同一個開關。</p>
+          </div>
+        </div>
+
+        <div class="pg-f">
+          <label>音效</label>
+          <div class="bd">
+            <div class="opts" id="optSfx"></div>
+            <p class="pg-n">發牌、出牌、贏墩、骰子落桌的聲音，全部是即時合成的，沒有音檔。</p>
+          </div>
+        </div>
+
+        <p class="pg-n pg-tail">這幾項記在這台裝置上，換一台要再選一次。<br>牌桌要平面還是立體，在牌桌頂列切。</p>
+      </section>
+
+      <!-- ---- 規則：一份印出來的說明，兩欄中間一條線 ---- -->
+      <section class="pg-pane" data-pane="rules" role="tabpanel" hidden>
+        <div class="pg-two">
+          <div class="rules">
+            <h3>局數階梯</h3>
+            <p>第 1 局每人 1 張，每局加 1 張，到 11 張後一路遞減回 1 張，共 21 局。若牌數不足 11 張，階梯頂點會自動降到牌數允許的最大值。</p>
+
+            <h3>王牌</h3>
+            <p>每局發完牌後，翻開牌庫最上面一張，該花色即本局王牌，整局不變。發完牌若牌庫剛好空了，該局<strong>無王</strong>。桌面顏色會跟著王牌走——黑色花色是冷綠，紅色花色是暖酒，無王是石板灰；局數越接近 11，桌色越深。</p>
+
+            <h3>叫墩（放骰子）</h3>
+            <p>宣告自己會贏幾墩，範圍 <code>0</code> 到<strong>本局張數</strong>。起始玩家每局輪替一位：第 1 局第一座、第 2 局第二座，以此類推。</p>
+            <p id="ruBid"></p>
+            <div class="note">實體提醒：一顆骰子只能顯示 1–6，叫 7–11 墩時桌上需要兩顆骰子或一顆 d12。介面在 7 以上改用數字面。</div>
+
+            <h3>出牌</h3>
+            <ol>
+              <li>本局第一墩由起始玩家先出，之後每墩由<strong>上一墩的贏家</strong>先出。</li>
+              <li>首張牌的花色為跟牌花色，手上有該花色<strong>必須跟出</strong>。</li>
+              <li>沒有該花色時可出任意牌；出王牌花色可以吃墩，其他花色即廢牌。</li>
+              <li>該墩有人出王牌，最大的王牌贏；沒有王牌，跟牌花色最大者贏。</li>
+              <li>雙副牌出現同點同花時，<strong>先出的那張贏</strong>。</li>
+            </ol>
+            <p id="ruJoker"></p>
+          </div>
+
+          <i class="pg-rule" aria-hidden="true"></i>
+
+          <div class="rules">
+            <h3>計分</h3>
+            <div id="ruScore"></div>
+
+            <h3>牌組</h3>
+            <p id="ruDeck"></p>
+
+            <h3>連線</h3>
+            <ul>
+              <li><strong>手牌別人真的看不到。</strong> 發牌在伺服器上發生，每個人的手牌寫進一張沒有任何讀取權限的表，只有你自己的那份會回到你的裝置——房主也看不到。同時叫墩還沒翻開的數字放在同一個地方。</li>
+              <li><strong>規則由房主定，開打前才改得動。</strong> 等待房間裡改，全桌都看得到；按下開始就鎖住，整場不變。</li>
+              <li><strong>幾個人進來就幾個人玩。</strong> 不必挑位子，人不夠房主可以加 AI 湊。至少兩個人才開得了局，最多十個。</li>
+              <li>房主關掉分頁時牌局暫停，任一在座玩家會自動接手。</li>
+              <li>玩家斷線超過 30 秒，該座位改由 AI 代打，本人回來可以繼續。</li>
+            </ul>
+
+            <h3>改規則</h3>
+            <p>叫墩方式、末位限制、鬼牌、牌組、三段計分都在<strong>等待房間</strong>裡調，只有房主按得動，全桌都看得到。開打之後鎖住，整場不變。單人局在頂列的「新局」裡調。</p>
+          </div>
+        </div>
+      </section>
+
     </div>
-    <div class="field"><label>桌上顯示的名字</label>
-      <input class="nameinput" id="inNameMe" maxlength="10" placeholder="最多 10 個字"></div>
-    <div class="field"><label>戰績</label></div>
-    <div id="histBody"></div>
-    <div class="sheet-actions">
-      <button class="btn" id="btnSignOut">登出</button>
-      <button class="btn primary" id="meClose">關閉</button>
-    </div>
-  </div>
-</div>
-
-<div class="overlay" id="rulesOv" hidden>
-  <div class="sheet">
-    <h2>規則</h2>
-    <p class="sub">依口述整理。最後一節是連線版的已知限制。</p>
-    <div class="rules">
-      <h3>局數階梯</h3>
-      <p>第 1 局每人 1 張，每局加 1 張，到 11 張後一路遞減回 1 張，共 21 局。若牌數不足 11 張，階梯頂點會自動降到牌數允許的最大值。</p>
-
-      <h3>王牌</h3>
-      <p>每局發完牌後，翻開牌庫最上面一張，該花色即本局王牌，整局不變。發完牌若牌庫剛好空了，該局<strong>無王</strong>。桌面顏色會跟著王牌走——黑色花色是冷綠，紅色花色是暖酒，無王是石板灰；局數越接近 11，桌色越深。</p>
-
-      <h3>叫墩（放骰子）</h3>
-      <p>宣告自己會贏幾墩，範圍 <code>0</code> 到<strong>本局張數</strong>。起始玩家每局輪替一位：第 1 局第一座、第 2 局第二座，以此類推。</p>
-      <p id="ruBid"></p>
-      <div class="note">實體提醒：一顆骰子只能顯示 1–6，叫 7–11 墩時桌上需要兩顆骰子或一顆 d12。介面在 7 以上改用數字面。</div>
-
-      <h3>出牌</h3>
-      <ol>
-        <li>本局第一墩由起始玩家先出，之後每墩由<strong>上一墩的贏家</strong>先出。</li>
-        <li>首張牌的花色為跟牌花色，手上有該花色<strong>必須跟出</strong>。</li>
-        <li>沒有該花色時可出任意牌；出王牌花色可以吃墩，其他花色即廢牌。</li>
-        <li>該墩有人出王牌，最大的王牌贏；沒有王牌，跟牌花色最大者贏。</li>
-        <li>雙副牌出現同點同花時，<strong>先出的那張贏</strong>。</li>
-      </ol>
-      <p id="ruJoker"></p>
-
-      <h3>計分</h3>
-      <div id="ruScore"></div>
-
-      <h3>牌組</h3>
-      <p id="ruDeck"></p>
-
-      <h3>連線</h3>
-      <ul>
-        <li><strong>手牌別人真的看不到。</strong> 發牌在伺服器上發生，每個人的手牌寫進一張沒有任何讀取權限的表，只有你自己的那份會回到你的裝置——房主也看不到。同時叫墩還沒翻開的數字放在同一個地方。</li>
-        <li><strong>規則由房主定，開打前才改得動。</strong> 等待房間裡改，全桌都看得到；按下開始就鎖住，整場不變。</li>
-        <li><strong>幾個人進來就幾個人玩。</strong> 不必挑位子，人不夠房主可以加 AI 湊。至少兩個人才開得了局，最多十個。</li>
-        <li>房主關掉分頁時牌局暫停，任一在座玩家會自動接手。</li>
-        <li>玩家斷線超過 30 秒，該座位改由 AI 代打，本人回來可以繼續。</li>
-      </ul>
-
-      <h3>改規則</h3>
-      <p>叫墩方式、末位限制、鬼牌、牌組、三段計分都在<strong>等待房間</strong>裡調，只有房主按得動，全桌都看得到。開打之後鎖住，整場不變。單人局在頂列的「新局」裡調。</p>
-    </div>
-    <div class="sheet-actions"><button class="btn primary" id="rulesClose">關閉</button></div>
   </div>
 </div>
 
@@ -2307,8 +2510,9 @@ SFX.frame = function(G, me, best, o){
 
 /* ---------------- 介面的聲音 ----------------
    用事件委派，不去改任何一個 onclick——那些 handler 是別人的地盤。 */
-var OPENERS = {btnRules:1, btnRoom:1, btnSetup:1, btnFinal:1, btnLobby:1, endAgain:1, setupStart:1, btnMe:1};
-var CLOSERS = {rulesClose:1, setupCancel:1, endClose:1, scoreClose:1, meClose:1};
+var OPENERS = {btnRules:1, btnPref:1, btnRoom:1, btnSetup:1, btnFinal:1, btnLobby:1,
+               endAgain:1, setupStart:1, btnMe:1, rmMe:1, lbMe:1, lbRules:1, lbPref:1};
+var CLOSERS = {pgX:1, setupCancel:1, endClose:1, scoreClose:1};
 document.addEventListener("click", function(e){
   var el = e.target.closest ? e.target.closest("button, .opt, .bidbtn, [data-net]") : null;
   if(!el) return;
@@ -3025,16 +3229,23 @@ function loginHref(){
   return "login.html?next=" +
     encodeURIComponent(location.pathname + location.search + location.hash);
 }
+/* 伺服器不認這張 session 的時候，localStorage 裡那把鑰匙要一起丟掉。
+   留著的話 index 的門禁會以為還登著——每次開頁都先畫出一整張牌桌，
+   等 authBoot 問完才被踢回登入頁。那一下就是使用者看到的閃光，而且會每次都閃。 */
+function forgetSession(){
+  try{
+    for(let i = localStorage.length - 1; i >= 0; i--){
+      const k = localStorage.key(i);
+      if(k && /^sb-.+-auth-token/.test(k)) localStorage.removeItem(k);
+    }
+  }catch(e){}
+}
 let bouncing = false;
 function gotoLogin(stale){
   if(bouncing) return;
   bouncing = true;
-  const jump = function(){ location.replace(loginHref()); };
-  /* 伺服器不認這張 session：不先清掉的話，登入頁看到 localStorage 還有東西
-     又會把人送回牌桌，兩頁互相踢。 */
-  if(stale && NET.sb){
-    try{ NET.sb.auth.signOut({scope:"local"}).then(jump, jump); }catch(e){ jump(); }
-  }else jump();
+  if(stale) forgetSession();
+  location.replace(loginHref());
 }
 /* getSession 每一次都要搶 storage 的鎖、讀一次 localStorage；一秒鐘敲好幾次伺服器的
    時候那是白付的成本。token 存一份在記憶體裡，剩不到一分鐘才回去換——
@@ -3080,7 +3291,8 @@ async function authBoot(){
   }
   let session = null;
   try{ session = (await NET.sb.auth.getSession()).data.session; }catch(e){}
-  if(!session){ gotoLogin(); return; }
+  /* stale：鑰匙還在但配不上鎖。不清掉的話下次開頁又會走一次「畫牌桌→被踢回來」 */
+  if(!session){ gotoLogin(true); return; }
   adoptUser(session.user);
 
   /* Google 轉回來時網址上會掛著 ?code=… 這類殘骸，session 收好了就擦掉 */
@@ -3097,7 +3309,7 @@ async function authBoot(){
   NET.sb.auth.onAuthStateChange(function(ev, sess){
     /* 換了一張 session（自動續期、登出、換帳號）：記憶體裡那份快取就不算數了 */
     TOK.v = null; TOK.exp = 0;
-    if(ev === "SIGNED_OUT" || !sess){ gotoLogin(); return; }
+    if(ev === "SIGNED_OUT" || !sess){ gotoLogin(true); return; }
     adoptUser(sess.user);
   });
 
@@ -4216,13 +4428,14 @@ function paintMeChip(){
   nm.textContent = MY.name || MY.gname || "帳號";
   btn.setAttribute("aria-label", "你的帳號：" + (MY.gname || MY.email || ""));
 }
-function openMe(){
-  const av = $("meAv");
-  if(MY.av){ av.src = MY.av; av.hidden = false; } else av.hidden = true;
-  $("meName").textContent = MY.gname || "—";
+function paintMe(){
+  const av = $("meAv"), disc = $("meDisc");
+  /* Google 沒給照片就寫名字的第一個字，跟開房頁的座位牌同一套 */
+  if(MY.av){ av.src = MY.av; av.hidden = false; disc.hidden = true; }
+  else{ av.hidden = true; disc.hidden = false; disc.textContent = (MY.name || MY.gname || "你").slice(0, 1); }
+  $("meName").textContent = MY.gname || MY.name || "—";
   $("meEmail").textContent = MY.email || "";
   $("inNameMe").value = MY.name || "";
-  $("meOv").hidden = false;
   loadHistory();
 }
 /* 戰績。這是唯一一張「本人讀得到自己那份」的表——rooms／hands 都沒有讀取 policy，
@@ -4644,8 +4857,42 @@ function paintRules(){
     (C.jokers ? ' 外加 <strong>2 張鬼牌</strong>' : '') + '，共 <strong>' + size + ' 張</strong>。' +
     '牌數必須不少於「人數 × 最大張數 + 1」（多的那一張是翻王牌用的），不夠的話階梯頂點會自動下修。');
 }
-$("btnRules").onclick = function(){ paintRules(); $("rulesOv").hidden = false; };
-$("rulesClose").onclick = function(){ $("rulesOv").hidden = true; };
+/* ================= 帳號 · 設定 · 規則 =================
+   三頁共用一個外框：上面那排章節名就是標題，切換只換底下那一疊內容，
+   所以從哪一顆按鈕進來都是同一頁，只是停在不同章。 */
+const PG_SAY = {
+  me:    "登入用的是 Google 帳號；桌上顯示的名字可以另外取。",
+  pref:  "牌面、鏡頭、速度、音效。選了就記住，隨時可以再換。",
+  rules: "依口述整理。最後一節是連線版的已知限制。"
+};
+let pgTab = "me";
+function paintPg(){
+  $("pgSay").textContent = PG_SAY[pgTab] || "";
+  $("pgTabs").querySelectorAll(".pg-tab").forEach(function(b){
+    b.setAttribute("aria-selected", b.dataset.pg === pgTab ? "true" : "false");
+  });
+  $("pg").querySelectorAll(".pg-pane").forEach(function(p){ p.hidden = p.dataset.pane !== pgTab; });
+  /* 每次翻到就重畫：規則講的是「這一桌」的 cfg，設定讀的是頂列那幾顆當下的狀態 */
+  if(pgTab === "me") paintMe();
+  else if(pgTab === "pref") paintPref();
+  else paintRules();
+}
+function openPg(tab){
+  if(tab) pgTab = tab;
+  paintPg();
+  $("pg").hidden = false;
+  $("pgScroll").scrollTop = 0;
+}
+function closePg(){ $("pg").hidden = true; }
+$("pgTabs").onclick = function(e){
+  const b = e.target.closest(".pg-tab");
+  if(!b || b.dataset.pg === pgTab) return;
+  pgTab = b.dataset.pg;
+  paintPg();
+  $("pgScroll").scrollTop = 0;
+};
+$("pgX").onclick = closePg;
+$("btnRules").onclick = function(){ openPg("rules"); };
 /* 單人在桌上時這顆＝回大廳；已經在房間裡就還是開房間面板。
    回大廳要重建一張空桌：沒有王牌桌子才會退回石板灰（paintTable 的 TABLE_NONE），
    「還沒發牌就還沒有顏色」這件事兩條路都要成立。單人局本來就不記戰績，丟掉沒有損失。 */
@@ -4655,19 +4902,17 @@ $("btnRoom").onclick = function(){
 };
 $("btnSetup").onclick = function(){ openSetup(); };
 $("setupCancel").onclick = function(){ $("setupOv").hidden = true; };
-$("btnMe").onclick = openMe;
-$("rmMe").onclick = openMe;
-$("meClose").onclick = function(){ $("meOv").hidden = true; };
+$("btnMe").onclick = function(){ openPg("me"); };
+$("rmMe").onclick = function(){ openPg("me"); };
 $("btnSignOut").onclick = async function(){
   const b = $("btnSignOut");
   b.disabled = true; b.textContent = "登出中…";
   try{ if(NET.code) await api("leave", {code:NET.code}); }catch(e){}
   try{ if(NET.sb) await NET.sb.auth.signOut(); }catch(e){}
   try{ localStorage.removeItem("ud.name"); }catch(e){}
-  gotoLogin();
+  gotoLogin(true);
 };
-$("btnPref").onclick = function(){ openPref(); };
-$("prefClose").onclick = function(){ $("prefOv").hidden = true; };
+$("btnPref").onclick = function(){ openPg("pref"); };
 $("endClose").onclick = function(){ $("endOv").hidden = true; };
 $("endAgain").onclick = function(){ $("endOv").hidden = true; openSetup(); };
 $("endLobby").onclick = function(){
@@ -4678,8 +4923,7 @@ $("endLobby").onclick = function(){
 };
 document.addEventListener("keydown", function(e){
   if(e.key === "Escape"){
-    $("rulesOv").hidden = true; $("setupOv").hidden = true; $("prefOv").hidden = true;
-    $("meOv").hidden = true; setScore(false);
+    closePg(); $("setupOv").hidden = true; setScore(false);
     /* 開房頁沒有 Esc 可關——那是「離開房間」才做的事；設定頁 Esc 退回座位表 */
     if(!$("room").hidden && roomView === "rules"){ roomView = "seats"; paintRoom(); }
   }
@@ -4801,16 +5045,33 @@ const CAM_DESC = {
 };
 function camPref(){ let v = "game"; try{ v = localStorage.getItem("ud.cam") || "game"; }catch(e){} return v === "study" ? "study" : "game"; }
 function setCam(v){ try{ localStorage.setItem("ud.cam", v); }catch(e){} if(UD.onCam) UD.onCam(v); }
+/* 速度與音效那兩顆只有牌桌頂列有，大廳跟開房頁看不到——設定裡放一份。
+   狀態與行為都還是那兩顆按鈕的，這裡只是轉接：不另外記一份，兩邊就不可能各說各話。 */
+function topOn(sel){ const b = document.querySelector(sel); return !!b && b.getAttribute("aria-pressed") === "true"; }
+function topTap(sel){
+  const b = document.querySelector(sel);
+  if(!b || b.disabled) return;
+  /* 聲音由使用者真的按到的那顆負責，轉接這一下不要再響一次 */
+  b.setAttribute("data-nosfx", "");
+  b.click();
+  b.removeAttribute("data-nosfx");
+}
 function paintPref(){
   optRow($("optDeck"), DECK_ORDER.map(id => ({v:id, t:DECKS[id].name})), DECK.id, function(v){ setDeck(v); paintPref(); });
   $("deckNote").textContent = DECK_DESC[DECK.id] || "";
   optRow($("optCam"), [{v:"game", t:"牌局"}, {v:"study", t:"書房"}], camPref(), function(v){ setCam(v); paintPref(); });
   $("camNote").textContent = CAM_DESC[camPref()];
+  const sp = document.querySelector("#speed button[aria-pressed='true']");
+  optRow($("optSpeed"), [{v:"slow", t:"慢"}, {v:"mid", t:"中"}, {v:"fast", t:"快"}],
+    (sp && sp.dataset.sp) || "mid",
+    function(v){ topTap('#speed button[data-sp="' + v + '"]'); paintPref(); });
+  optRow($("optSfx"), [{v:"1", t:"開"}, {v:"0", t:"關"}], topOn("#btnSfx") ? "1" : "0",
+    function(v){ if((v === "1") !== topOn("#btnSfx")) topTap("#btnSfx"); paintPref(); });
   $("deckPreview").innerHTML =
     [[14,0],[13,1],[12,0],[7,2]].map(p => cardHTML({r:p[0], s:p[1], id:"pv" + p[0] + p[1]})).join("") +
     '<div class="pvback"><div class="back"></div></div>';
 }
-function openPref(){ paintPref(); $("prefOv").hidden = false; }
+
 $("setupStart").onclick = function(){
   $("setupOv").hidden = true; $("endOv").hidden = true;
   unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
@@ -4979,7 +5240,7 @@ $("lbSolo").onclick = function(){
   startSolo();
 };
 /* 這幾個直接借用工具列那幾顆，peer session 之後改那邊的行為也跟著變 */
-$("lbMe").onclick    = function(){ openMe(); };
+$("lbMe").onclick    = function(){ openPg("me"); };
 $("lbRules").onclick = function(){ $("btnRules").click(); };
 $("lbPref").onclick  = function(){ $("btnPref").click(); };
 $("lbOut").onclick   = function(){ $("btnSignOut").click(); };

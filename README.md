@@ -59,6 +59,26 @@ updown.html                    Claude artifact 版（單人）
 updown-online.html             Claude artifact 版（組織內多人）
 ```
 
+## 頁面與牌桌是兩種東西
+
+這個產品只有兩個視覺 register，分得很乾淨：
+
+- **牌桌本體**是實體的——絨布、木頭、玻璃控制項、會隨王牌與局數變色的桌面。
+  牌局中的對話框（新局、牌局結束）長在這一層，所以它們是浮起的玻璃卡片。
+- **頁面**是印刷品——登入、大廳、開房頁、帳號／設定／規則。石板灰的地、用線分隔不用面、
+  標題是 Bodoni、選中的東西底下一條銅線、整頁只有一處高對比。
+
+頁面那一層的地吃 `--page` / `--page-deep` / `--page-glow`，**不吃 `--felt`**：
+牌桌是酒紅的時候翻到設定，那一頁不該跟著變色。`--felt` 只由 `paintTable()` 依王牌與局數寫，
+`:root` 給的初值刻意就是「空桌」的石板灰（`TABLE_NONE`，h250），跟 `login.html` 完全同一組值——
+所以開機第一次上色就已經是對的顏色，不會先閃一下綠絨布。
+
+帳號、設定、規則**是同一頁**（`#pg`）：上面那排章節名就是標題，切換只換底下那一疊，
+從哪一顆按鈕進來都一樣，只是停在不同章。內容由 `paintMe()` / `paintPref()` / `paintRules()` 填，
+規則與計分例子直接呼叫 `roundPoints()`，介面跟引擎不可能各說各話。
+設定裡的「出牌速度」「音效」是轉接頂列那兩顆按鈕（`topTap()`），不另外記一份狀態——
+大廳與開房頁沒有頂列，那兩項本來就沒地方調。
+
 ## 牌面
 
 五套可切換的仿真牌，頂列「設定」裡選（有預覽，桌上立刻跟著換），記在 `localStorage` 的 `ud.deck`：
@@ -177,6 +197,12 @@ J／Q／K 的人像是 `docs/cards/` 的英式雙頭人像，啟動時抓成文�
 在 `<head>` 就擋一次——**刻意不等 supabase-js 載完**，不然使用者會先看到一整張空牌桌閃一下。
 那一關只同步讀 localStorage 裡的 session 鍵決定要不要轉走；真正的驗證在 `authBoot()`
 與 edge function 那邊。從 Google 轉回來時網址上帶著 `?code=`，這種情況不能踢。
+那段 `<script>` 排在字型那條 `<link>` **之前**：等待中的 stylesheet 會擋住後面每一支
+inline script 執行，排在後面的話這一關要等 fonts.googleapis.com 回來才跑得到。
+
+`authBoot()` 問完發現伺服器不認這張 session 時，走的是 `gotoLogin(true)`——**連 localStorage
+那把鑰匙一起丟掉**（`forgetSession()`）。不丟的話 `<head>` 那一關會一直以為還登著，
+每次開頁都先畫出一整張大廳、等問完才被踢回登入頁，而且會每次都閃。
 
 呼叫 `functions/v1/game` 時 `Authorization` 帶的是**使用者自己的 access token**，不是 anon key——
 anon key 誰都有，那不叫身分。伺服器用 `auth.getUser(jwt)` 換出 `auth.users.id`，
