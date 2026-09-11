@@ -7662,8 +7662,32 @@ function hitTest(ev){
 /* 能不能出，交給既有那顆 DOM 按鈕判斷——規則只寫一次 */
 function btnFor(id){ return document.querySelector('#hand .card[data-card="' + id + '"]'); }
 
+/* 手指不是游標，它有寬度。射不中就在落點周圍再射一圈（±14px 八個方向），
+   而且出得掉的那張優先——在扇形裡每張只露出很窄一條，六個人的桌子鏡頭又拉得遠，
+   牌在畫面上更小，正中紅心的機率本來就低。 */
+const TAP_R = 14;
+const TAP_PTS = [[0,0],[0,-TAP_R],[0,TAP_R],[-TAP_R,0],[TAP_R,0],
+                 [-TAP_R,-TAP_R],[TAP_R,-TAP_R],[-TAP_R,TAP_R],[TAP_R,TAP_R]];
+function hitCard(ev){
+  let first = null;
+  for(const d of TAP_PTS){
+    const m = hitTest({clientX:ev.clientX + d[0], clientY:ev.clientY + d[1]});
+    if(!m) continue;
+    const id = m.userData.cardId;
+    if(first === null) first = id;
+    const b = btnFor(id);
+    if(b && !b.disabled) return id;
+  }
+  return first;
+}
+
+/* hover 是滑鼠的事，手指沒有——而且在觸控上它有害。
+   iOS 碰下去的同一瞬間會補一個 pointermove，那張牌就開始往上抬（.22 個世界單位，
+   接近牌高的三分之一）；手指放開時 pointerleave 又把它放下來。等補出來的 click
+   終於射線，牌早就從手指底下移開、而且還在動——射不中，點了完全沒反應。
+   所以觸控不進 hover，牌不動。 */
 CANVAS.addEventListener("pointermove", function(ev){
-  if(!S) return;
+  if(!S || ev.pointerType !== "mouse") return;
   const m = hitTest(ev);
   const b = m && btnFor(m.userData.cardId);
   const key = (b && !b.disabled) ? cardKey(m.userData.cardId) : null;
@@ -7673,11 +7697,18 @@ CANVAS.addEventListener("pointermove", function(ev){
 CANVAS.addEventListener("pointerleave", function(){
   if(S && S.hover){ S.hover = null; S.dirty = 3; }
 });
+/* 按下去的那一刻牌還在原地，先記下射中的是哪一張。click 是手指放開之後才補出來的，
+   那時候畫面可能已經不一樣了——以按下去那一下為準才是人的本意。 */
+let tapCard = null;
+CANVAS.addEventListener("pointerdown", function(ev){
+  tapCard = S ? hitCard(ev) : null;
+});
 CANVAS.addEventListener("click", function(ev){
   if(!S) return;
-  const m = hitTest(ev);
-  if(!m) return;
-  const b = btnFor(m.userData.cardId);
+  const id = tapCard || hitCard(ev);
+  tapCard = null;
+  if(!id) return;
+  const b = btnFor(id);
   if(b && !b.disabled){ S.hover = null; b.click(); }
 });
 
