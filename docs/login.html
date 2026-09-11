@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>登入 · 11 Up &amp; Down</title>
 <meta name="description" content="用 Google 登入，坐上 11 Up &amp; Down 的牌桌。">
-<meta name="theme-color" content="#16332c">
+<meta name="theme-color" content="#1e2126">
 <meta name="robots" content="noindex">
 <meta property="og:title" content="11 Up &amp; Down">
 <meta property="og:description" content="叫墩撲克。用 Google 登入就能上桌。">
@@ -15,10 +15,10 @@
 <style>
 /* ============================================================
    11 Up & Down — 登入頁
-   同一個深夜牌桌的世界：色票、字型、光暈、髮絲線都取自 docs/index.html 的 :root。
-   這一頁只有一件事可以做，所以整頁只有一顆不透明的控制項。
-   牌背是 DECKS.edwardian.back.art() 的靜態快照（見 .cardback 上方註解），
-   不是第二份牌面實作——這裡不需要會換牌面，也就不該把那套程式複製過來。
+   跟大廳同一個世界：石板灰（大廳那張空桌的色，trump 為 null 時 paintTable 給的
+   TABLE_NONE h250），字型、髮絲線、光暈都取自 docs/index.html 的 :root。
+   這一頁只有一件事可以做，所以整頁只有一顆不透明的控制項——那顆還得是
+   Google 規範的白底彩標，剛好就是唯一的高對比。
    ============================================================ */
 html,body{margin:0;padding:0}
 img{max-width:100%}
@@ -27,9 +27,9 @@ img{max-width:100%}
 :root{
   color-scheme:dark;
 
-  --felt:      oklch(.245 .042 168);
-  --felt-deep: oklch(.165 .034 168);
-  --glow:      oklch(.375 .058 168);
+  --felt:      oklch(.285 .0098 250);
+  --felt-deep: oklch(.197 .0078 250);
+  --glow:      oklch(.400 .0137 250);
 
   --ink:    oklch(.965 .014 92);
   --ink-2:  oklch(.805 .017 92);
@@ -40,29 +40,27 @@ img{max-width:100%}
 
   --brass:     oklch(.845 .128 84);
   --brass-soft:oklch(.845 .128 84 / .16);
-  --bad:       oklch(.735 .135 32);
-
-  --glass:      oklch(.98 .012 92 / .085);
-  --glass-edge: oklch(1 0 0 / .20);
-
-  --sh-2: 0 2px 5px rgba(0,0,0,.38), 0 16px 38px rgba(0,0,0,.42);
+  --bad:  oklch(.735 .135 32);
 
   --e-out: cubic-bezier(.16,1,.3,1);
-}
 
+  /* 字標大小只有這一個旋鈕：桌機取 clamp 的上限，手機取中間那個 vw */
+  --mark: 290px;
+}
 *{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+h1{margin:0}
 
 body{
-  min-height:100dvh;
-  display:flex;flex-direction:column;
+  min-height:100dvh;display:flex;flex-direction:column;
   background:var(--felt-deep);
   color:var(--ink);
   font-family:"Archivo","Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
-  font-size:14px; line-height:1.5;
+  font-size:14px;line-height:1.5;
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
 }
-/* 牌桌那七層極淡光暈，一模一樣搬過來——開場就該是同一個房間 */
+/* 七層極淡光暈：跟牌桌同一張底，死平的深色才會呼吸 */
 body::before{
   content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
@@ -76,75 +74,47 @@ body::before{
     radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
 }
 ::selection{background:var(--brass-soft);color:var(--ink)}
-:focus-visible{outline:2px solid var(--brass);outline-offset:3px;border-radius:6px}
-h1{margin:0;text-wrap:balance}
-p{text-wrap:pretty}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px;border-radius:99px}
 
-/* ================= 版面 ================= */
 .gate{
-  flex:1 0 auto;
-  display:grid;
-  grid-template-columns:minmax(0,1fr);
-  align-content:center;
-  justify-items:center;
-  gap:38px;
-  padding:clamp(28px,6vw,64px) clamp(20px,5vw,56px);
-  padding-bottom:calc(clamp(28px,6vw,64px) + env(safe-area-inset-bottom));
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px clamp(18px,4vw,40px);
+  padding-bottom:calc(40px + env(safe-area-inset-bottom));
+  text-align:center;width:100%;
+  animation:in .5s var(--e-out) both;
 }
-@media (min-width:860px){
-  .gate{
-    grid-template-columns:minmax(0,1fr) auto;
-    align-items:center;
-    justify-items:start;
-    gap:clamp(48px,7vw,96px);
-    max-width:1120px;margin:0 auto;
-  }
-}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.gate{animation:none}}
 
-/* ================= 左：說詞 ================= */
-.pitch{max-width:34rem;width:100%}
-
-/* 局數階梯 1→11→1。牌桌頂列的同一個記號——這形狀本身就是規則 */
-.ladder{
-  display:flex;align-items:flex-end;gap:2px;height:22px;margin-bottom:20px;
+/* ---- 字標：「11」本身就是標誌 ---- */
+.lock{display:flex;flex-direction:column;align-items:center;margin-bottom:52px}
+.big{
+  font-family:"Bodoni Moda",Georgia,"Songti TC",serif;
+  font-weight:700;line-height:.78;letter-spacing:-.045em;
+  font-size:clamp(150px,27vw,var(--mark));
+  /* 由上往下微微收暗，數字才不是一塊死白 */
+  background:linear-gradient(170deg in oklab,var(--ink),oklch(.72 .014 92));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
 }
-.ladder i{
-  display:block;width:3px;border-radius:1px 1px 0 0;
-  height:var(--h);
-  background:var(--ink-3);opacity:.34;
-  transform-origin:bottom;
-}
-.ladder i.peak{background:var(--brass);opacity:1}
-
-h1{
+.name{display:flex;align-items:center;gap:26px;margin-top:10px}
+.name i{width:clamp(22px,5vw,54px);height:1px;background:var(--hair);display:block}
+.name span{
   font-family:"Bodoni Moda",Georgia,serif;
-  font-weight:700;
-  font-size:clamp(38px,7.2vw,60px);
-  letter-spacing:-.018em;line-height:1.02;
-  margin-bottom:14px;
-}
-.tag{
-  margin:0 0 30px;
-  color:var(--ink-2);
-  font-size:clamp(14.5px,1.7vw,16px);
-  line-height:1.62;
+  font-size:clamp(18px,2.6vw,30px);font-weight:600;
+  letter-spacing:.3em;text-indent:.3em;color:var(--ink-2);white-space:nowrap;
 }
 
-/* ---- 整頁唯一一顆不透明的東西 ---- */
+/* ---- 唯一的控制項。Google 的鈕照官方規範：白底、彩色 G、形狀不改 ---- */
 .gbtn{
-  display:inline-flex;align-items:center;gap:12px;
-  min-height:48px;padding:0 22px 0 20px;
-  border:0;border-radius:99px;
-  background:#FFFFFF;color:#1F1F1F;
-  font:inherit;font-size:15px;font-weight:600;letter-spacing:.005em;
-  cursor:pointer;
-  box-shadow:var(--sh-2);
-  transition:transform .16s var(--e-out), box-shadow .16s var(--e-out), background-color .16s;
+  display:inline-flex;align-items:center;justify-content:center;gap:12px;
+  padding:0 26px;height:50px;border-radius:99px;
+  background:#FFFFFF;color:#1F1F1F;font-size:15px;font-weight:500;letter-spacing:.01em;
+  box-shadow:0 1px 2px rgba(0,0,0,.34),0 12px 34px rgba(0,0,0,.34);
+  transition:transform .18s var(--e-out),box-shadow .22s,background .18s;
 }
-.gbtn:hover{background:#F1F1F1}
-.gbtn:active{transform:scale(.96)}
+.gbtn:hover:not(:disabled){background:#F4F4F4;box-shadow:0 1px 2px rgba(0,0,0,.34),0 16px 44px rgba(0,0,0,.42)}
+.gbtn:active:not(:disabled){transform:scale(.985)}
 .gbtn:disabled{cursor:default;background:#E6E4DE;color:#6B6863;box-shadow:none}
-.gbtn:disabled:active{transform:none}
 .gbtn svg{width:19px;height:19px;flex:none}
 .gbtn .spin{
   width:17px;height:17px;flex:none;border-radius:99px;
@@ -154,180 +124,43 @@ h1{
 @keyframes spin{to{transform:rotate(360deg)}}
 
 .err{
-  margin:16px 0 0;padding:11px 0;
+  margin:26px 0 0;padding:11px 0;max-width:44ch;
   border-top:1px solid oklch(.735 .135 32 / .3);
   border-bottom:1px solid oklch(.735 .135 32 / .3);
   font-size:12.5px;color:var(--ink-2);
 }
 .err b{color:var(--bad);font-weight:600}
 
-/* ---- 為什麼要登入。用線分隔，不用面 ---- */
-.why{
-  list-style:none;margin:34px 0 0;padding:0;
-  border-top:1px solid var(--hair-2);
-}
-.why li{
-  display:grid;grid-template-columns:4.6em 1fr;gap:14px;align-items:baseline;
-  padding:13px 0;
-  border-bottom:1px solid var(--hair-2);
-  font-size:13px;color:var(--ink-3);line-height:1.6;
-}
-.why .k{
-  font-size:10px;letter-spacing:.15em;text-transform:uppercase;
-  color:var(--brass);white-space:nowrap;
-  padding-top:2px;
-}
-.why b{color:var(--ink-2);font-weight:600}
-
-.fine{
-  margin:20px 0 0;
-  font-size:11.5px;color:var(--ink-3);opacity:.82;line-height:1.65;
-}
-.fine a{color:var(--ink-2)}
-
-/* ================= 右：牌 ================= */
-.stage{
-  margin:0;
-  order:-1;                      /* 手機：先看到牌，再看到字 */
-  --cw:clamp(126px,34vw,244px);
-  width:calc(var(--cw) * 1.5);
-  height:calc(var(--cw) * 1.4 * 1.16);
-  position:relative;
-  justify-self:center;
-  flex:none;
-}
-.stage .slot{
-  position:absolute;
-  top:50%;left:50%;
-  width:var(--cw);height:calc(var(--cw) * 1.4);
-  margin:calc(var(--cw) * -.7) 0 0 calc(var(--cw) * -.5);
-  border-radius:calc(var(--cw) * .058);
-  filter:drop-shadow(0 2px 5px rgba(0,0,0,.38)) drop-shadow(0 18px 40px rgba(0,0,0,.46));
-  animation:deal .62s var(--e-out) both;
-}
-/* 三張，不是一張——牌庫，不是一張海報。底下兩張只露出邊 */
-.stage .s1{transform:rotate(-8.5deg) translate(-13%,2%);   opacity:.72; animation-delay:.02s}
-.stage .s2{transform:rotate(5.5deg)  translate(11%,-1.5%); opacity:.86; animation-delay:.10s}
-.stage .s3{transform:rotate(-1.6deg);                       animation-delay:.18s}
-.stage svg{display:block;width:100%;height:100%}
-@keyframes deal{
-  from{opacity:0;transform:translateY(22px) rotate(0deg) scale(.965)}
-}
-/* 到位之後底下兩張要回到自己的角度，所以進場動畫只給最上面那張走完整條；
-   另外兩張用各自的 keyframes，才不會被 transform 覆蓋掉旋轉 */
-.stage .s1{animation-name:deal1}
-.stage .s2{animation-name:deal2}
-@keyframes deal1{
-  from{opacity:0;transform:translateY(22px) rotate(0deg) scale(.965)}
-  to  {opacity:.72;transform:rotate(-8.5deg) translate(-13%,2%)}
-}
-@keyframes deal2{
-  from{opacity:0;transform:translateY(22px) rotate(0deg) scale(.965)}
-  to  {opacity:.86;transform:rotate(5.5deg) translate(11%,-1.5%)}
-}
-/* 桌機牌回到右欄。媒體查詢不加權重，所以這條必須排在 .stage 的 order:-1 之後 */
-@media (min-width:860px){
-  .stage{order:0;--cw:clamp(168px,19vw,244px)}
-}
-
-footer{
-  padding:0 clamp(20px,5vw,56px) calc(24px + env(safe-area-inset-bottom));
-  font-size:11.5px;color:var(--ink-3);opacity:.7;
-  text-align:center;
-}
-
-@media (prefers-reduced-motion:reduce){
-  .stage .slot{animation:none;opacity:1}
-  .stage .s1{opacity:.72}
-  .stage .s2{opacity:.86}
-  .gbtn{transition:background-color .16s}
-  .gbtn:active{transform:none}
-  .gbtn .spin{animation:none;border-top-color:rgba(31,31,31,.22)}
+@media (max-width:760px){
+  .lock{margin-bottom:40px}
+  .name{gap:13px}
 }
 </style>
 </head>
 <body>
-
 <main class="gate">
-  <div class="pitch">
-    <!-- 1→11→1：牌桌頂列那道階梯，21 局的形狀 -->
-    <div class="ladder" id="ladder" aria-hidden="true"></div>
 
-    <h1>11 Up &amp; Down</h1>
-    <p class="tag">叫墩撲克。手牌從每人 1 張爬到 11 張，再降回 1 張，共 21 局。<br>用 Google 登入，坐上牌桌。</p>
-
-    <button class="gbtn" id="go">
-      <span class="spin" id="goSpin" hidden></span>
-      <svg viewBox="0 0 48 48" id="goMark" aria-hidden="true" focusable="false">
-        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-      </svg>
-      <span id="goLabel">使用 Google 帳號登入</span>
-    </button>
-
-    <p class="err" id="err" hidden></p>
-
-    <ul class="why">
-      <li><span class="k">座位牌</span><span><b>名字跟頭像自動帶入。</b>桌上那張座位牌就是你，不用再打一次名字。</span></li>
-      <li><span class="k">跨裝置</span><span><b>換手機開還是同一個人。</b>電腦上的位子接得回來，不會變成另一個新玩家。</span></li>
-      <li><span class="k">戰績</span><span><b>每一場都記著。</b>分數、叫中率、跟誰打的——不只看今晚。</span></li>
-    </ul>
-
-    <p class="fine">只會用到 Google 給的名字、頭像與 email。不會替你發文，也讀不到你的信。<br>
-      手牌在伺服器上發，只送到你自己的裝置——這件事跟登不登入無關，本來就是這樣。</p>
+  <div class="lock">
+    <h1 class="big">11</h1>
+    <div class="name"><i></i><span>UP &amp; DOWN</span><i></i></div>
   </div>
 
-  <!-- 牌背＝DECKS.edwardian.back.art() 的靜態快照（酒紅捲草、象牙雙框、四角花色）。
-       這裡用 inline SVG 而不是 data-URI，因為 inline 的才吃得到頁面字型，
-       「11」與 UP & DOWN 可以直接是 <text>，不必像牌桌上那樣再疊一層偽元素。 -->
-  <figure class="stage" aria-hidden="true">
-    <div class="slot s1"><svg viewBox="0 0 100 140"><use href="#cardback"/></svg></div>
-    <div class="slot s2"><svg viewBox="0 0 100 140"><use href="#cardback"/></svg></div>
-    <div class="slot s3"><svg viewBox="0 0 100 140"><use href="#cardback"/></svg></div>
-  </figure>
+  <button class="gbtn" id="go">
+    <span class="spin" id="goSpin" hidden></span>
+    <svg viewBox="0 0 48 48" id="goMark" aria-hidden="true" focusable="false">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+    </svg>
+    <span id="goLabel">使用 Google 帳號登入</span>
+  </button>
+
+  <p class="err" id="err" hidden></p>
+
 </main>
-
-<footer>牌局伺服器在 Supabase 上 · 手牌那張表一條讀取 policy 都沒有</footer>
-
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-  <defs>
-    <g id="cardback">
-      <defs><pattern id="bp" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 2q2-3 4 0t4 0M0 6q2 3 4 0t4 0" fill="none" stroke="#EFE6CF" stroke-width=".4" opacity=".3"/></pattern></defs>
-      <rect width="100" height="140" rx="5.8" fill="#EFE6CF"/>
-      <rect x="4" y="4" width="92" height="132" rx="3" fill="#6E2029"/>
-      <rect x="4" y="4" width="92" height="132" rx="3" fill="url(#bp)"/>
-      <rect x="6.2" y="6.2" width="87.6" height="127.6" rx="2.2" fill="none" stroke="#EFE6CF" stroke-width=".55" opacity=".8"/>
-      <rect x="8" y="8" width="84" height="124" rx="1.6" fill="none" stroke="#C4A15A" stroke-width=".3" opacity=".8"/>
-      <g transform="rotate(45 50 70)"><rect x="34" y="54" width="32" height="32" fill="#6E2029" stroke="#EFE6CF" stroke-width=".8"/>
-      <rect x="36.6" y="56.6" width="26.8" height="26.8" fill="none" stroke="#C4A15A" stroke-width=".4"/></g>
-      <g transform="translate(16 16.5) rotate(0) scale(0.34) translate(-12 -12)"><path d="M12 1.5C10.1 4.3 2.5 9.4 2.5 14.5c0 2.9 2.05 4.9 4.55 4.9 1.75 0 3.1-.95 3.9-2.35.1 2.75-.75 4.55-2.55 5.45h7.2c-1.8-.9-2.65-2.7-2.55-5.45.8 1.4 2.15 2.35 3.9 2.35 2.5 0 4.55-2 4.55-4.9C21.5 9.4 13.9 4.3 12 1.5z" fill="#EFE6CF" opacity=".85"/></g>
-      <g transform="translate(84 16.5) rotate(0) scale(0.34) translate(-12 -12)"><path d="M12 21.6C11.1 20.9 2.4 15 2.4 8.8 2.4 5.4 4.8 3 7.7 3c1.9 0 3.5 1.1 4.3 2.7C12.8 4.1 14.4 3 16.3 3c2.9 0 5.3 2.4 5.3 5.8 0 6.2-8.7 12.1-9.6 12.8z" fill="#EFE6CF" opacity=".85"/></g>
-      <g transform="translate(16 123.5) rotate(180) scale(0.34) translate(-12 -12)"><path d="M12 1.4c2.4 4.4 5.2 8 8.9 10.6-3.7 2.6-6.5 6.2-8.9 10.6-2.4-4.4-5.2-8-8.9-10.6C6.8 9.4 9.6 5.8 12 1.4z" fill="#EFE6CF" opacity=".85"/></g>
-      <g transform="translate(84 123.5) rotate(180) scale(0.34) translate(-12 -12)"><path d="M12 2.3a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM6.3 8.9a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM17.7 8.9a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM11 11.2c.35 3.4-.2 7.1-2.7 10.4h7.4c-2.5-3.3-3.05-7-2.7-10.4z" fill="#EFE6CF" opacity=".85"/></g>
-      <!-- 牌桌上這兩行是偽元素／canvas 疊的（外部字型進不了 data-URI SVG）；inline 就能直接寫 -->
-      <text x="49.68" y="77.5" text-anchor="middle" font-family="Bodoni Moda, Georgia, serif" font-weight="700"
-            font-size="21" letter-spacing="-.03em" fill="#EFE6CF">11</text>
-      <text x="50.42" y="104" text-anchor="middle" font-family="Archivo, sans-serif" font-weight="600"
-            font-size="4.2" letter-spacing=".2em" fill="#C4A15A">UP &amp; DOWN</text>
-    </g>
-  </defs>
-</svg>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 <script>
-/* 1→11→1，21 根。頂點那根是黃銅色 */
-(function(){
-  const l = document.getElementById("ladder");
-  const steps = [];
-  for(let i=1;i<=11;i++) steps.push(i);
-  for(let i=10;i>=1;i--) steps.push(i);
-  l.innerHTML = steps.map(function(n){
-    return '<i class="' + (n === 11 ? "peak" : "") + '" style="--h:' + (4 + n * 1.6).toFixed(1) + 'px"></i>';
-  }).join("");
-})();
-
 /* ================= 登入 ================= */
 const SB_URL = "https://psuchtzacdppdpltpglg.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBzdWNodHphY2RwcGRwbHRwZ2xnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NjA5MTEsImV4cCI6MjEwNDUzNjkxMX0.BOjc9PB7iieZsfE07ia18Y0o3VDwmOgDFTQheeN-ezc";
