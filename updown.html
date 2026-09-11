@@ -240,16 +240,26 @@ input{font:inherit}
 }
 .seat.is-active .seat-score{color:var(--brass)}
 .seat-row{display:flex;align-items:center;gap:11px}
-.won{
-  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
-  font-size:12.5px;color:var(--ink-3);white-space:nowrap;
+/* 叫了幾墩就幾顆點：贏一墩填實一顆。空心＝還欠、金色＝已經拿到、整排轉綠＝剛好、後面多出來的紅點＝超了 */
+.tally{display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:108px;flex:none}
+.tally u{
+  display:block;width:9px;height:9px;border-radius:50%;text-decoration:none;
+  box-shadow:inset 0 0 0 1.5px var(--ink-3);opacity:.55;
+  transition:background-color .3s var(--e-out), box-shadow .3s var(--e-out), opacity .3s var(--e-out);
 }
-.won b{font-size:17px;font-weight:500;color:var(--ink-2)}
-.won.hit b{color:var(--good)}
-.won.over b{color:var(--bad)}
+.tally u.got{background:var(--brass);box-shadow:none;opacity:1}
+.tally u.over{background:var(--bad);box-shadow:none;opacity:1}
+.tally.done u.got{background:var(--good)}
+/* 一句話的狀態：還差幾／剛好／超了 */
+.aword{
+  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11.5px;
+  color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums;
+}
+.aword.hit{color:var(--good)}
+.aword.bust{color:var(--bad)}
 
 /* 手上還剩幾張：細條，不寫數字 */
-.spread{display:flex;gap:2px;margin-left:auto;align-items:flex-end;height:16px}
+.spread{display:flex;gap:2px;margin-left:10px;align-items:flex-end;height:16px}
 .spread i{
   display:block;width:3px;height:16px;border-radius:1px;
   background:var(--ink-3);opacity:.42;
@@ -2329,8 +2339,6 @@ function seatHTML(i){
   const s = G.seats[i];
   const act = (G.phase === "bid" || G.phase === "play") && G.turn === i;
   const bid = G.bids[i];
-  const cls = bid === null || bid === undefined ? "" :
-    (G.won[i] === bid ? "hit" : G.won[i] > bid ? "over" : "");
   const online = MODE === "net" && s.kind === "human" && !!liveCids()[s.cid];
   const prev = SEEN.scores[i] === undefined ? (G.score[i]||0) : SEEN.scores[i];
   return '<div class="seat ' + (act ? "is-active" : "") + (i === mySeat() ? " is-me" : "") +
@@ -2340,11 +2348,27 @@ function seatHTML(i){
       seatLabel(i) + seatTag(i) + '</span>' +
       '<span class="seat-score" data-score="' + (G.score[i]||0) + '" data-from="' + prev + '">' +
       (G.score[i]||0) + '</span></div>' +
-    '<div class="seat-row">' + dieHTML(bid, i) +
-      '<span class="won ' + cls + '"><b>' + (G.won[i]||0) + '</b> / ' +
-      (bid === null || bid === undefined ? "—" : bid) + '</span>' +
+    '<div class="seat-row">' + dieHTML(bid, i) + bidPips(i) +
       '<span class="spread">' + Array.from({length:(G.hands[i]||[]).length}, () => "<i></i>").join("") +
     '</span></div></div>';
+}
+
+/* 叫了幾墩就幾顆點，贏一墩填實一顆——骰子說「他答應了幾」，點說「走到哪了」 */
+function bidPips(i){
+  const bid = G.bids[i], got = G.won[i] || 0;
+  if(bid === null || bid === undefined)
+    return '<span class="aword">' + (G.phase === "bid" ? "還沒叫" : "—") + '</span>';
+  const over = Math.max(0, got - bid), d = bid - got;
+  let h = "";
+  for(let k = 0; k < bid; k++) h += '<u class="' + (k < got ? "got" : "") + '"></u>';
+  for(let k = 0; k < over; k++) h += '<u class="over"></u>';
+  const word = bid === 0 && got === 0 ? "一墩都不要"
+             : over > 0 ? "超 " + over
+             : d > 0 ? "還差 " + d : "剛好";
+  const wcls = over > 0 ? " bust" : d === 0 ? " hit" : "";
+  return (bid || over ? '<span class="tally' + (d === 0 && !over ? " done" : "") + '" role="img" aria-label="叫 ' +
+           bid + ' 墩，已贏 ' + got + ' 墩">' + h + '</span>' : "") +
+         '<span class="aword' + wcls + '">' + word + '</span>';
 }
 
 /* 桌面顏色：王牌花色決定色相，局數階梯決定深度 */

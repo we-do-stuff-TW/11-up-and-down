@@ -316,27 +316,27 @@ body.is3d .av{width:16px;height:16px}
 }
 .seat.is-active .seat-score{color:var(--brass)}
 .seat-row{display:flex;align-items:center;gap:11px}
-.won{
-  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
-  font-size:12.5px;color:var(--ink-3);white-space:nowrap;
+/* 叫了幾墩就幾顆點：贏一墩填實一顆。點是「還差幾」的計數器，不是裝飾——
+   空心＝還欠、金色＝已經拿到、整排轉綠＝剛好、後面多出來的紅點＝超了 */
+.tally{display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:108px;flex:none}
+.tally u{
+  display:block;width:9px;height:9px;border-radius:50%;text-decoration:none;
+  box-shadow:inset 0 0 0 1.5px var(--ink-3);opacity:.55;
+  transition:background-color .3s var(--e-out), box-shadow .3s var(--e-out), opacity .3s var(--e-out);
 }
-.won b{font-size:17px;font-weight:500;color:var(--ink-2)}
-.won.hit b{color:var(--good)}
-.won.over b{color:var(--bad)}
-
-/* 叫中的軌跡：每局一格。綠＝叫中、紅＝沒中（矮一半，像扣掉的）、框起來的是這一局。
-   跟表頭的局數階梯、計分表格子裡的小點是同一套記號 */
-.trail{display:flex;flex-wrap:wrap;gap:2px;align-items:center;max-width:132px;min-height:6px}
-.trail i{display:block;width:4px;height:4px;border-radius:1px;background:var(--ink-3);opacity:.20}
-.trail i.hit{background:var(--good);opacity:.95}
-.trail i.miss{background:var(--bad);opacity:.62;height:2px}
-.trail i.now{background:none;box-shadow:inset 0 0 0 1px var(--brass);opacity:.9}
-.trail.dense{gap:1px}
-.trail.dense i{width:3px;height:3px}
-.trail.dense i.miss{height:2px}
+.tally u.got{background:var(--brass);box-shadow:none;opacity:1}
+.tally u.over{background:var(--bad);box-shadow:none;opacity:1}
+.tally.done u.got{background:var(--good)}
+/* 一句話的狀態：還差幾／剛好／超了 */
+.aword{
+  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11.5px;
+  color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums;
+}
+.aword.hit{color:var(--good)}
+.aword.bust{color:var(--bad)}
 
 /* 手上還剩幾張：細條，不寫數字 */
-.spread{display:flex;gap:2px;margin-left:auto;align-items:flex-end;height:16px}
+.spread{display:flex;gap:2px;margin-left:10px;align-items:flex-end;height:16px}
 .spread i{
   display:block;width:3px;height:16px;border-radius:1px;
   background:var(--ink-3);opacity:.42;
@@ -864,6 +864,11 @@ body.is3d .seat.is-active{
   box-shadow:inset 0 0 0 1px var(--glass-lip), 0 10px 30px rgba(0,0,0,.42);
 }
 body.is3d .seat .spread{display:none}   /* 剩幾張牌由桌上那疊牌背自己說 */
+/* 桌上那塊牌小一號：點與字跟著收，叫 8、9 墩時整排點才不會撐到畫面邊 */
+body.is3d .seat-row{gap:8px}
+body.is3d .tally{gap:3px;max-width:95px}
+body.is3d .tally u{width:8px;height:8px;box-shadow:inset 0 0 0 1.3px var(--ink-3)}
+body.is3d .aword{font-size:11px}
 
 /* 手牌：3D 負責畫，DOM 只留下按得到、也讀得到的那一層。
    透明但可對焦，位置貼著投影後的牌面，所以焦點框會框在正確的那張牌上。 */
@@ -3128,8 +3133,6 @@ function seatHTML(i){
   const s = G.seats[i];
   const act = (G.phase === "bid" || G.phase === "play") && G.turn === i;
   const bid = G.bids[i];
-  const cls = bid === null || bid === undefined ? "" :
-    (G.won[i] === bid ? "hit" : G.won[i] > bid ? "over" : "");
   const online = MODE === "net" && s.kind === "human" && !!liveCids()[s.cid];
   const prev = SEEN.scores[i] === undefined ? (G.score[i]||0) : SEEN.scores[i];
   return '<div class="seat ' + (act ? "is-active" : "") + (i === mySeat() ? " is-me" : "") +
@@ -3141,29 +3144,28 @@ function seatHTML(i){
       seatLabel(i) + seatTag(i) + '</span>' +
       '<span class="seat-score" data-score="' + (G.score[i]||0) + '" data-from="' + prev + '">' +
       (G.score[i]||0) + '</span></div>' +
-    '<div class="seat-row">' + dieHTML(bid, i) +
-      '<span class="won ' + cls + '"><b>' + (G.won[i]||0) + '</b> / ' +
-      (bid === null || bid === undefined ? "—" : bid) + '</span>' +
+    '<div class="seat-row">' + dieHTML(bid, i) + bidPips(i) +
       '<span class="spread">' + Array.from({length:handCount(i)}, () => "<i></i>").join("") +
-    '</span></div>' + trailHTML(i) + '</div>';
+    '</span></div></div>';
 }
-/* 叫中的軌跡：每局一格，綠＝叫中、紅＝沒中、框起來的是這一局。
-   分數只是個總數，這一排才看得出一個人今晚穩不穩——不看數字也讀得懂 */
-function trailHTML(i){
-  const log = G.log || [];
-  let hits = 0, h = "";
-  for(let r = 0; r < G.ladder.length; r++){
-    const row = log[r];
-    if(row){
-      const c = row.cells[i], hit = !!(c && c.hit);
-      if(hit) hits++;
-      h += '<i class="' + (hit ? "hit" : "miss") + '"></i>';
-    }else h += '<i class="' + (r === G.ri ? "now" : "") + '"></i>';
-  }
-  return '<span class="trail' + (G.ladder.length > 24 ? " dense" : "") + '" role="img" aria-label="' +
-    log.length + ' 局中叫中 ' + hits + ' 局">' + h + '</span>';
+/* 叫了幾墩就幾顆點，贏一墩填實一顆——骰子說「他答應了幾」，點說「走到哪了」。
+   點填滿＝剛好，再多贏的往後長出紅點。不必讀數字，數點就知道還差幾。 */
+function bidPips(i){
+  const bid = G.bids[i], got = G.won[i] || 0;
+  if(bid === null || bid === undefined)
+    return '<span class="aword">' + (G.phase === "bid" ? "還沒叫" : "—") + '</span>';
+  const over = Math.max(0, got - bid), d = bid - got;
+  let h = "";
+  for(let k = 0; k < bid; k++) h += '<u class="' + (k < got ? "got" : "") + '"></u>';
+  for(let k = 0; k < over; k++) h += '<u class="over"></u>';
+  const word = bid === 0 && got === 0 ? "一墩都不要"
+             : over > 0 ? "超 " + over
+             : d > 0 ? "還差 " + d : "剛好";
+  const wcls = over > 0 ? " bust" : d === 0 ? " hit" : "";
+  return (bid || over ? '<span class="tally' + (d === 0 && !over ? " done" : "") + '" role="img" aria-label="叫 ' +
+           bid + ' 墩，已贏 ' + got + ' 墩">' + h + '</span>' : "") +
+         '<span class="aword' + wcls + '">' + word + '</span>';
 }
-
 /* 桌面顏色：王牌花色決定色相，局數階梯決定深度 */
 const TABLE_HUE = [{h:168,c:.042},{h:20,c:.055},{h:20,c:.055},{h:168,c:.042}];
 const TABLE_NONE = {h:250,c:.014};
