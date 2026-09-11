@@ -4751,10 +4751,19 @@ function onRulePick(el, k, v){
   if(el.closest("#setupOv")){ draft[k] = ruleCast(k, v); paintSetup(); return; }
   if(MODE === "net" && NET.code && amHost() && G && G.phase === "lobby"){
     const cfg = Object.assign(rules(G.cfg), {[k]:ruleCast(k, v)});
+    const was = G.cfg;
     /* 先在本機改：規則是房主自己按的，等伺服器繞一圈回來才動會慢半拍。
        送出去的那份才是真的，applyRow 回來會原封覆蓋。 */
-    G.cfg = cfg; paintRoom();
-    api("cfg", {code:NET.code, cfg:cfg});
+    roomErr = ""; G.cfg = cfg; paintRoom();
+    api("cfg", {code:NET.code, cfg:cfg}).then(function(d){
+      /* 伺服器不收（房主被接走、斷線）：退回原本那份。不退的話面板會一直顯示
+         一條根本沒生效的規則，要等下一列進來才回正。G 被 applyRow 換掉就不用管了。 */
+      if(!d && G && G.cfg === cfg){
+        G.cfg = was;
+        roomErr = NET.err || "這一桌的規則改不動，再試一次";
+        paintRoom();
+      }
+    });
   }
 }
 
