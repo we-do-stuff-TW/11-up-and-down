@@ -1358,7 +1358,12 @@ body.is3d .status{
   position:absolute;left:50%;translate:-50% 0;bottom:var(--status-b,25%);
   z-index:3;width:min(92%,720px);pointer-events:none;
 }
-body.is3d .status > *{pointer-events:auto}
+/* 只有真的按得下去的東西才吃點擊。狀態列刻意壓在手牌上緣（placeOverlays 的 h-top-24），
+   讓整排子元素都吃點擊的話，那行字就是一塊看不見的擋板：點在它底下的牌沒反應，
+   而牌是 WebGL 畫的，照樣亮著——「牌是亮的、點了沒反應」就是這樣來的。
+   人一多鏡頭往後拉，牌變小，那行字蓋掉的比例更大。 */
+body.is3d .status button,
+body.is3d .status .pill{pointer-events:auto}
 body.is3d .status .msg,
 body.is3d .status .hint{text-shadow:0 2px 10px rgba(0,0,0,.6)}
 body.is3d .bidrow .pill,
