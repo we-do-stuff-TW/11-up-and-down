@@ -4446,6 +4446,26 @@ function renderHand(me){
   const mine = G.phase === "play" && G.turn === me;
   const ok = {};
   if(mine) for(const c of legalCards(hand, G.led)) ok[c.id] = 1;
+
+  /* 只有「手上剩哪幾張」變了才重建 DOM；能不能出只改既有那幾顆按鈕。
+     為什麼這件事這麼要緊：click 是「按下與放開落在同一個元素」才產生的事件。
+     連線模式每收到一列狀態就 render 一次（六個人光是心跳就每秒好幾列），
+     只要在你按下去跟放開之間重寫一次 innerHTML，你按的那顆按鈕就不存在了，
+     click 根本不會產生——牌還是亮的、狀態列還寫著「輪到你出牌」，點下去卻完全
+     沒反應，而且要狂點才偶爾中一次（剛好那一下中間沒有重畫）。
+     人越多列來得越密，中的機率越低，所以六個人比四個人難打得多。 */
+  const keys = hand.map(c => c.id).join(",");
+  if(el.__keys === keys && el.querySelector("[data-card]")){
+    for(const c of hand){
+      const b = el.querySelector('[data-card="' + c.id + '"]');
+      if(!b) continue;
+      b.disabled = !mine || !ok[c.id];
+      b.classList.toggle("legal", !!(mine && ok[c.id]));
+    }
+    el.__h = null;          /* DOM 已經不對應任何一份快取字串了 */
+    return false;
+  }
+  el.__keys = keys;
   return setHTML(el, hand.map(c => cardHTML(c, {
     button:true, disabled: !mine || !ok[c.id],
     trumpMark: c.s === G.trump
@@ -4859,7 +4879,28 @@ document.addEventListener("input", function(e){
     pushName();
   }
 });
+/* 保險絲：按下去的那一刻就記住按在哪一張牌上。
+   為什麼需要它：按下與放開之間只要那顆按鈕被換掉，瀏覽器就**完全不發 click**
+   ——實測放開時只剩 mouseup 打在 #hand 上，click 一個都沒有。所以這條退路不能掛在
+   click 上，要掛在 pointerup。按鈕還在的話就什麼都不做，讓 click 照原本的路走。 */
+let downCard = null;
+document.addEventListener("pointerdown", function(e){
+  const c = e.target.closest && e.target.closest("[data-card]");
+  downCard = (c && !c.disabled)
+    ? {id:c.dataset.card, x:e.clientX, y:e.clientY, t:Date.now()} : null;
+}, true);
+document.addEventListener("pointerup", function(e){
+  const d = downCard;
+  if(!d) return;
+  if(e.target.closest && e.target.closest("[data-card]")) return;   /* 按鈕還在＝click 會照常來 */
+  downCard = null;
+  if(Date.now() - d.t > 1200) return;                               /* 按太久：當成猶豫，不算 */
+  if(Math.abs(e.clientX - d.x) > 14 || Math.abs(e.clientY - d.y) > 14) return;  /* 手指移開了 */
+  doPlay(d.id, document.querySelector('#hand .card[data-card="' + d.id + '"]'));
+}, true);
+
 document.addEventListener("click", function(e){
+  downCard = null;
   const bid = e.target.closest("[data-bid]");
   if(bid){ doBid(+bid.dataset.bid); return; }
   const card = e.target.closest("[data-card]");
