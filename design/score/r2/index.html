@@ -1,0 +1,34 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>計分表第二輪</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:opsz,wght@6..96,600&display=swap">
+<style>
+html,body{margin:0;background:#0c1714;color:#d8dedb;font:14px/1.6 "Archivo",-apple-system,"PingFang TC","Noto Sans TC",sans-serif}
+header{padding:30px 30px 18px;border-bottom:1px solid rgba(255,255,255,.1)}
+h1{margin:0;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:30px}
+header p{margin:8px 0 0;color:#8fa09a;max-width:66ch}
+.row{display:flex;gap:26px;padding:26px 30px;align-items:flex-start;overflow-x:auto}
+figure{margin:0;flex:none;width:440px}
+figcaption{padding:0 0 10px}figcaption b{font-size:15px}
+figcaption span{display:block;color:#8fa09a;font-size:12.5px;margin-top:4px}
+iframe{width:440px;height:760px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:#0e1c18}
+nav{padding:0 30px 34px;color:#8fa09a;font-size:13px}nav a{color:#d8ba7a;margin-right:16px}
+</style></head><body>
+<header>
+  <h1>計分表 · 第二輪</h1>
+  <p>以第一輪的 A（記分簿）為底，把每一格的「拿／叫」拿掉，只記得分失分。
+     欄寬省下來以後三案各自拿去做不同的事。同一場牌（4 人、第 14 局）；
+     十個人看 <code>?n=10</code>，手機寬看 <code>phone.html</code>。</p>
+</header>
+<div class="row">
+  <figure><figcaption><b>甲 · 帳本</b><span>只有數字。正負號已經說完叫中沒中，省下的欄寬全給字級。</span></figcaption>
+    <iframe src="a.html"></iframe></figure>
+  <figure><figcaption><b>乙 · 刻度</b><span>數字底下壓一條從中線長出的細條，得分往右、失分往左。</span></figcaption>
+    <iframe src="b.html"></iframe></figure>
+  <figure><figcaption><b>丙 · 累計</b><span>上排是那一局的增減，下排大字是打完那局的累計。看得到超車。</span></figcaption>
+    <iframe src="c.html"></iframe></figure>
+</div>
+<nav><a href="a.html">甲</a><a href="b.html">乙</a><a href="c.html">丙</a>
+<a href="phone.html">手機三案</a>
+<a href="a.html?n=10">甲 · 10 人</a><a href="b.html?n=10">乙 · 10 人</a><a href="c.html?n=10">丙 · 10 人</a></nav>
+</body></html>

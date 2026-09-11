@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>乙 · 刻度</title>
+<meta name="theme-color" content="#16332c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500&family=Libre+Baskerville:wght@700&display=swap">
+<style>
+/* 取自 docs/index.html 的 :root。計分表坐在**牌局中**的桌面上，不是大廳那張空桌——
+   所以這裡的 --felt 走 paintTable() 的有王牌版本：♠（h168 c.042）、第 13 局（hs=10、
+   peak=11 → d=.9）。算出來 L=.229 C=.0513，跟真的打到一半時看到的顏色一樣。 */
+html,body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --felt: oklch(.229 .0513 168); --felt-deep: oklch(.141 .0410 168); --glow: oklch(.344 .0718 168);
+  --ink: oklch(.965 .014 92); --ink-2: oklch(.805 .017 92); --ink-3: oklch(.700 .016 92);
+  --hair: oklch(.90 .02 92 / .155); --hair-2: oklch(.90 .02 92 / .075);
+  --brass: oklch(.845 .128 84); --brass-2: oklch(.760 .112 84); --brass-soft: oklch(.845 .128 84 / .16);
+  --good: oklch(.800 .125 156); --bad: oklch(.735 .135 32);
+  --glass: oklch(.98 .012 92 / .085); --glass-edge: oklch(1 0 0 / .20); --glass-lip: oklch(1 0 0 / .34);
+  --card:#F8F5EC; --card-2:#ECE5D2; --card-ink:#1A1714; --card-red:#A32B25;
+  --sh-1: 0 1px 2px rgba(0,0,0,.34), 0 6px 16px rgba(0,0,0,.30);
+  --sh-glass: 0 1px 1px rgba(0,0,0,.20), 0 10px 30px rgba(0,0,0,.34);
+  --e-out: cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+h1,h2,h3{margin:0}
+p{margin:0}
+body{
+  margin:0;min-height:100dvh;
+  background:var(--felt-deep);color:var(--ink);
+  font-family:"Archivo","Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.bodoni{font-family:"Bodoni Moda",Georgia,"Songti TC",serif}
+
+/* ── 展示台：左邊假裝是牌桌，右邊是真正要看的那一欄 ────────────
+   計分表在桌機是右欄、在手機是整頁浮層，所以原型兩種都擺得出來。 */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) var(--col,420px);min-height:100dvh}
+.stage.solo{grid-template-columns:minmax(0,1fr)}
+.faux{
+  position:relative;
+  background:
+    radial-gradient(circle at 20% 8%,  rgba(255,255,255,.05), transparent 9%),
+    radial-gradient(circle at 62% 34%, rgba(255,255,255,.042), transparent 15%),
+    radial-gradient(circle at 55% 90%, rgba(255,255,255,.06), transparent 18%),
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+  display:flex;align-items:center;justify-content:center;
+}
+.faux span{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:oklch(1 0 0/.14)}
+/* 手機：整頁浮層，底色跟桌面同一支漸層 */
+.phone .stage{grid-template-columns:minmax(0,1fr)}
+.phone .faux{display:none}
+body.phone{
+  background:
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+}
+.ledger{display:flex;flex-direction:column;min-height:0;height:100dvh;
+  border-left:1px solid var(--hair)}
+body.phone .ledger{border-left:none}
+.tsuit{width:11px;height:11px;fill:var(--ink-3);vertical-align:-1px}
+.tsuit.r{fill:var(--bad)}
+.notrump{font-size:10px;letter-spacing:.1em;color:var(--ink-3);opacity:.8}
+
+/* ── 三案共用的骨架 ────────────────────────────────────────────
+   都是「局為列、人為欄」的表，差別只在格子裡放什麼。
+   Francis 定案：格子不記「拿／叫」，只記得分失分——所以欄寬一下子夠用了，
+   十個人也不必把字縮到看不清。 */
+.hd{display:flex;align-items:baseline;gap:10px;padding:17px 18px 11px}
+.hd h2{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.hd .of{margin-left:auto;font-size:11px;color:var(--ink-3)}
+
+.scroll{overflow:auto;flex:1;min-height:0;padding:0 12px 18px}
+table.sc{border-collapse:collapse;width:100%;table-layout:fixed;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+table.sc col.gut{width:66px}
+table.sc thead th{
+  position:sticky;top:0;z-index:2;background:var(--felt-deep);
+  /* border-collapse 的邊框不跟著 sticky 走（會留在表格原本的位置），用 inset 陰影畫這條線 */
+  box-shadow:inset 0 -1px 0 var(--hair);
+  padding:6px 7px 13px;text-align:right;white-space:nowrap;
+}
+table.sc thead th .nm{
+  display:block;font-family:"Archivo",sans-serif;font-size:10.5px;font-weight:500;
+  letter-spacing:.06em;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;
+}
+table.sc thead th.me .nm{color:var(--ink)}
+table.sc thead th.gut{text-align:left}
+table.sc thead th.gut .nm{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase}
+
+/* 局數那一欄：張數、王牌，底下一條長度＝張數的細線。整疊看下來就是 1→11→1 */
+table.sc tbody td{position:relative;border-bottom:1px solid var(--hair-2)}
+/* 各案都會寫 table.sc td{text-align:right}，特異性比 td.gut 高，所以這裡要寫得一樣長 */
+table.sc td.gut{text-align:left;padding-left:10px;color:var(--ink-3)}
+td.gut .sz{position:relative;font-size:14px;color:var(--ink-2)}
+td.gut .tsuit{position:relative;margin-left:7px;width:12px;height:12px}
+td.gut .notrump{position:relative;margin-left:6px}
+.szbar{position:absolute;left:10px;bottom:7px;height:2px;width:var(--w);
+  border-radius:1px;background:oklch(.90 .02 92 / .22)}
+
+/* 進行中的那一局：還沒有分數可記，只標「你在這裡」 */
+tr.now td{background:oklch(.98 .012 92 / .045)}
+tr.now td.gut::after{content:"";position:absolute;left:0;top:19%;bottom:19%;width:2px;
+  border-radius:1px;background:var(--brass);z-index:1}
+tr.now td.gut .sz{color:var(--brass)}
+tr.now td.gut .szbar{background:var(--brass);opacity:.5}
+tr.ahead td.gut{color:oklch(.700 .016 92 / .4)}
+tr.ahead .szbar{opacity:.45}
+.dot{color:oklch(.700 .016 92 / .45)}
+
+.ft{display:flex;align-items:baseline;gap:10px;padding:11px 18px 14px;
+  border-top:1px solid var(--hair);font-size:11.5px;color:var(--ink-3)}
+.ft b{color:var(--ink-2);font-weight:500}
+.ft .r{margin-left:auto;font-family:"IBM Plex Mono",monospace}
+
+/* TITLE: 乙 · 刻度 */
+/* ── 乙案：刻度 ────────────────────────────────────────────────
+   骨架跟甲一樣，但每個數字底下多一條軌：中線是零，得分往右長、失分往左長，
+   長度＝分數。數字照樣讀得到，整片看下來又多一層地形——
+   「哪幾局是大局」「誰在哪一局垮掉」不必逐格讀數字。
+   條放在數字**底下**不是背後：壓在字上會兩邊都看不清。 */
+table.sc thead th .tot{
+  display:block;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;
+  font-size:32px;line-height:1.05;letter-spacing:-.015em;color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+table.sc thead th .tot.lead{color:var(--brass)}
+
+table.sc td{padding:0 7px;height:44px;text-align:center;white-space:nowrap}
+.cell{display:block}
+.p{display:block;font-size:16.5px;line-height:1.25;color:var(--ink-2);letter-spacing:-.01em}
+.p.neg{color:var(--bad)}
+/* 軌：整欄看下來是同一條中線，所以不必畫滿，只在有分數的那幾格點一下 */
+.tk{position:relative;display:block;height:5px;margin-top:5px}
+.tk::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;
+  background:oklch(.90 .02 92 / .16)}
+.bar{position:absolute;top:0;height:5px;border-radius:2.5px;width:var(--w)}
+.bar.pos{left:50%;background:oklch(.800 .125 156 / .55)}
+.bar.neg{right:50%;background:oklch(.735 .135 32 / .62)}
+
+.tight table.sc td{padding:0 4px;height:40px}
+.tight .p{font-size:14px}
+.tight .tk{height:4px;margin-top:4px}
+.tight .bar{height:4px}
+.tight table.sc thead th{padding:6px 4px 11px}
+.tight table.sc thead th .tot{font-size:24px}
+.tighter table.sc td{padding:0 2px;height:37px}
+.tighter .p{font-size:12.5px}
+.tighter table.sc thead th{padding:6px 3px 10px}
+.tighter table.sc thead th .tot{font-size:19px}
+.tighter table.sc thead th .nm{font-size:9.5px;letter-spacing:0}
+.tighter table.sc col.gut{width:54px}
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<path id="ps" d="M12 1.5C10.1 4.3 2.5 9.4 2.5 14.5c0 2.9 2.05 4.9 4.55 4.9 1.75 0 3.1-.95 3.9-2.35.1 2.75-.75 4.55-2.55 5.45h7.2c-1.8-.9-2.65-2.7-2.55-5.45.8 1.4 2.15 2.35 3.9 2.35 2.5 0 4.55-2 4.55-4.9C21.5 9.4 13.9 4.3 12 1.5z"/>
+<path id="ph" d="M12 21.6C11.1 20.9 2.4 15 2.4 8.8 2.4 5.4 4.8 3 7.7 3c1.9 0 3.5 1.1 4.3 2.7C12.8 4.1 14.4 3 16.3 3c2.9 0 5.3 2.4 5.3 5.8 0 6.2-8.7 12.1-9.6 12.8z"/>
+<path id="pd" d="M12 1.4c2.4 4.4 5.2 8 8.9 10.6-3.7 2.6-6.5 6.2-8.9 10.6-2.4-4.4-5.2-8-8.9-10.6C6.8 9.4 9.6 5.8 12 1.4z"/>
+<path id="pc" d="M12 2.3a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM6.3 8.9a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM17.7 8.9a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM11 11.2c.35 3.4-.2 7.1-2.7 10.4h7.4c-2.5-3.3-3.05-7-2.7-10.4z"/>
+</defs>
+</svg>
+
+<div class="stage" id="stage">
+  <div class="faux"><span>牌桌</span></div>
+  <aside class="ledger">
+    <header class="hd"><h2>計分表</h2><span class="of mono" id="of"></span></header>
+    <div class="scroll" id="scroll"><table class="sc" id="sc"></table></div>
+    <footer class="ft" id="ft"></footer>
+  </aside>
+</div>
+
+<script>
+/* ── 假資料，但規則是真的 ─────────────────────────────────────
+   計分公式抄 docs/index.html 的 roundPoints()（預設規則：叫中 10+叫、叫 0 得 5、
+   沒中 −|差|）。每一局所有人「拿到的墩數」加起來一定等於那一局的張數——
+   照著真的牌局長，看起來才不會像亂數。種子固定，三案看到的是同一場牌。 */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+function ladderOf(peak){
+  const L=[]; for(let i=1;i<=peak;i++)L.push(i); for(let i=peak-1;i>=1;i--)L.push(i); return L;
+}
+function roundPoints(bid,got){
+  if(bid===got) return bid===0?5:10+bid;
+  return -Math.abs(got-bid);
+}
+/* n 個人、第 ri 局（size 張）：先把 size 墩分掉，再讓每個人的叫墩在自己拿到的附近晃 */
+function makeGame(names,peak,now,seed){
+  const n=names.length, rnd=mulberry32(seed||7), ladder=ladderOf(peak);
+  const log=[], score=names.map(()=>0);
+  ladder.forEach(function(size,ri){
+    const got=new Array(n).fill(0);
+    for(let t=0;t<size;t++) got[Math.floor(rnd()*n)]++;
+    const cells=[];
+    for(let k=0;k<n;k++){
+      let bid=got[k];
+      const r=rnd();
+      if(r<0.34) bid=Math.max(0,Math.min(size,got[k]+(rnd()<0.5?-1:1)));
+      else if(r<0.40) bid=Math.max(0,Math.min(size,got[k]+(rnd()<0.5?-2:2)));
+      const pts=roundPoints(bid,got[k]);
+      cells.push({bid:bid,got:got[k],pts:pts,hit:bid===got[k]});
+    }
+    log.push({size:size,trump:Math.floor(rnd()*5)===4?null:Math.floor(rnd()*4),cells:cells});
+  });
+  /* now 之前是打完的，now 這局只有叫墩跟「目前拿到幾墩」，之後是空的 */
+  const done=log.slice(0,now);
+  done.forEach(r=>r.cells.forEach((c,k)=>score[k]+=c.pts));
+  const cur=log[now], part=cur.cells.map(c=>Math.max(0,c.got-1-Math.floor(rnd()*2)));
+  return {
+    names:names, n:n, ladder:ladder, now:now, size:cur.size, trump:cur.trump,
+    log:done,                       /* 已經打完的局 */
+    bids:cur.cells.map(c=>c.bid),   /* 這一局叫了幾 */
+    won:part,                       /* 這一局目前拿到幾 */
+    score:score,
+    deckSize:64, decks:2
+  };
+}
+const PIPS=["ps","ph","pd","pc"];
+function pip(s,cls){
+  if(s===null||s===undefined) return '<span class="notrump">無王</span>';
+  return '<svg class="'+(cls||"tsuit")+(s===1||s===2?" r":"")+'" viewBox="0 0 24 24"><use href="#'+PIPS[s]+'"/></svg>';
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sgn=p=>(p>=0?"+":"−")+Math.abs(p);
+
+/* 預設展示的那一桌：4 個人、打到第 14 局（階梯 1→11→1 的第 14 格＝9 張） */
+const G4=makeGame(["Francis","阿哲","Mei","老王"],11,13,20260911);
+/* 十個人那桌：欄位最擠的極端，三案都要撐得住 */
+const G10=makeGame(["Francis","阿哲","Mei","老王","Ken","小圓","Ray","阿美","Jo","大頭"],6,7,4242);
+function pickGame(){
+  const q=new URLSearchParams(location.search);
+  return q.get("n")==="10"?G10:G4;
+}
+
+const G = pickGame();
+if (new URLSearchParams(location.search).get("v") === "phone") document.body.classList.add("phone");
+if (G.n >= 7) document.body.classList.add("tight");
+if (G.n >= 9) document.body.classList.add("tighter");
+
+const MAXSIZE = Math.max.apply(null, G.ladder);
+const MAXABS = Math.max.apply(null, G.log.length
+  ? [].concat.apply([], G.log.map(r => r.cells.map(c => Math.abs(c.pts)))) : [1]);
+/* 打完第 ri 局的時候，每個人累計幾分 */
+const RUN = (function(){
+  const out = [], acc = G.names.map(() => 0);
+  G.log.forEach(function(row){ row.cells.forEach(function(c, k){ acc[k] += c.pts; }); out.push(acc.slice()); });
+  return out;
+})();
+function gut(size, ri, now){
+  const row = G.log[ri];
+  return '<td class="gut"><span class="szbar" style="--w:' + (6 + Math.round(size / MAXSIZE * 30)) + 'px"></span>' +
+    '<span class="sz">' + size + '</span>' +
+    (row ? pip(row.trump) : now ? pip(G.trump) : '') + '</td>';
+}
+function chrome(){
+  document.getElementById("of").textContent = G.decks + " 副 · " + G.deckSize + " 張 · " + G.n + " 人";
+  document.getElementById("ft").innerHTML =
+    '<span>第 <b>' + (G.now + 1) + '</b> 局 · 每人 <b>' + G.size + '</b> 張</span>' +
+    '<span class="r">' + (G.now + 1) + " / " + G.ladder.length + '</span>';
+  const tr = document.querySelector("tr.now"), box = document.getElementById("scroll");
+  if (tr) { const a = tr.getBoundingClientRect(), b = box.getBoundingClientRect();
+            box.scrollTop += (a.top - b.top) - (b.height - a.height) / 2; }
+}
+
+
+const hiScore = Math.max.apply(null, G.score);   /* 別叫 top：全域已經有 window.top，const 同名會 SyntaxError */
+let h = '<colgroup><col class="gut"><col span="' + G.n + '"></colgroup><thead><tr>' +
+  '<th class="gut"><span class="nm">局</span></th>';
+G.names.forEach(function(nm, i){
+  h += '<th' + (i === 0 ? ' class="me"' : '') + '><span class="nm">' + esc(nm) + '</span>' +
+    '<span class="tot' + (G.score[i] === hiScore ? " lead" : "") + '">' + G.score[i] + '</span></th>';
+});
+h += '</tr></thead><tbody>';
+
+G.ladder.forEach(function(size, ri){
+  const row = G.log[ri], now = ri === G.now;
+  h += '<tr class="' + (now ? "now" : row ? "" : "ahead") + '">' + gut(size, ri, now);
+  for (let k = 0; k < G.n; k++){
+    if (!row) h += '<td><span class="cell"><span class="p dot">·</span><span class="tk"></span></span></td>';
+    else{
+      const p = row.cells[k].pts;
+      /* 最長吃到半格的 92%，留一點邊，不然相鄰兩欄的條會黏在一起 */
+      const w = Math.max(5, Math.round(Math.abs(p) / MAXABS * 46)) + "%";
+      h += '<td><span class="cell">' +
+        '<span class="p' + (p < 0 ? " neg" : "") + '">' + sgn(p) + '</span>' +
+        '<span class="tk"><i class="bar ' + (p < 0 ? "neg" : "pos") + '" style="--w:' + w + '"></i></span>' +
+        '</span></td>';
+    }
+  }
+  h += '</tr>';
+});
+document.getElementById("sc").innerHTML = h + '</tbody>';
+chrome();
+
+</script>
+</body>
+</html>

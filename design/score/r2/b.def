@@ -1,0 +1,75 @@
+/* TITLE: 乙 · 刻度 */
+/* ── 乙案：刻度 ────────────────────────────────────────────────
+   骨架跟甲一樣，但每個數字底下多一條軌：中線是零，得分往右長、失分往左長，
+   長度＝分數。數字照樣讀得到，整片看下來又多一層地形——
+   「哪幾局是大局」「誰在哪一局垮掉」不必逐格讀數字。
+   條放在數字**底下**不是背後：壓在字上會兩邊都看不清。 */
+table.sc thead th .tot{
+  display:block;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;
+  font-size:32px;line-height:1.05;letter-spacing:-.015em;color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+table.sc thead th .tot.lead{color:var(--brass)}
+
+table.sc td{padding:0 7px;height:44px;text-align:center;white-space:nowrap}
+.cell{display:block}
+.p{display:block;font-size:16.5px;line-height:1.25;color:var(--ink-2);letter-spacing:-.01em}
+.p.neg{color:var(--bad)}
+/* 軌：整欄看下來是同一條中線，所以不必畫滿，只在有分數的那幾格點一下 */
+.tk{position:relative;display:block;height:5px;margin-top:5px}
+.tk::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;
+  background:oklch(.90 .02 92 / .16)}
+.bar{position:absolute;top:0;height:5px;border-radius:2.5px;width:var(--w)}
+.bar.pos{left:50%;background:oklch(.800 .125 156 / .55)}
+.bar.neg{right:50%;background:oklch(.735 .135 32 / .62)}
+
+.tight table.sc td{padding:0 4px;height:40px}
+.tight .p{font-size:14px}
+.tight .tk{height:4px;margin-top:4px}
+.tight .bar{height:4px}
+.tight table.sc thead th{padding:6px 4px 11px}
+.tight table.sc thead th .tot{font-size:24px}
+.tighter table.sc td{padding:0 2px;height:37px}
+.tighter .p{font-size:12.5px}
+.tighter table.sc thead th{padding:6px 3px 10px}
+.tighter table.sc thead th .tot{font-size:19px}
+.tighter table.sc thead th .nm{font-size:9.5px;letter-spacing:0}
+.tighter table.sc col.gut{width:54px}
+/*==HTML==*/
+<div class="stage" id="stage">
+  <div class="faux"><span>牌桌</span></div>
+  <aside class="ledger">
+    <header class="hd"><h2>計分表</h2><span class="of mono" id="of"></span></header>
+    <div class="scroll" id="scroll"><table class="sc" id="sc"></table></div>
+    <footer class="ft" id="ft"></footer>
+  </aside>
+</div>
+/*==JS==*/
+const hiScore = Math.max.apply(null, G.score);   /* 別叫 top：全域已經有 window.top，const 同名會 SyntaxError */
+let h = '<colgroup><col class="gut"><col span="' + G.n + '"></colgroup><thead><tr>' +
+  '<th class="gut"><span class="nm">局</span></th>';
+G.names.forEach(function(nm, i){
+  h += '<th' + (i === 0 ? ' class="me"' : '') + '><span class="nm">' + esc(nm) + '</span>' +
+    '<span class="tot' + (G.score[i] === hiScore ? " lead" : "") + '">' + G.score[i] + '</span></th>';
+});
+h += '</tr></thead><tbody>';
+
+G.ladder.forEach(function(size, ri){
+  const row = G.log[ri], now = ri === G.now;
+  h += '<tr class="' + (now ? "now" : row ? "" : "ahead") + '">' + gut(size, ri, now);
+  for (let k = 0; k < G.n; k++){
+    if (!row) h += '<td><span class="cell"><span class="p dot">·</span><span class="tk"></span></span></td>';
+    else{
+      const p = row.cells[k].pts;
+      /* 最長吃到半格的 92%，留一點邊，不然相鄰兩欄的條會黏在一起 */
+      const w = Math.max(5, Math.round(Math.abs(p) / MAXABS * 46)) + "%";
+      h += '<td><span class="cell">' +
+        '<span class="p' + (p < 0 ? " neg" : "") + '">' + sgn(p) + '</span>' +
+        '<span class="tk"><i class="bar ' + (p < 0 ? "neg" : "pos") + '" style="--w:' + w + '"></i></span>' +
+        '</span></td>';
+    }
+  }
+  h += '</tr>';
+});
+document.getElementById("sc").innerHTML = h + '</tbody>';
+chrome();

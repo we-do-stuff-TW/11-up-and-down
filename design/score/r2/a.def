@@ -1,0 +1,62 @@
+/* TITLE: 甲 · 帳本 */
+/* ── 甲案：帳本 ────────────────────────────────────────────────
+   最少的東西。格子裡只有一個數字，正的就是那一局叫中了、負的就是沒中——
+   正負號本身已經說完，所以不再另外標記號、也不再上綠色。
+   省下來的欄寬全部還給字級：格子 19px、總分 Bodoni 34px。 */
+table.sc thead th .tot{
+  display:block;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;
+  font-size:34px;line-height:1.05;letter-spacing:-.015em;color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+table.sc thead th .tot.lead{color:var(--brass)}
+
+table.sc td{padding:0 8px;height:41px;text-align:right;white-space:nowrap}
+.p{font-size:19px;color:var(--ink-2);letter-spacing:-.01em}
+.p.neg{color:var(--bad)}
+/* 這一局賺最多的那個人：只把數字提亮一階，不加底也不加框 */
+.p.best{color:var(--ink)}
+
+.tight table.sc td{padding:0 5px;height:37px}
+.tight .p{font-size:15.5px}
+.tight table.sc thead th{padding:6px 5px 11px}
+.tight table.sc thead th .tot{font-size:25px}
+.tighter table.sc td{padding:0 3px;height:34px}
+.tighter .p{font-size:13.5px}
+.tighter table.sc thead th{padding:6px 3px 10px}
+.tighter table.sc thead th .tot{font-size:19px}
+.tighter table.sc thead th .nm{font-size:9.5px;letter-spacing:0}
+.tighter table.sc col.gut{width:54px}
+/*==HTML==*/
+<div class="stage" id="stage">
+  <div class="faux"><span>牌桌</span></div>
+  <aside class="ledger">
+    <header class="hd"><h2>計分表</h2><span class="of mono" id="of"></span></header>
+    <div class="scroll" id="scroll"><table class="sc" id="sc"></table></div>
+    <footer class="ft" id="ft"></footer>
+  </aside>
+</div>
+/*==JS==*/
+const hiScore = Math.max.apply(null, G.score);   /* 別叫 top：全域已經有 window.top，const 同名會 SyntaxError */
+let h = '<colgroup><col class="gut"><col span="' + G.n + '"></colgroup><thead><tr>' +
+  '<th class="gut"><span class="nm">局</span></th>';
+G.names.forEach(function(nm, i){
+  h += '<th' + (i === 0 ? ' class="me"' : '') + '><span class="nm">' + esc(nm) + '</span>' +
+    '<span class="tot' + (G.score[i] === hiScore ? " lead" : "") + '">' + G.score[i] + '</span></th>';
+});
+h += '</tr></thead><tbody>';
+
+G.ladder.forEach(function(size, ri){
+  const row = G.log[ri], now = ri === G.now;
+  h += '<tr class="' + (now ? "now" : row ? "" : "ahead") + '">' + gut(size, ri, now);
+  const best = row ? Math.max.apply(null, row.cells.map(c => c.pts)) : null;
+  for (let k = 0; k < G.n; k++){
+    if (!row) h += '<td><span class="dot">·</span></td>';
+    else{
+      const p = row.cells[k].pts;
+      h += '<td><span class="p' + (p < 0 ? " neg" : p === best ? " best" : "") + '">' + sgn(p) + '</span></td>';
+    }
+  }
+  h += '</tr>';
+});
+document.getElementById("sc").innerHTML = h + '</tbody>';
+chrome();

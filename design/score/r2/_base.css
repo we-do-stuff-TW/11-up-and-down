@@ -1,0 +1,50 @@
+/* ── 三案共用的骨架 ────────────────────────────────────────────
+   都是「局為列、人為欄」的表，差別只在格子裡放什麼。
+   Francis 定案：格子不記「拿／叫」，只記得分失分——所以欄寬一下子夠用了，
+   十個人也不必把字縮到看不清。 */
+.hd{display:flex;align-items:baseline;gap:10px;padding:17px 18px 11px}
+.hd h2{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.hd .of{margin-left:auto;font-size:11px;color:var(--ink-3)}
+
+.scroll{overflow:auto;flex:1;min-height:0;padding:0 12px 18px}
+table.sc{border-collapse:collapse;width:100%;table-layout:fixed;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+table.sc col.gut{width:66px}
+table.sc thead th{
+  position:sticky;top:0;z-index:2;background:var(--felt-deep);
+  /* border-collapse 的邊框不跟著 sticky 走（會留在表格原本的位置），用 inset 陰影畫這條線 */
+  box-shadow:inset 0 -1px 0 var(--hair);
+  padding:6px 7px 13px;text-align:right;white-space:nowrap;
+}
+table.sc thead th .nm{
+  display:block;font-family:"Archivo",sans-serif;font-size:10.5px;font-weight:500;
+  letter-spacing:.06em;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;
+}
+table.sc thead th.me .nm{color:var(--ink)}
+table.sc thead th.gut{text-align:left}
+table.sc thead th.gut .nm{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase}
+
+/* 局數那一欄：張數、王牌，底下一條長度＝張數的細線。整疊看下來就是 1→11→1 */
+table.sc tbody td{position:relative;border-bottom:1px solid var(--hair-2)}
+/* 各案都會寫 table.sc td{text-align:right}，特異性比 td.gut 高，所以這裡要寫得一樣長 */
+table.sc td.gut{text-align:left;padding-left:10px;color:var(--ink-3)}
+td.gut .sz{position:relative;font-size:14px;color:var(--ink-2)}
+td.gut .tsuit{position:relative;margin-left:7px;width:12px;height:12px}
+td.gut .notrump{position:relative;margin-left:6px}
+.szbar{position:absolute;left:10px;bottom:7px;height:2px;width:var(--w);
+  border-radius:1px;background:oklch(.90 .02 92 / .22)}
+
+/* 進行中的那一局：還沒有分數可記，只標「你在這裡」 */
+tr.now td{background:oklch(.98 .012 92 / .045)}
+tr.now td.gut::after{content:"";position:absolute;left:0;top:19%;bottom:19%;width:2px;
+  border-radius:1px;background:var(--brass);z-index:1}
+tr.now td.gut .sz{color:var(--brass)}
+tr.now td.gut .szbar{background:var(--brass);opacity:.5}
+tr.ahead td.gut{color:oklch(.700 .016 92 / .4)}
+tr.ahead .szbar{opacity:.45}
+.dot{color:oklch(.700 .016 92 / .45)}
+
+.ft{display:flex;align-items:baseline;gap:10px;padding:11px 18px 14px;
+  border-top:1px solid var(--hair);font-size:11.5px;color:var(--ink-3)}
+.ft b{color:var(--ink-2);font-weight:500}
+.ft .r{margin-left:auto;font-family:"IBM Plex Mono",monospace}

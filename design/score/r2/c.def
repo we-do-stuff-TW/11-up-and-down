@@ -1,0 +1,65 @@
+/* TITLE: 丙 · 累計 */
+/* ── 丙案：累計 ────────────────────────────────────────────────
+   每一格兩排：上排小字是那一局的得分失分，下排大字是打完那一局的累計。
+   頂上就不必再放一次總分了——最後有數字的那一列就是現在的比數，
+   而且往上看得到是哪一局被超車的。表會自動捲到「現在」，所以總分永遠在視線裡。
+   人一多就收掉上排，只留累計（十個人時那才是還讀得完的東西）。 */
+table.sc thead th{padding:8px 7px 11px}
+table.sc td{padding:0 7px;height:46px;text-align:right;white-space:nowrap}
+.d{display:block;font-size:11.5px;line-height:1.25;color:oklch(.700 .016 92 / .7)}
+.d.neg{color:oklch(.735 .135 32 / .8)}
+/* 別叫 .r：紅花色的 pip 是 class="tsuit r"，頁尾右側也是 .ft .r，會一起被 display:block 打到 */
+.run{display:block;font-size:19px;line-height:1.15;color:var(--ink-2);letter-spacing:-.01em}
+/* 那一局的領先者：只有累計那一排上銅色 */
+.run.lead{color:var(--brass)}
+
+/* 最後一列有數字的：現在的比數。整張表只有這一列是亮的 */
+tr.latest td{background:oklch(.98 .012 92 / .05)}
+tr.latest .run{font-size:24px;color:var(--ink)}
+tr.latest .run.lead{color:var(--brass)}
+tr.latest td.gut::after{content:"現在";position:absolute;left:10px;bottom:4px;
+  font-family:"Archivo",sans-serif;font-size:8.5px;letter-spacing:.18em;color:var(--ink-3)}
+tr.latest td.gut .szbar{display:none}
+
+.tight table.sc td{padding:0 4px;height:38px}
+.tight .d{display:none}
+.tight .run{font-size:16px}
+.tight tr.latest .run{font-size:19px}
+.tighter table.sc td{padding:0 3px;height:35px}
+.tighter .run{font-size:14px}
+.tighter tr.latest .run{font-size:16px}
+.tighter table.sc thead th .nm{font-size:9.5px;letter-spacing:0}
+.tighter table.sc col.gut{width:54px}
+/*==HTML==*/
+<div class="stage" id="stage">
+  <div class="faux"><span>牌桌</span></div>
+  <aside class="ledger">
+    <header class="hd"><h2>計分表</h2><span class="of mono" id="of"></span></header>
+    <div class="scroll" id="scroll"><table class="sc" id="sc"></table></div>
+    <footer class="ft" id="ft"></footer>
+  </aside>
+</div>
+/*==JS==*/
+let h = '<colgroup><col class="gut"><col span="' + G.n + '"></colgroup><thead><tr>' +
+  '<th class="gut"><span class="nm">局</span></th>';
+G.names.forEach(function(nm, i){
+  h += '<th' + (i === 0 ? ' class="me"' : '') + '><span class="nm">' + esc(nm) + '</span></th>';
+});
+h += '</tr></thead><tbody>';
+
+G.ladder.forEach(function(size, ri){
+  const row = G.log[ri], now = ri === G.now, latest = ri === G.log.length - 1;
+  h += '<tr class="' + (now ? "now" : latest ? "latest" : row ? "" : "ahead") + '">' + gut(size, ri, now);
+  const run = RUN[ri], lead = run ? Math.max.apply(null, run) : null;
+  for (let k = 0; k < G.n; k++){
+    if (!row) h += '<td><span class="dot">·</span></td>';
+    else{
+      const p = row.cells[k].pts;
+      h += '<td><span class="d' + (p < 0 ? " neg" : "") + '">' + sgn(p) + '</span>' +
+        '<span class="run' + (run[k] === lead ? " lead" : "") + '">' + run[k] + '</span></td>';
+    }
+  }
+  h += '</tr>';
+});
+document.getElementById("sc").innerHTML = h + '</tbody>';
+chrome();
