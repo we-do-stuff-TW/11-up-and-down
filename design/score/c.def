@@ -1,0 +1,117 @@
+/* TITLE: C · 一疊卡 */
+/* ── C 案：一疊卡 ──────────────────────────────────────────────
+   沒有橫表。頂上一條總分帶（釘住不動），底下每一局是一張卡，最新的在最上面，
+   卡裡每個人一行「拿／叫 ＋分」。手機上不必左右看，十個人也只是卡裡多幾行。
+   代價：要看「某個人的每一局」得自己往下翻。 */
+.hd{display:flex;align-items:baseline;gap:10px;padding:17px 18px 12px}
+.hd h2{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.hd .of{margin-left:auto;font-size:11px;color:var(--ink-3)}
+
+/* 總分帶：整頁最大的字，釘在頂上 */
+.band{display:flex;overflow-x:auto;scrollbar-width:none;
+  border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+  background:var(--felt-deep)}
+.band::-webkit-scrollbar{display:none}
+.band .t{flex:1 0 auto;min-width:0;padding:11px 14px 13px;position:relative}
+.band .t + .t::before{content:"";position:absolute;left:0;top:20%;bottom:20%;width:1px;background:var(--hair-2)}
+.band .t .nm{display:block;font-size:10.5px;letter-spacing:.05em;color:var(--ink-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.band .t .v{display:block;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;
+  font-size:32px;line-height:1.08;letter-spacing:-.015em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.band .t.lead .v{color:var(--brass)}
+.band .t.lead .nm{color:var(--ink-2)}
+.band .t.me .nm::after{content:"（你）";color:var(--ink-3);font-size:9.5px}
+
+.list{overflow:auto;flex:1;min-height:0}
+
+.c{padding:13px 18px 15px;border-bottom:1px solid var(--hair-2)}
+.c.now{background:oklch(.98 .012 92 / .05);border-bottom-color:var(--hair)}
+.c .ch{display:flex;align-items:baseline;gap:9px;margin-bottom:9px}
+.c .ch .n{font-size:13.5px;color:var(--ink-2)}
+.c .ch .n b{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:15px;color:var(--ink)}
+.c .ch .sz{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-3)}
+.c .ch .tsuit{width:13px;height:13px}
+.c .ch .tag{margin-left:auto;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.c.now .ch .tag{color:var(--brass)}
+.c.now .ch .n b{color:var(--brass)}
+
+/* 兩欄之間一條細線，不然左欄的分數會跟右欄的名字黏成一團 */
+.rows{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));column-gap:1px}
+.r{padding-inline:0 10px}
+.rows .r:nth-child(odd):not(:only-child){box-shadow:1px 0 0 var(--hair-2);padding-right:14px}
+.rows .r:nth-child(even){padding-left:14px}
+.r{display:flex;align-items:baseline;gap:8px;padding-block:4px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.r .who{font-family:"Archivo",sans-serif;font-size:13px;color:var(--ink-3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.r.me .who{color:var(--ink-2)}
+.r .gb{font-size:14.5px;color:var(--ink-2);white-space:nowrap}
+.r .gb u{text-decoration:none;font-size:11px;color:var(--ink-3);opacity:.75}
+.r .pt{min-width:32px;text-align:right;font-size:12.5px;color:var(--ink-3)}
+.r.hit .gb{color:var(--good)} .r.hit .pt{color:var(--good)}
+.r.miss .pt{color:var(--bad)}
+.r .need{min-width:32px;text-align:right;font-size:11px;color:var(--ink-3)}
+.r .need.set{color:var(--brass)}
+
+.ahead{display:flex;align-items:center;gap:9px;padding:12px 18px;color:var(--ink-3);font-size:11.5px}
+.ahead i{flex:1;height:1px;background:var(--hair-2)}
+
+.ft{display:flex;align-items:baseline;gap:10px;padding:11px 18px 14px;
+  border-top:1px solid var(--hair);font-size:11.5px;color:var(--ink-3)}
+.ft .r{margin-left:auto;font-family:"IBM Plex Mono",monospace;display:block;padding:0}
+/*==HTML==*/
+<div class="stage" id="stage">
+  <div class="faux"><span>牌桌</span></div>
+  <aside class="ledger">
+    <header class="hd"><h2>計分表</h2><span class="of mono" id="of"></span></header>
+    <div class="band" id="band"></div>
+    <div class="list" id="list"></div>
+    <footer class="ft" id="ft"></footer>
+  </aside>
+</div>
+/*==JS==*/
+const G = pickGame();
+if (new URLSearchParams(location.search).get("v") === "phone") document.body.classList.add("phone");
+
+function card(ri){
+  const row = G.log[ri], now = ri === G.now, size = G.ladder[ri];
+  let h = '<div class="c' + (now ? " now" : "") + '"><div class="ch">' +
+    '<span class="n">第 <b>' + (ri + 1) + '</b> 局</span>' +
+    '<span class="sz">' + size + ' 張</span>' + pip(now ? G.trump : row.trump) +
+    '<span class="tag">' + (now ? "進行中" : "") + '</span></div><div class="rows">';
+  for (let k = 0; k < G.n; k++){
+    if (now){
+      const need = G.bids[k] - G.won[k];
+      h += '<div class="r' + (k === 0 ? " me" : "") + '"><span class="who">' + esc(G.names[k]) + '</span>' +
+        '<span class="gb">' + G.won[k] + '<u>/' + G.bids[k] + '</u></span>' +
+        '<span class="need' + (need === 0 ? " set" : "") + '">' +
+        (need === 0 ? "剛好" : need > 0 ? "差 " + need : "多 " + (-need)) + '</span></div>';
+    }else{
+      const c = row.cells[k];
+      h += '<div class="r ' + (c.hit ? "hit" : "miss") + (k === 0 ? " me" : "") + '">' +
+        '<span class="who">' + esc(G.names[k]) + '</span>' +
+        '<span class="gb">' + c.got + '<u>/' + c.bid + '</u></span>' +
+        '<span class="pt">' + sgn(c.pts) + '</span></div>';
+    }
+  }
+  return h + '</div></div>';
+}
+function draw(){
+  const top = Math.max.apply(null, G.score);
+  document.getElementById("band").innerHTML = G.names.map(function(nm, i){
+    return '<div class="t' + (G.score[i] === top ? " lead" : "") + (i === 0 ? " me" : "") + '">' +
+      '<span class="nm">' + esc(nm) + '</span><span class="v">' + G.score[i] + '</span></div>';
+  }).join("");
+
+  const left = G.ladder.length - G.now - 1;
+  let h = card(G.now);
+  for (let ri = G.now - 1; ri >= 0; ri--) h += card(ri);
+  h += '<div class="ahead"><i></i><span>還有 ' + left + ' 局 · 最後一局回到 ' +
+    G.ladder[G.ladder.length - 1] + ' 張</span><i></i></div>';
+  document.getElementById("list").innerHTML = h;
+
+  document.getElementById("of").textContent = G.decks + " 副 · " + G.deckSize + " 張 · " + G.n + " 人";
+  document.getElementById("ft").innerHTML = '<span>最新的一局在最上面</span><span class="r">' +
+    (G.now + 1) + " / " + G.ladder.length + '</span>';
+}
+draw();

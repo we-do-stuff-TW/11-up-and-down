@@ -1,0 +1,59 @@
+/* 取自 docs/index.html 的 :root。計分表坐在**牌局中**的桌面上，不是大廳那張空桌——
+   所以這裡的 --felt 走 paintTable() 的有王牌版本：♠（h168 c.042）、第 13 局（hs=10、
+   peak=11 → d=.9）。算出來 L=.229 C=.0513，跟真的打到一半時看到的顏色一樣。 */
+html,body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --felt: oklch(.229 .0513 168); --felt-deep: oklch(.141 .0410 168); --glow: oklch(.344 .0718 168);
+  --ink: oklch(.965 .014 92); --ink-2: oklch(.805 .017 92); --ink-3: oklch(.700 .016 92);
+  --hair: oklch(.90 .02 92 / .155); --hair-2: oklch(.90 .02 92 / .075);
+  --brass: oklch(.845 .128 84); --brass-2: oklch(.760 .112 84); --brass-soft: oklch(.845 .128 84 / .16);
+  --good: oklch(.800 .125 156); --bad: oklch(.735 .135 32);
+  --glass: oklch(.98 .012 92 / .085); --glass-edge: oklch(1 0 0 / .20); --glass-lip: oklch(1 0 0 / .34);
+  --card:#F8F5EC; --card-2:#ECE5D2; --card-ink:#1A1714; --card-red:#A32B25;
+  --sh-1: 0 1px 2px rgba(0,0,0,.34), 0 6px 16px rgba(0,0,0,.30);
+  --sh-glass: 0 1px 1px rgba(0,0,0,.20), 0 10px 30px rgba(0,0,0,.34);
+  --e-out: cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+h1,h2,h3{margin:0}
+p{margin:0}
+body{
+  margin:0;min-height:100dvh;
+  background:var(--felt-deep);color:var(--ink);
+  font-family:"Archivo","Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.bodoni{font-family:"Bodoni Moda",Georgia,"Songti TC",serif}
+
+/* ── 展示台：左邊假裝是牌桌，右邊是真正要看的那一欄 ────────────
+   計分表在桌機是右欄、在手機是整頁浮層，所以原型兩種都擺得出來。 */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) var(--col,420px);min-height:100dvh}
+.stage.solo{grid-template-columns:minmax(0,1fr)}
+.faux{
+  position:relative;
+  background:
+    radial-gradient(circle at 20% 8%,  rgba(255,255,255,.05), transparent 9%),
+    radial-gradient(circle at 62% 34%, rgba(255,255,255,.042), transparent 15%),
+    radial-gradient(circle at 55% 90%, rgba(255,255,255,.06), transparent 18%),
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+  display:flex;align-items:center;justify-content:center;
+}
+.faux span{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:oklch(1 0 0/.14)}
+/* 手機：整頁浮層，底色跟桌面同一支漸層 */
+.phone .stage{grid-template-columns:minmax(0,1fr)}
+.phone .faux{display:none}
+body.phone{
+  background:
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+}
+.ledger{display:flex;flex-direction:column;min-height:0;height:100dvh;
+  border-left:1px solid var(--hair)}
+body.phone .ledger{border-left:none}
+.tsuit{width:11px;height:11px;fill:var(--ink-3);vertical-align:-1px}
+.tsuit.r{fill:var(--bad)}
+.notrump{font-size:10px;letter-spacing:.1em;color:var(--ink-3);opacity:.8}

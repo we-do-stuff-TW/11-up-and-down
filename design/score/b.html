@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>B · 一人一列</title>
+<meta name="theme-color" content="#16332c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500&family=Libre+Baskerville:wght@700&display=swap">
+<style>
+/* 取自 docs/index.html 的 :root。計分表坐在**牌局中**的桌面上，不是大廳那張空桌——
+   所以這裡的 --felt 走 paintTable() 的有王牌版本：♠（h168 c.042）、第 13 局（hs=10、
+   peak=11 → d=.9）。算出來 L=.229 C=.0513，跟真的打到一半時看到的顏色一樣。 */
+html,body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --felt: oklch(.229 .0513 168); --felt-deep: oklch(.141 .0410 168); --glow: oklch(.344 .0718 168);
+  --ink: oklch(.965 .014 92); --ink-2: oklch(.805 .017 92); --ink-3: oklch(.700 .016 92);
+  --hair: oklch(.90 .02 92 / .155); --hair-2: oklch(.90 .02 92 / .075);
+  --brass: oklch(.845 .128 84); --brass-2: oklch(.760 .112 84); --brass-soft: oklch(.845 .128 84 / .16);
+  --good: oklch(.800 .125 156); --bad: oklch(.735 .135 32);
+  --glass: oklch(.98 .012 92 / .085); --glass-edge: oklch(1 0 0 / .20); --glass-lip: oklch(1 0 0 / .34);
+  --card:#F8F5EC; --card-2:#ECE5D2; --card-ink:#1A1714; --card-red:#A32B25;
+  --sh-1: 0 1px 2px rgba(0,0,0,.34), 0 6px 16px rgba(0,0,0,.30);
+  --sh-glass: 0 1px 1px rgba(0,0,0,.20), 0 10px 30px rgba(0,0,0,.34);
+  --e-out: cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+h1,h2,h3{margin:0}
+p{margin:0}
+body{
+  margin:0;min-height:100dvh;
+  background:var(--felt-deep);color:var(--ink);
+  font-family:"Archivo","Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.bodoni{font-family:"Bodoni Moda",Georgia,"Songti TC",serif}
+
+/* ── 展示台：左邊假裝是牌桌，右邊是真正要看的那一欄 ────────────
+   計分表在桌機是右欄、在手機是整頁浮層，所以原型兩種都擺得出來。 */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) var(--col,420px);min-height:100dvh}
+.stage.solo{grid-template-columns:minmax(0,1fr)}
+.faux{
+  position:relative;
+  background:
+    radial-gradient(circle at 20% 8%,  rgba(255,255,255,.05), transparent 9%),
+    radial-gradient(circle at 62% 34%, rgba(255,255,255,.042), transparent 15%),
+    radial-gradient(circle at 55% 90%, rgba(255,255,255,.06), transparent 18%),
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+  display:flex;align-items:center;justify-content:center;
+}
+.faux span{font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:oklch(1 0 0/.14)}
+/* 手機：整頁浮層，底色跟桌面同一支漸層 */
+.phone .stage{grid-template-columns:minmax(0,1fr)}
+.phone .faux{display:none}
+body.phone{
+  background:
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+}
+.ledger{display:flex;flex-direction:column;min-height:0;height:100dvh;
+  border-left:1px solid var(--hair)}
+body.phone .ledger{border-left:none}
+.tsuit{width:11px;height:11px;fill:var(--ink-3);vertical-align:-1px}
+.tsuit.r{fill:var(--bad)}
+.notrump{font-size:10px;letter-spacing:.1em;color:var(--ink-3);opacity:.8}
+
+/* TITLE: B · 一人一列 */
+/* ── B 案：人為主 ──────────────────────────────────────────────
+   把表轉九十度：一個人一列，總分是整頁最大的字，右邊一條 21 格的軌跡
+   （綠＝叫中往上、紅＝沒中往下、高度＝分數）。列依名次排，誰在贏一眼就看得到。
+   十個人也只是十列，不會像橫表那樣把欄位擠到看不見。
+   要查某一局誰拿幾墩：點那個人展開他的逐局。 */
+.hd{display:flex;align-items:baseline;gap:10px;padding:17px 18px 6px}
+.hd h2{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.hd .of{margin-left:auto;font-size:11px;color:var(--ink-3)}
+.sub{padding:0 18px 13px;font-size:11.5px;color:var(--ink-3)}
+.sub b{color:var(--ink-2);font-weight:500}
+
+.list{overflow:auto;flex:1;min-height:0;padding:0 8px 18px}
+
+.p{width:100%;display:grid;grid-template-columns:20px minmax(0,1fr) auto;
+  align-items:center;column-gap:12px;row-gap:9px;
+  padding:14px 10px 15px;border-bottom:1px solid var(--hair-2);border-radius:10px;
+  transition:background-color .18s}
+.p:hover{background:oklch(.98 .012 92 / .035)}
+.p .rk{font-family:"Bodoni Moda",Georgia,serif;font-size:14px;color:var(--ink-3);text-align:center}
+.p .nm{font-size:15px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p .nm .you{margin-left:7px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.p .tt{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:34px;line-height:1;
+  letter-spacing:-.015em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.p.lead .rk{color:var(--brass)}
+.p.lead .tt{color:var(--brass)}
+.p.me .nm{color:var(--ink)}
+
+/* 軌跡：一格一局，中線是零 */
+.tk{grid-column:2;display:flex;align-items:center;gap:1.5px;height:30px;position:relative}
+.tk::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--hair-2)}
+.tk i{flex:1;position:relative;height:100%;border-radius:1px}
+.tk i b{position:absolute;left:0;right:0;border-radius:1.5px;display:block}
+.tk i.up b{bottom:50%;margin-bottom:1px;background:var(--good);opacity:.72}
+.tk i.dn b{top:50%;margin-top:1px;background:var(--bad);opacity:.7}
+.tk i.fut b{top:calc(50% - 1px);height:2px;background:oklch(.90 .02 92 / .10)}
+.tk i.now{background:oklch(.845 .128 84 / .10);box-shadow:inset 0 0 0 1px oklch(.845 .128 84 / .34)}
+/* 這一局：叫了幾、目前拿到幾 */
+.p .live{grid-column:3;justify-self:end;text-align:right;
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:12.5px;color:var(--ink-3);white-space:nowrap}
+.p .live b{color:var(--ink-2);font-weight:500;font-size:14px}
+.p .live.set b{color:var(--brass)}
+
+/* 展開：那個人的逐局 */
+.det{grid-column:2 / -1;display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:1px 14px;
+  padding:9px 0 3px;border-top:1px solid var(--hair-2);margin-top:3px}
+.det span{display:flex;align-items:baseline;gap:6px;padding:3px 2px;
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--ink-3)}
+.det span u{text-decoration:none;color:oklch(.700 .016 92 / .6);min-width:16px}
+.det span em{font-style:normal;color:var(--ink-2)}
+.det span.hit em{color:var(--good)}
+.det span.miss em{color:var(--bad)}
+.det span i{font-style:normal;margin-left:auto;color:var(--ink-3)}
+.det span.hit i{color:var(--good)}
+.det span.miss i{color:var(--bad)}
+
+.ft{display:flex;align-items:baseline;gap:10px;padding:11px 18px 14px;
+  border-top:1px solid var(--hair);font-size:11.5px;color:var(--ink-3)}
+.ft .r{margin-left:auto;font-family:"IBM Plex Mono",monospace}
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<path id="ps" d="M12 1.5C10.1 4.3 2.5 9.4 2.5 14.5c0 2.9 2.05 4.9 4.55 4.9 1.75 0 3.1-.95 3.9-2.35.1 2.75-.75 4.55-2.55 5.45h7.2c-1.8-.9-2.65-2.7-2.55-5.45.8 1.4 2.15 2.35 3.9 2.35 2.5 0 4.55-2 4.55-4.9C21.5 9.4 13.9 4.3 12 1.5z"/>
+<path id="ph" d="M12 21.6C11.1 20.9 2.4 15 2.4 8.8 2.4 5.4 4.8 3 7.7 3c1.9 0 3.5 1.1 4.3 2.7C12.8 4.1 14.4 3 16.3 3c2.9 0 5.3 2.4 5.3 5.8 0 6.2-8.7 12.1-9.6 12.8z"/>
+<path id="pd" d="M12 1.4c2.4 4.4 5.2 8 8.9 10.6-3.7 2.6-6.5 6.2-8.9 10.6-2.4-4.4-5.2-8-8.9-10.6C6.8 9.4 9.6 5.8 12 1.4z"/>
+<path id="pc" d="M12 2.3a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM6.3 8.9a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM17.7 8.9a4.55 4.55 0 1 0 0 9.1 4.55 4.55 0 1 0 0-9.1zM11 11.2c.35 3.4-.2 7.1-2.7 10.4h7.4c-2.5-3.3-3.05-7-2.7-10.4z"/>
+</defs>
+</svg>
+
+<div class="stage" id="stage">
+  <div class="faux"><span>牌桌</span></div>
+  <aside class="ledger">
+    <header class="hd"><h2>計分表</h2><span class="of mono" id="of"></span></header>
+    <p class="sub" id="sub"></p>
+    <div class="list" id="list"></div>
+    <footer class="ft" id="ft"></footer>
+  </aside>
+</div>
+
+<script>
+/* ── 假資料，但規則是真的 ─────────────────────────────────────
+   計分公式抄 docs/index.html 的 roundPoints()（預設規則：叫中 10+叫、叫 0 得 5、
+   沒中 −|差|）。每一局所有人「拿到的墩數」加起來一定等於那一局的張數——
+   照著真的牌局長，看起來才不會像亂數。種子固定，三案看到的是同一場牌。 */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+function ladderOf(peak){
+  const L=[]; for(let i=1;i<=peak;i++)L.push(i); for(let i=peak-1;i>=1;i--)L.push(i); return L;
+}
+function roundPoints(bid,got){
+  if(bid===got) return bid===0?5:10+bid;
+  return -Math.abs(got-bid);
+}
+/* n 個人、第 ri 局（size 張）：先把 size 墩分掉，再讓每個人的叫墩在自己拿到的附近晃 */
+function makeGame(names,peak,now,seed){
+  const n=names.length, rnd=mulberry32(seed||7), ladder=ladderOf(peak);
+  const log=[], score=names.map(()=>0);
+  ladder.forEach(function(size,ri){
+    const got=new Array(n).fill(0);
+    for(let t=0;t<size;t++) got[Math.floor(rnd()*n)]++;
+    const cells=[];
+    for(let k=0;k<n;k++){
+      let bid=got[k];
+      const r=rnd();
+      if(r<0.34) bid=Math.max(0,Math.min(size,got[k]+(rnd()<0.5?-1:1)));
+      else if(r<0.40) bid=Math.max(0,Math.min(size,got[k]+(rnd()<0.5?-2:2)));
+      const pts=roundPoints(bid,got[k]);
+      cells.push({bid:bid,got:got[k],pts:pts,hit:bid===got[k]});
+    }
+    log.push({size:size,trump:Math.floor(rnd()*5)===4?null:Math.floor(rnd()*4),cells:cells});
+  });
+  /* now 之前是打完的，now 這局只有叫墩跟「目前拿到幾墩」，之後是空的 */
+  const done=log.slice(0,now);
+  done.forEach(r=>r.cells.forEach((c,k)=>score[k]+=c.pts));
+  const cur=log[now], part=cur.cells.map(c=>Math.max(0,c.got-1-Math.floor(rnd()*2)));
+  return {
+    names:names, n:n, ladder:ladder, now:now, size:cur.size, trump:cur.trump,
+    log:done,                       /* 已經打完的局 */
+    bids:cur.cells.map(c=>c.bid),   /* 這一局叫了幾 */
+    won:part,                       /* 這一局目前拿到幾 */
+    score:score,
+    deckSize:64, decks:2
+  };
+}
+const PIPS=["ps","ph","pd","pc"];
+function pip(s,cls){
+  if(s===null||s===undefined) return '<span class="notrump">無王</span>';
+  return '<svg class="'+(cls||"tsuit")+(s===1||s===2?" r":"")+'" viewBox="0 0 24 24"><use href="#'+PIPS[s]+'"/></svg>';
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sgn=p=>(p>=0?"+":"−")+Math.abs(p);
+
+/* 預設展示的那一桌：4 個人、打到第 14 局（階梯 1→11→1 的第 14 格＝9 張） */
+const G4=makeGame(["Francis","阿哲","Mei","老王"],11,13,20260911);
+/* 十個人那桌：欄位最擠的極端，三案都要撐得住 */
+const G10=makeGame(["Francis","阿哲","Mei","老王","Ken","小圓","Ray","阿美","Jo","大頭"],6,7,4242);
+function pickGame(){
+  const q=new URLSearchParams(location.search);
+  return q.get("n")==="10"?G10:G4;
+}
+
+
+const G = pickGame();
+const Q = new URLSearchParams(location.search);
+if (Q.get("v") === "phone") document.body.classList.add("phone");
+let open = Q.has("open") ? +Q.get("open") : 0;   /* 預設攤開「你」那一列——空著的直欄拿來放你自己的逐局 */
+
+const maxAbs = Math.max.apply(null, G.log.length
+  ? [].concat.apply([], G.log.map(r => r.cells.map(c => Math.abs(c.pts)))) : [1]);
+
+function track(k){
+  let h = '<div class="tk">';
+  G.ladder.forEach(function(size, ri){
+    const row = G.log[ri];
+    if (!row) return h += '<i class="' + (ri === G.now ? "now " : "") + 'fut"><b></b></i>';
+    const p = row.cells[k].pts, hgt = Math.max(3, Math.round(Math.abs(p) / maxAbs * 14));
+    h += '<i class="' + (p >= 0 ? "up" : "dn") + '" title="第 ' + (ri+1) + ' 局 ' +
+      row.cells[k].got + '/' + row.cells[k].bid + ' ' + sgn(p) + '"><b style="height:' + hgt + 'px"></b></i>';
+  });
+  return h + '</div>';
+}
+function detail(k){
+  let h = '<div class="det">';
+  G.log.forEach(function(row, ri){
+    const c = row.cells[k];
+    h += '<span class="' + (c.hit ? "hit" : "miss") + '"><u>' + (ri+1) + '</u><em>' + c.got +
+      '</em>/' + c.bid + '<i>' + sgn(c.pts) + '</i></span>';
+  });
+  return h + '</div>';
+}
+function draw(){
+  const order = G.names.map((n, i) => i).sort((a, b) => G.score[b] - G.score[a]);
+  const top = Math.max.apply(null, G.score);
+  let h = "";
+  order.forEach(function(k, rank){
+    const need = G.bids[k] - G.won[k];
+    h += '<button class="p' + (G.score[k] === top ? " lead" : "") + (k === 0 ? " me" : "") +
+      '" data-k="' + k + '">' +
+      '<span class="rk">' + (rank + 1) + '</span>' +
+      '<span class="nm">' + esc(G.names[k]) + (k === 0 ? '<span class="you">你</span>' : '') + '</span>' +
+      '<span class="tt">' + G.score[k] + '</span>' +
+      track(k) +
+      '<span class="live' + (need === 0 ? " set" : "") + '">叫 <b>' + G.bids[k] +
+        '</b> · 拿 <b>' + G.won[k] + '</b></span>' +
+      (open === k ? detail(k) : "") +
+      '</button>';
+  });
+  document.getElementById("list").innerHTML = h;
+  document.getElementById("of").textContent = G.decks + " 副 · " + G.deckSize + " 張 · " + G.n + " 人";
+  document.getElementById("sub").innerHTML = '第 <b>' + (G.now + 1) + '</b> 局進行中 · 每人 <b>' +
+    G.size + '</b> 張 · 王牌 ' + pip(G.trump);
+  document.getElementById("ft").innerHTML = '<span>點一個人看他的逐局</span><span class="r">' +
+    (G.now + 1) + " / " + G.ladder.length + '</span>';
+}
+document.getElementById("list").addEventListener("click", function(e){
+  const b = e.target.closest(".p"); if (!b) return;
+  open = (+b.dataset.k === open) ? -1 : +b.dataset.k; draw();
+});
+draw();
+
+</script>
+</body>
+</html>

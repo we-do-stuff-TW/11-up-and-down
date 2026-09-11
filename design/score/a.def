@@ -1,0 +1,140 @@
+/* TITLE: A · 記分簿 */
+/* ── A 案：記分簿 ──────────────────────────────────────────────
+   結構不動（局為列、人為欄），改的是尺寸與層級：總分變成 Bodoni 大數字釘在頂上，
+   每一列從 22px 長到 37px，格子裡的「拿／叫」升到 15px。
+   欄位會隨人數收：7 人以上收掉分數增減，9 人以上連斜線也收掉，只留拿到幾墩。 */
+.hd{display:flex;align-items:baseline;gap:10px;padding:17px 18px 11px}
+.hd h2{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.hd .of{margin-left:auto;font-size:11px;color:var(--ink-3)}
+
+.scroll{overflow:auto;flex:1;min-height:0;padding:0 12px 18px}
+table.sc{border-collapse:collapse;width:100%;table-layout:fixed;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+table.sc col.gut{width:66px}
+
+/* 表頭＝總分。整張表只有這一排是亮的 */
+table.sc thead th{
+  position:sticky;top:0;z-index:2;background:var(--felt-deep);
+  /* border-collapse 的邊框不跟著 sticky 走（會留在表格原本的位置），用 inset 陰影畫這條線 */
+  box-shadow:inset 0 -1px 0 var(--hair);
+  padding:6px 7px 13px;text-align:right;white-space:nowrap;
+}
+table.sc thead th .nm{
+  display:block;font-family:"Archivo",sans-serif;font-size:10.5px;font-weight:500;
+  letter-spacing:.06em;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;
+}
+table.sc thead th .tot{
+  display:block;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;
+  font-size:31px;line-height:1.05;letter-spacing:-.01em;color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+table.sc thead th .tot.lead{color:var(--brass)}
+table.sc thead th.me .nm{color:var(--ink-2)}
+table.sc thead th.me .nm::after{content:"（你）";color:var(--ink-3);font-size:9.5px}
+table.sc thead th.gut{text-align:left}
+table.sc thead th.gut .nm{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase}
+
+/* 一列＝一局 */
+table.sc td{padding:0 7px;height:37px;text-align:right;white-space:nowrap;
+  border-bottom:1px solid var(--hair-2);color:var(--ink-3)}
+td.gut{position:relative;text-align:left;padding-left:10px}
+/* 階梯的刻度：一條貼在局數底下的細線，長度＝那一局幾張。整疊看下來就是 1→11→1 */
+.szbar{position:absolute;left:10px;bottom:7px;height:2px;width:var(--w);
+  border-radius:1px;background:oklch(.90 .02 92 / .22)}
+td.gut .sz{position:relative;font-size:14px;color:var(--ink-2)}
+td.gut .tsuit{position:relative;margin-left:7px;width:12px;height:12px}
+td.gut .notrump{position:relative;margin-left:6px}
+
+.g{font-size:15px;color:var(--ink-2)}
+.b{font-size:11px;color:var(--ink-3);opacity:.75}
+.pt{display:inline-block;min-width:30px;margin-left:7px;font-size:12px;color:var(--ink-3)}
+td.hit .g{color:var(--good)} td.hit .pt{color:var(--good)}
+td.miss .pt{color:var(--bad)}
+table.sc tbody td{position:relative}
+
+/* 進行中的那一局 */
+tr.now td{background:oklch(.98 .012 92 / .045)}
+tr.now td.gut::after{content:"";position:absolute;left:0;top:19%;bottom:19%;width:2px;
+  border-radius:1px;background:var(--brass);z-index:1}
+tr.now td.gut .sz{color:var(--brass)}
+tr.now td.gut .szbar{background:var(--brass);opacity:.5}
+tr.now .g{color:var(--ink)}
+tr.ahead td{color:oklch(.700 .016 92 / .4)}
+tr.ahead .b{opacity:.4}
+
+/* 人多就收。欄位一窄，先收掉「＋幾分」（總分已經在頂上），再把整排字級降一級。
+   十個人是這一案最吃力的地方：總分只剩 17px，名字也只放得下兩三個字。 */
+.tight .pt{display:none}
+.tight td{padding:0 4px}
+.tight table.sc col.gut{width:52px}
+.tight table.sc thead th{padding:6px 4px 11px}
+.tight table.sc thead th .tot{font-size:22px}
+.tight .g{font-size:13px}
+.tight .b{font-size:10px}
+.tighter table.sc thead th{padding:6px 2px 10px}
+.tighter table.sc thead th .tot{font-size:17px}
+.tighter table.sc thead th .nm{font-size:9.5px;letter-spacing:0}
+.tighter table.sc thead th.me .nm::after{content:""}
+.tighter td{padding:0 2px}
+.tighter .g{font-size:12px}
+.tighter .b{font-size:9.5px}
+
+.ft{display:flex;align-items:baseline;gap:10px;padding:11px 18px 14px;
+  border-top:1px solid var(--hair);font-size:11.5px;color:var(--ink-3)}
+.ft b{color:var(--ink-2);font-weight:500}
+.ft .r{margin-left:auto;font-family:"IBM Plex Mono",monospace}
+/*==HTML==*/
+<div class="stage" id="stage">
+  <div class="faux"><span>牌桌</span></div>
+  <aside class="ledger">
+    <header class="hd"><h2>計分表</h2><span class="of mono" id="of"></span></header>
+    <div class="scroll" id="scroll"><table class="sc" id="sc"></table></div>
+    <footer class="ft" id="ft"></footer>
+  </aside>
+</div>
+/*==JS==*/
+const G = pickGame();
+if (new URLSearchParams(location.search).get("v") === "phone") document.body.classList.add("phone");
+if (G.n >= 7) document.body.classList.add("tight");
+if (G.n >= 9) document.body.classList.add("tighter");
+
+function draw(){
+  const maxSize = Math.max.apply(null, G.ladder);
+  const top = Math.max.apply(null, G.score);
+  let h = '<colgroup><col class="gut"><col span="' + G.n + '"></colgroup><thead><tr>' +
+    '<th class="gut"><span class="nm">局</span></th>';
+  G.names.forEach(function(nm, i){
+    h += '<th' + (i === 0 ? ' class="me"' : '') + '><span class="nm">' + esc(nm) + '</span><span class="tot' +
+      (G.score[i] === top ? " lead" : "") + '">' + G.score[i] + '</span></th>';
+  });
+  h += '</tr></thead><tbody>';
+
+  G.ladder.forEach(function(size, ri){
+    const row = G.log[ri], now = ri === G.now;
+    h += '<tr class="' + (now ? "now" : row ? "" : "ahead") + '">' +
+      '<td class="gut"><span class="szbar" style="--w:' + (6 + Math.round(size / maxSize * 30)) + 'px"></span>' +
+      '<span class="sz">' + size + '</span>' +
+      (row ? pip(row.trump) : now ? pip(G.trump) : '') + '</td>';
+    for (let k = 0; k < G.n; k++){
+      if (row)
+        h += '<td class="' + (row.cells[k].hit ? "hit" : "miss") + '"><span class="g">' + row.cells[k].got +
+          '</span><span class="b">/' + row.cells[k].bid + '</span>' +
+          '<span class="pt">' + sgn(row.cells[k].pts) + '</span></td>';
+      else if (now)
+        h += '<td><span class="g">' + G.won[k] + '</span><span class="b">/' + G.bids[k] + '</span>' +
+          '<span class="pt"></span></td>';
+      else h += '<td><span class="b">·</span></td>';
+    }
+    h += '</tr>';
+  });
+  document.getElementById("sc").innerHTML = h + '</tbody>';
+  document.getElementById("of").textContent = G.decks + " 副 · " + G.deckSize + " 張 · " + G.n + " 人";
+  document.getElementById("ft").innerHTML =
+    '<span>第 <b>' + (G.now + 1) + '</b> 局 · 每人 <b>' + G.size + '</b> 張</span>' +
+    '<span class="r">' + (G.now + 1) + " / " + G.ladder.length + '</span>';
+
+  const tr = document.querySelector("tr.now"), box = document.getElementById("scroll");
+  if (tr) { const a = tr.getBoundingClientRect(), b = box.getBoundingClientRect();
+            box.scrollTop += (a.top - b.top) - (b.height - a.height) / 2; }
+}
+draw();

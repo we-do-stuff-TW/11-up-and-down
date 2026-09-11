@@ -1,0 +1,128 @@
+/* TITLE: B · 一人一列 */
+/* ── B 案：人為主 ──────────────────────────────────────────────
+   把表轉九十度：一個人一列，總分是整頁最大的字，右邊一條 21 格的軌跡
+   （綠＝叫中往上、紅＝沒中往下、高度＝分數）。列依名次排，誰在贏一眼就看得到。
+   十個人也只是十列，不會像橫表那樣把欄位擠到看不見。
+   要查某一局誰拿幾墩：點那個人展開他的逐局。 */
+.hd{display:flex;align-items:baseline;gap:10px;padding:17px 18px 6px}
+.hd h2{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.hd .of{margin-left:auto;font-size:11px;color:var(--ink-3)}
+.sub{padding:0 18px 13px;font-size:11.5px;color:var(--ink-3)}
+.sub b{color:var(--ink-2);font-weight:500}
+
+.list{overflow:auto;flex:1;min-height:0;padding:0 8px 18px}
+
+.p{width:100%;display:grid;grid-template-columns:20px minmax(0,1fr) auto;
+  align-items:center;column-gap:12px;row-gap:9px;
+  padding:14px 10px 15px;border-bottom:1px solid var(--hair-2);border-radius:10px;
+  transition:background-color .18s}
+.p:hover{background:oklch(.98 .012 92 / .035)}
+.p .rk{font-family:"Bodoni Moda",Georgia,serif;font-size:14px;color:var(--ink-3);text-align:center}
+.p .nm{font-size:15px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p .nm .you{margin-left:7px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.p .tt{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:34px;line-height:1;
+  letter-spacing:-.015em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.p.lead .rk{color:var(--brass)}
+.p.lead .tt{color:var(--brass)}
+.p.me .nm{color:var(--ink)}
+
+/* 軌跡：一格一局，中線是零 */
+.tk{grid-column:2;display:flex;align-items:center;gap:1.5px;height:30px;position:relative}
+.tk::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--hair-2)}
+.tk i{flex:1;position:relative;height:100%;border-radius:1px}
+.tk i b{position:absolute;left:0;right:0;border-radius:1.5px;display:block}
+.tk i.up b{bottom:50%;margin-bottom:1px;background:var(--good);opacity:.72}
+.tk i.dn b{top:50%;margin-top:1px;background:var(--bad);opacity:.7}
+.tk i.fut b{top:calc(50% - 1px);height:2px;background:oklch(.90 .02 92 / .10)}
+.tk i.now{background:oklch(.845 .128 84 / .10);box-shadow:inset 0 0 0 1px oklch(.845 .128 84 / .34)}
+/* 這一局：叫了幾、目前拿到幾 */
+.p .live{grid-column:3;justify-self:end;text-align:right;
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:12.5px;color:var(--ink-3);white-space:nowrap}
+.p .live b{color:var(--ink-2);font-weight:500;font-size:14px}
+.p .live.set b{color:var(--brass)}
+
+/* 展開：那個人的逐局 */
+.det{grid-column:2 / -1;display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:1px 14px;
+  padding:9px 0 3px;border-top:1px solid var(--hair-2);margin-top:3px}
+.det span{display:flex;align-items:baseline;gap:6px;padding:3px 2px;
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:11.5px;color:var(--ink-3)}
+.det span u{text-decoration:none;color:oklch(.700 .016 92 / .6);min-width:16px}
+.det span em{font-style:normal;color:var(--ink-2)}
+.det span.hit em{color:var(--good)}
+.det span.miss em{color:var(--bad)}
+.det span i{font-style:normal;margin-left:auto;color:var(--ink-3)}
+.det span.hit i{color:var(--good)}
+.det span.miss i{color:var(--bad)}
+
+.ft{display:flex;align-items:baseline;gap:10px;padding:11px 18px 14px;
+  border-top:1px solid var(--hair);font-size:11.5px;color:var(--ink-3)}
+.ft .r{margin-left:auto;font-family:"IBM Plex Mono",monospace}
+/*==HTML==*/
+<div class="stage" id="stage">
+  <div class="faux"><span>牌桌</span></div>
+  <aside class="ledger">
+    <header class="hd"><h2>計分表</h2><span class="of mono" id="of"></span></header>
+    <p class="sub" id="sub"></p>
+    <div class="list" id="list"></div>
+    <footer class="ft" id="ft"></footer>
+  </aside>
+</div>
+/*==JS==*/
+const G = pickGame();
+const Q = new URLSearchParams(location.search);
+if (Q.get("v") === "phone") document.body.classList.add("phone");
+let open = Q.has("open") ? +Q.get("open") : 0;   /* 預設攤開「你」那一列——空著的直欄拿來放你自己的逐局 */
+
+const maxAbs = Math.max.apply(null, G.log.length
+  ? [].concat.apply([], G.log.map(r => r.cells.map(c => Math.abs(c.pts)))) : [1]);
+
+function track(k){
+  let h = '<div class="tk">';
+  G.ladder.forEach(function(size, ri){
+    const row = G.log[ri];
+    if (!row) return h += '<i class="' + (ri === G.now ? "now " : "") + 'fut"><b></b></i>';
+    const p = row.cells[k].pts, hgt = Math.max(3, Math.round(Math.abs(p) / maxAbs * 14));
+    h += '<i class="' + (p >= 0 ? "up" : "dn") + '" title="第 ' + (ri+1) + ' 局 ' +
+      row.cells[k].got + '/' + row.cells[k].bid + ' ' + sgn(p) + '"><b style="height:' + hgt + 'px"></b></i>';
+  });
+  return h + '</div>';
+}
+function detail(k){
+  let h = '<div class="det">';
+  G.log.forEach(function(row, ri){
+    const c = row.cells[k];
+    h += '<span class="' + (c.hit ? "hit" : "miss") + '"><u>' + (ri+1) + '</u><em>' + c.got +
+      '</em>/' + c.bid + '<i>' + sgn(c.pts) + '</i></span>';
+  });
+  return h + '</div>';
+}
+function draw(){
+  const order = G.names.map((n, i) => i).sort((a, b) => G.score[b] - G.score[a]);
+  const top = Math.max.apply(null, G.score);
+  let h = "";
+  order.forEach(function(k, rank){
+    const need = G.bids[k] - G.won[k];
+    h += '<button class="p' + (G.score[k] === top ? " lead" : "") + (k === 0 ? " me" : "") +
+      '" data-k="' + k + '">' +
+      '<span class="rk">' + (rank + 1) + '</span>' +
+      '<span class="nm">' + esc(G.names[k]) + (k === 0 ? '<span class="you">你</span>' : '') + '</span>' +
+      '<span class="tt">' + G.score[k] + '</span>' +
+      track(k) +
+      '<span class="live' + (need === 0 ? " set" : "") + '">叫 <b>' + G.bids[k] +
+        '</b> · 拿 <b>' + G.won[k] + '</b></span>' +
+      (open === k ? detail(k) : "") +
+      '</button>';
+  });
+  document.getElementById("list").innerHTML = h;
+  document.getElementById("of").textContent = G.decks + " 副 · " + G.deckSize + " 張 · " + G.n + " 人";
+  document.getElementById("sub").innerHTML = '第 <b>' + (G.now + 1) + '</b> 局進行中 · 每人 <b>' +
+    G.size + '</b> 張 · 王牌 ' + pip(G.trump);
+  document.getElementById("ft").innerHTML = '<span>點一個人看他的逐局</span><span class="r">' +
+    (G.now + 1) + " / " + G.ladder.length + '</span>';
+}
+document.getElementById("list").addEventListener("click", function(e){
+  const b = e.target.closest(".p"); if (!b) return;
+  open = (+b.dataset.k === open) ? -1 : +b.dataset.k; draw();
+});
+draw();
