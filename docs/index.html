@@ -741,6 +741,110 @@ table.score tbody tr:hover td{background:oklch(.90 .02 92 / .035)}
   animation:ov .22s var(--e-out) both;
 }
 @keyframes ov{from{opacity:0}to{opacity:1}}
+
+/* ================= 大廳 =================
+   身分不做成一個「面」，只是右上角幾行字加一條線——整頁只有中間那排牌位是亮的。 */
+body.in-lobby .app{display:none}
+.lobby{
+  position:fixed;inset:0;z-index:50;          /* 浮層是 60，所以規則／設定／帳號蓋得過大廳 */
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:34px clamp(18px,4vw,40px);
+  padding-bottom:calc(34px + env(safe-area-inset-bottom));
+  animation:lbIn .3s var(--e-out) both;
+  --foil:#C4A15A;
+}
+@keyframes lbIn{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.lobby{animation:none}}
+
+.lb-mark{position:absolute;top:30px;left:32px;display:flex;align-items:baseline;gap:13px;line-height:1}
+.lb-mark b{font-family:"Bodoni Moda",Georgia,serif;font-size:30px;font-weight:700;letter-spacing:.005em}
+.lb-mark u{text-decoration:none;font-size:9px;font-weight:600;letter-spacing:.36em;color:var(--ink-3);padding-left:.36em}
+
+/* ---- 身分：名字＋頭像 / 一條線 / 一行戰績 ---- */
+.lb-me{position:absolute;top:28px;right:32px;display:flex;flex-direction:column;align-items:flex-end;
+  gap:9px;padding:2px;min-width:210px;background:none;border:0;cursor:pointer}
+.lb-row{display:flex;align-items:center;gap:11px}
+.lb-nm{font-size:14px;font-weight:600;letter-spacing:.02em;line-height:1;color:var(--ink)}
+.lb-av{width:30px;height:30px;border-radius:99px;object-fit:cover;flex:none;
+  box-shadow:0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.3)}
+.lb-hr{width:100%;height:1px;background:var(--hair);transition:background .24s var(--e-out)}
+.lb-stat{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;
+  font-size:10.5px;color:var(--ink-3);letter-spacing:.04em;transition:color .2s}
+.lb-stat b{color:var(--ink-2);font-weight:400}
+.lb-me:hover .lb-hr{background:var(--brass-soft)}
+.lb-me:hover .lb-stat{color:var(--ink-2)}
+.lb-me:hover .lb-stat b{color:var(--brass)}
+
+.lb-ask{margin:0 0 4px;font-family:"Bodoni Moda",Georgia,serif;font-size:clamp(30px,4.6vw,44px);
+  font-weight:600;letter-spacing:-.008em;text-align:center;line-height:1.08}
+.lb-tip{margin:0 0 26px;color:var(--ink-3);font-size:12.5px;text-align:center;letter-spacing:.04em}
+
+/* ---- 房號：四張空牌位。真正收鍵盤的是底下那個看不見的 input，
+        IME、貼上、手機鍵盤才會全部正常。 ---- */
+.lb-code{display:flex;gap:11px;margin-bottom:24px;position:relative}
+.lb-code #lcIn{position:absolute;inset:0;width:100%;height:100%;opacity:0;
+  border:0;padding:0;background:none;color:transparent;caret-color:transparent;
+  font-size:16px;   /* 小於 16px 的話 iOS Safari 會自己放大整頁 */
+  cursor:pointer;z-index:2}
+.lb-cell{width:76px;height:106px;border-radius:9px;display:grid;place-items:center;position:relative;
+  font-family:"Bodoni Moda",Georgia,serif;font-size:42px;font-weight:600;color:var(--ink);
+  background:oklch(1 0 0/.038);
+  box-shadow:inset 0 0 0 1px var(--hair),inset 0 1px 0 var(--glass-lip);
+  transition:box-shadow .22s var(--e-out),background .22s var(--e-out),color .22s}
+.lb-cell::before{content:"";position:absolute;inset:4px;border-radius:5px;border:1px solid var(--hair-2)}
+.lb-cell.filled{color:var(--card-ink);
+  background:linear-gradient(158deg in oklab,#FDFAF3,var(--card) 46%,var(--card-2));
+  box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),var(--sh-1)}
+.lb-cell.filled::before{border:.5px solid var(--foil);opacity:.42}
+.lb-cell.on{box-shadow:inset 0 0 0 1px var(--brass),inset 0 1px 0 var(--glass-lip),0 0 0 3px oklch(.845 .128 84/.14)}
+.lb-cell.on::after{content:"";width:2px;height:44px;background:var(--brass);border-radius:2px;
+  animation:lbBlink 1.05s steps(1,end) infinite}
+@keyframes lbBlink{0%,50%{opacity:1}50.01%,100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.lb-cell.on::after{animation:none}}
+
+.lb-enter{padding:14px 34px;border-radius:99px;font-size:15px;font-weight:600;letter-spacing:.06em;
+  background:linear-gradient(178deg in oklab,var(--brass),var(--brass-2));color:#241906;
+  box-shadow:inset 0 1px 0 oklch(1 0 0/.5),0 2px 6px rgba(0,0,0,.3),0 14px 34px oklch(.845 .128 84/.24);
+  transition:transform .18s var(--e-out),box-shadow .22s,opacity .22s}
+.lb-enter:hover:not(:disabled){box-shadow:inset 0 1px 0 oklch(1 0 0/.5),0 2px 6px rgba(0,0,0,.3),0 18px 46px oklch(.845 .128 84/.36)}
+.lb-enter:active:not(:disabled){transform:scale(.96)}
+.lb-enter:disabled{opacity:.34;cursor:default;box-shadow:inset 0 1px 0 oklch(1 0 0/.4),0 1px 3px rgba(0,0,0,.24)}
+.lb-err{margin:14px 0 0;font-size:12.5px;color:var(--bad);text-align:center}
+
+.lb-or{display:flex;align-items:center;gap:14px;width:min(420px,100%);margin:40px 0 22px;
+  color:var(--ink-3);font-size:10px;letter-spacing:.2em}
+.lb-or i{flex:1;height:1px;background:var(--hair);display:block}
+/* 開一桌／一個人打不是註腳——放到跟標題同一個字族，只小一階 */
+.lb-alt{display:flex;gap:clamp(30px,5vw,60px);align-items:baseline}
+.lb-al{font-family:"Bodoni Moda",Georgia,serif;font-size:var(--lb-alt,32px);font-weight:600;
+  letter-spacing:.015em;line-height:1.1;color:var(--ink-2);padding:6px 2px 10px;position:relative;
+  background:none;border:0;cursor:pointer;transition:color .2s var(--e-out),opacity .2s}
+.lb-al::after{content:"";position:absolute;left:2px;right:2px;bottom:2px;height:1px;
+  background:var(--hair-2);transition:background .2s var(--e-out)}
+.lb-al:hover:not(:disabled){color:var(--ink)}
+.lb-al:hover:not(:disabled)::after{background:var(--brass)}
+.lb-al:active:not(:disabled){transform:scale(.985)}
+.lb-al:disabled{opacity:.4;cursor:default}
+
+.lb-ft{display:flex;gap:12px;align-items:center;color:var(--ink-3);font-size:11.5px;margin-top:34px}
+.lb-ft button{padding:6px 2px;background:none;border:0;color:inherit;cursor:pointer;
+  font:inherit;transition:color .18s}
+.lb-ft button:hover{color:var(--ink)}
+.lb-ft i{width:1px;height:10px;background:var(--hair);display:block}
+
+@media (max-width:760px){
+  .lobby{justify-content:flex-start;padding:18px 16px 26px}
+  .lb-mark{position:static;align-self:flex-start;margin-bottom:2px}
+  .lb-me{position:static;order:9;width:100%;min-width:0;align-items:flex-start;margin-top:34px;gap:8px}
+  .lb-row{flex-direction:row-reverse}
+  .lb-ft{order:10;margin-top:16px}
+  .lb-ask{margin-top:auto}
+  .lb-code{gap:9px}
+  .lb-cell{width:64px;height:90px;font-size:34px}
+  .lb-cell.on::after{height:36px}
+  .lb-alt{gap:26px;justify-content:center}
+  .lb-al{font-size:var(--lb-alt-m,26px)}
+}
 .sheet{
   width:min(608px,100%);max-height:88vh;overflow:auto;   /* 人數那一排 2～10 共十顆要排得下 */
   padding:26px 28px 24px;border-radius:22px;
@@ -1075,6 +1179,46 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   </main>
 </div>
 
+<!-- ================= 大廳 =================
+     登入之後先到這裡。牌桌在底下已經擺好但停在 phase:"lobby"——
+     跟連線房間開打前是同一個狀態，所以沒發牌、也沒有 AI 計時器在跑。 -->
+<div class="lobby" id="lobby" hidden>
+  <div class="lb-mark"><b>11</b><u>UP &amp; DOWN</u></div>
+
+  <button class="lb-me" id="lbMe">
+    <span class="lb-row"><span class="lb-nm" id="lbName">你</span><img class="lb-av" id="lbAv" alt="" referrerpolicy="no-referrer" hidden></span>
+    <span class="lb-hr"></span>
+    <span class="lb-stat" id="lbStat"></span>
+  </button>
+
+  <h1 class="lb-ask">加入誰的桌？</h1>
+  <p class="lb-tip">房號是四碼，開桌的人畫面上就有</p>
+
+  <div class="lb-code" id="lcode">
+    <input id="lcIn" maxlength="4" autocomplete="off" autocapitalize="characters"
+           spellcheck="false" inputmode="text" aria-label="四碼房號">
+    <span class="lb-cell" aria-hidden="true"></span>
+    <span class="lb-cell" aria-hidden="true"></span>
+    <span class="lb-cell" aria-hidden="true"></span>
+    <span class="lb-cell" aria-hidden="true"></span>
+  </div>
+
+  <button class="lb-enter" id="lbGo" disabled>進去</button>
+  <p class="lb-err" id="lbErr" role="alert" hidden></p>
+
+  <div class="lb-or"><i></i><span>或者</span><i></i></div>
+  <div class="lb-alt">
+    <button class="lb-al" id="lbHost">開一桌</button>
+    <button class="lb-al" id="lbSolo">一個人打</button>
+  </div>
+
+  <footer class="lb-ft">
+    <button id="lbRules">規則</button><i></i>
+    <button id="lbPref">設定</button><i></i>
+    <button id="lbOut">登出</button>
+  </footer>
+</div>
+
 <div class="overlay" id="setupOv" hidden>
   <div class="sheet">
     <h2>牌桌設定</h2>
@@ -1186,6 +1330,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
     <table class="final" id="endTable"></table>
     <div class="sheet-actions">
       <button class="btn" id="endClose">看計分表</button>
+      <button class="btn" id="endLobby">回大廳</button>
       <button class="btn primary" id="endAgain">再來一局</button>
     </div>
   </div>
@@ -2629,6 +2774,9 @@ function adoptUser(u){
     try{ localStorage.setItem("ud.name", MY.name); }catch(e){}
   }
   paintMeChip();
+  /* 大廳比 authBoot 早畫出來，名字／頭像／戰績要等身分回來才填得上 */
+  paintLobbyMe();
+  loadLobbyStats();
   /* 單人局在驗身分之前就開好了，那時候還不知道你長什麼樣 */
   if(MODE === "solo" && G && G.seats[0]){ G.seats[0].av = MY.av; render(); }
 }
@@ -4015,7 +4163,8 @@ function paintRules(){
 }
 $("btnRules").onclick = function(){ paintRules(); $("rulesOv").hidden = false; };
 $("rulesClose").onclick = function(){ $("rulesOv").hidden = true; };
-$("btnRoom").onclick = openNet;
+/* 單人在桌上時這顆＝回大廳；已經在房間裡就還是開房間面板 */
+$("btnRoom").onclick = function(){ if(MODE === "net") openNet(); else openLobby(); };
 $("btnSetup").onclick = function(){ openSetup(); };
 $("setupCancel").onclick = function(){ $("setupOv").hidden = true; };
 $("btnMe").onclick = openMe;
@@ -4032,6 +4181,12 @@ $("btnPref").onclick = function(){ openPref(); };
 $("prefClose").onclick = function(){ $("prefOv").hidden = true; };
 $("endClose").onclick = function(){ $("endOv").hidden = true; };
 $("endAgain").onclick = function(){ $("endOv").hidden = true; openSetup(); };
+$("endLobby").onclick = function(){
+  $("endOv").hidden = true;
+  unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
+  buildIdleTable(); openLobby();
+  loadLobbyStats(true);   /* 剛打完一場，數字要重讀 */
+};
 document.addEventListener("keydown", function(e){
   if(e.key === "Escape"){ $("rulesOv").hidden = true; $("setupOv").hidden = true; $("prefOv").hidden = true; $("netOv").hidden = true; $("meOv").hidden = true; setScore(false); }
 });
@@ -4193,9 +4348,138 @@ const UD = window.UD = {
   }
 };
 
+/* ================= 大廳 =================
+   登入之後先到這裡，不再直接開單人局。
+   牌桌在底下已經擺好但停在 phase:"lobby"——跟連線房間開打前是同一個狀態，
+   所以沒發牌、沒有 AI 計時器在跑，render() 也不會炸（它只 guard !G）。 */
+let lbStats = null;      /* {games, wins, pct}，讀過一次就留著 */
+let lbBusy = false;
+
+/* 跟 startSolo 一樣把桌子擺好，但不呼叫 startRound——牌不發 */
+function buildIdleTable(){
+  G = newGame(Object.assign(rules(draft), {n:draft.n}));
+  G.seats[0] = {name:"你", kind:"human", cid:"me", av:MY.av};
+  for(let i=1;i<G.cfg.n;i++) G.seats[i] = {name:String.fromCharCode(65+i), kind:"ai", cid:null};
+  G.host = "me";
+  render();
+}
+
+function openLobby(){
+  document.body.classList.add("in-lobby");
+  $("lobby").hidden = false;
+  lbErr("");
+  paintLobbyMe();
+  loadLobbyStats();
+  /* 手機不要一進來就彈鍵盤 */
+  if(!matchMedia("(max-width:760px)").matches)
+    setTimeout(function(){ try{ $("lcIn").focus({preventScroll:true}); }catch(e){} }, 80);
+}
+function closeLobby(){
+  document.body.classList.remove("in-lobby");
+  $("lobby").hidden = true;
+  lbErr("");
+}
+function lbErr(msg){
+  const el = $("lbErr");
+  if(!el) return;
+  el.textContent = msg || "";
+  el.hidden = !msg;
+}
+function paintLobbyMe(){
+  const av = $("lbAv");
+  if(!av) return;
+  if(MY.av){ av.src = MY.av; av.hidden = false; } else av.hidden = true;
+  $("lbName").textContent = MY.name || MY.gname || "你";
+}
+/* 戰績那一行。跟 loadHistory 讀同一張表，但只要三個數字，所以只抓需要的欄位。 */
+async function loadLobbyStats(force){
+  const line = $("lbStat");
+  if(!line) return;
+  if(lbStats && !force){ paintLobbyStat(); return; }
+  if(!NET.sb) return;
+  try{
+    const r = await NET.sb.from("results").select("rank,hits,rounds");
+    if(r.error || !r.data) return;
+    let hits = 0, rounds = 0;
+    r.data.forEach(function(x){ hits += x.hits || 0; rounds += x.rounds || 0; });
+    lbStats = {
+      games: r.data.length,
+      wins: r.data.filter(x => x.rank === 1).length,
+      pct: rounds ? Math.round(hits * 100 / rounds) : 0
+    };
+    paintLobbyStat();
+  }catch(e){}
+}
+function paintLobbyStat(){
+  const s = lbStats, line = $("lbStat");
+  if(!s || !line) return;
+  line.innerHTML = s.games
+    ? '<b>' + s.games + '</b> 場 · <b>' + s.wins + '</b> 次第一 · 叫中 <b>' + s.pct + '%</b>'
+    : '還沒有打完的紀錄';
+}
+
+/* ---- 四張空牌位。收鍵盤的是蓋在上面那個透明 input，
+        格子只是畫出來給人看的，所以 IME、貼上、手機鍵盤全部照常。 ---- */
+function paintCode(){
+  const inp = $("lcIn");
+  if(!inp) return;
+  const v = inp.value, on = document.activeElement === inp;
+  const cells = $("lcode").querySelectorAll(".lb-cell");
+  for(let i=0;i<cells.length;i++){
+    cells[i].textContent = v[i] || "";
+    cells[i].classList.toggle("filled", !!v[i]);
+    cells[i].classList.toggle("on", on && i === Math.min(v.length, cells.length - 1));
+  }
+  $("lbGo").disabled = v.length !== 4 || lbBusy;
+}
+$("lcIn").addEventListener("input", function(e){
+  /* 房號的字母表是 ABCDEFGHJKLMNPQRSTUVWXYZ23456789——沒有 I O 0 1，念出來不會聽錯 */
+  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 4);
+  lbErr(); paintCode();
+});
+$("lcIn").addEventListener("focus", paintCode);
+$("lcIn").addEventListener("blur", paintCode);
+$("lcIn").addEventListener("keydown", function(e){
+  if(e.key === "Enter" && !$("lbGo").disabled) $("lbGo").click();
+});
+
+function lbLock(on){
+  lbBusy = on;
+  ["lbHost", "lbSolo"].forEach(function(id){ const b = $(id); if(b) b.disabled = on; });
+  paintCode();
+}
+
+$("lbGo").onclick = async function(){
+  const code = $("lcIn").value;
+  if(code.length !== 4 || lbBusy) return;
+  lbLock(true); lbErr("");
+  try{ await joinRoom(code); closeLobby(); openNet(); }
+  catch(e){ lbErr(NET.err || ("找不到房號 " + code)); }
+  lbLock(false);
+};
+$("lbHost").onclick = async function(){
+  if(lbBusy) return;
+  lbLock(true); lbErr("");
+  try{ await createRoom(rules(draft)); closeLobby(); openNet(); }
+  catch(e){ lbErr(NET.err || "開房失敗"); }
+  lbLock(false);
+};
+$("lbSolo").onclick = function(){
+  if(lbBusy) return;
+  closeLobby();
+  unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
+  startSolo();
+};
+/* 這幾個直接借用工具列那幾顆，peer session 之後改那邊的行為也跟著變 */
+$("lbMe").onclick    = function(){ openMe(); };
+$("lbRules").onclick = function(){ $("btnRules").click(); };
+$("lbPref").onclick  = function(){ $("btnPref").click(); };
+$("lbOut").onclick   = function(){ $("btnSignOut").click(); };
+
 applyBackText();
 loadDeckFonts(DECK).then(applyBackText);
-startSolo();
+buildIdleTable();
+openLobby();
 paintMeChip();
 authBoot();
 })();
