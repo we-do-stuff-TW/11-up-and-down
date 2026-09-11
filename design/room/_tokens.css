@@ -1,0 +1,56 @@
+/* 取自 docs/index.html 的 :root——大廳跟牌桌是同一個房間，色票不另立一套 */
+html,body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --felt: oklch(.245 .042 168); --felt-deep: oklch(.165 .034 168); --glow: oklch(.375 .058 168);
+  --ink: oklch(.965 .014 92); --ink-2: oklch(.805 .017 92); --ink-3: oklch(.700 .016 92);
+  --hair: oklch(.90 .02 92 / .155); --hair-2: oklch(.90 .02 92 / .075);
+  --brass: oklch(.845 .128 84); --brass-2: oklch(.760 .112 84); --brass-soft: oklch(.845 .128 84 / .16);
+  --good: oklch(.800 .125 156); --bad: oklch(.735 .135 32);
+  --glass: oklch(.98 .012 92 / .085); --glass-edge: oklch(1 0 0 / .20); --glass-lip: oklch(1 0 0 / .34);
+  --card:#F8F5EC; --card-2:#ECE5D2; --card-ink:#1A1714; --card-red:#A32B25; --card-line:rgba(26,23,20,.20);
+  --sh-1: 0 1px 2px rgba(0,0,0,.34), 0 6px 16px rgba(0,0,0,.30);
+  --sh-2: 0 2px 5px rgba(0,0,0,.38), 0 16px 38px rgba(0,0,0,.42);
+  --sh-glass: 0 1px 1px rgba(0,0,0,.20), 0 10px 30px rgba(0,0,0,.34);
+  --e-out: cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+input{font:inherit}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{text-wrap:pretty}
+body{
+  min-height:100dvh;display:flex;flex-direction:column;
+  background:var(--felt-deep);color:var(--ink);
+  font-family:"Archivo","Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(circle at 18% 6%,  rgba(255,255,255,.050), transparent 9%),
+    radial-gradient(circle at 42% 11%, rgba(255,255,255,.038), transparent 11%),
+    radial-gradient(circle at 24% 27%, rgba(255,255,255,.046), transparent 12%),
+    radial-gradient(circle at 63% 38%, rgba(255,255,255,.042), transparent 15%),
+    radial-gradient(circle at 48% 62%, rgba(255,255,255,.040), transparent 11%),
+    radial-gradient(circle at 89% 78%, rgba(255,255,255,.052), transparent 13%),
+    radial-gradient(circle at 58% 92%, rgba(255,255,255,.062), transparent 18%),
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+}
+::selection{background:var(--brass-soft);color:var(--ink)}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px;border-radius:6px}
+.av{width:38px;height:38px;border-radius:99px;object-fit:cover;background:var(--glass);box-shadow:0 0 0 1px var(--hair);flex:none}
+.k{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3)}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+/* ── 名片專用（cream stock）─────────────────────────────── */
+:root{
+  --stock:#FAF6EC; --stock-2:#EDE6D4; --stock-3:#E2D9C2;
+  --stock-ink:#1A1714; --stock-ink-2:rgba(26,23,20,.62); --stock-ink-3:rgba(26,23,20,.40);
+  --stock-hair:rgba(26,23,20,.14); --stock-hair-2:rgba(26,23,20,.075);
+  --foil:#A9823C; --foil-2:#C4A15A;
+}
+.bodoni{font-family:"Bodoni Moda",Georgia,"Songti TC",serif}
+.serif{font-family:"Libre Baskerville",Georgia,serif}

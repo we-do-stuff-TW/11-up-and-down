@@ -1,0 +1,40 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+<title>C 座位表 · 開房頁</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:opsz,wght@6..96,600&display=swap">
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#15181d;color:#F2EFE6;font-family:Archivo,"PingFang TC",sans-serif;padding:34px 40px 60px}
+h1{font-family:"Bodoni Moda",serif;font-size:30px;font-weight:600;margin:0 0 4px}
+.sub{color:#9a968c;font-size:13px;margin:0 0 26px}
+.row{margin-bottom:30px}
+.hd{display:flex;align-items:baseline;gap:14px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.12)}
+.hd b{font-size:15px}
+.hd span{color:#9a968c;font-size:12.5px}
+.hd a{margin-left:auto;color:#C4A15A;font-size:12px;text-decoration:none}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+figure{margin:0}
+figcaption{font-size:11px;color:#9a968c;letter-spacing:.14em;margin-bottom:6px}
+img{width:100%;display:block;border-radius:8px;box-shadow:0 1px 0 rgba(255,255,255,.08),0 18px 40px rgba(0,0,0,.5)}
+.old{opacity:.5}
+</style></head><body>
+<h1>C 座位表 · 開房頁</h1>
+<p class="sub">定案的一案。桌子是線稿座位表，設定＝同一張紙翻面。<a href="c.html" style="color:#C4A15A">開原型 →</a>（底下切換器可切 開房／設定、房主／客人）</p>
+
+<div class="row"><div class="hd"><b>房主</b><span>開房 → 設定</span><a href="c.html">開 →</a></div>
+  <div class="pair">
+    <figure><figcaption>開房</figcaption><img src="shots/c-room.png"></figure>
+    <figure><figcaption>設定</figcaption><img src="shots/c-set.png"></figure>
+  </div></div>
+
+<div class="row"><div class="hd"><b>客人</b><span>沒有設定入口、沒有開始；規則整份唯讀看得到</span><a href="c.html?guest">開 →</a></div>
+  <div class="pair">
+    <figure><figcaption>客人看到的開房頁</figcaption><img src="shots/c-guest.png"></figure>
+    <figure><figcaption>手機（房主／設定／客人）</figcaption><img src="shots/c-phone.png"></figure>
+  </div></div>
+
+<div class="row old"><div class="hd"><b>沒選上的</b><span>留著對照</span></div>
+  <div class="pair">
+    <figure><figcaption>A 圍桌</figcaption><img src="shots/a-room.png"></figure>
+    <figure><figcaption>B 滿版牌桌</figcaption><img src="shots/b-room.png"></figure>
+  </div></div>
+</body></html>

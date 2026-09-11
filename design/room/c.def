@@ -1,0 +1,412 @@
+/* TITLE: C 座位表 · 開房 */
+/* ── C 案：不做木頭跟絨布，桌子是一張線稿座位表。設定＝同一張紙翻面。 ── */
+.pg{flex:1;display:flex;flex-direction:column;min-height:100dvh}
+.top{display:flex;align-items:center;justify-content:space-between;gap:20px;
+  padding:22px clamp(22px,2.6vw,36px) 0}
+.top .you{display:flex;align-items:center;gap:10px}
+.top .you .nm{font-size:13px;color:var(--ink-2)}
+.top .you .av,.top .you .mono-av{width:26px;height:26px;font-size:11px}
+
+.body{flex:1;display:flex;min-height:0}
+
+/* ── 左：座位表 ─────────────────────────────────────────── */
+.plan{flex:1;position:relative;display:grid;place-items:center;min-width:0;padding:20px 40px 40px}
+.diagram{position:relative;width:680px;height:434px}
+.ring{position:absolute;inset:0;border-radius:50%;border:1px solid oklch(.845 .128 84/.30);
+  background:radial-gradient(78% 84% at 50% 46% in oklab,oklch(1 0 0/.028),transparent 72%)}
+.ring::after{content:"";position:absolute;inset:9px;border-radius:50%;border:1px solid oklch(.845 .128 84/.10)}
+.mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.mid .code{font-family:"Bodoni Moda",Georgia,serif;font-size:84px;font-weight:600;line-height:1;
+  letter-spacing:.1em;text-indent:.1em;color:var(--ink)}
+.mid .cap{color:var(--ink-3)}
+.mid .copy{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-3);
+  padding:7px 13px;border-radius:99px;transition:.18s}
+.mid .copy:hover{background:oklch(1 0 0/.05);color:var(--ink-2)}
+.mid .copy i{width:3px;height:3px;border-radius:99px;background:var(--foil-2);display:block}
+
+/* 桌邊的刻度：每個位子在橢圓上都有一道 */
+.tick{position:absolute;left:50%;top:50%;width:19px;height:1px;background:var(--foil-2);opacity:.45;
+  translate:calc(-50% + var(--x)) calc(-50% + var(--y));rotate:var(--r)}
+.tick.open{background:var(--ink-3);opacity:.3}
+
+.p{position:absolute;left:50%;top:50%;translate:calc(-50% + var(--x)) calc(-50% + var(--y));
+  display:flex;align-items:center;gap:10px;white-space:nowrap}
+.p.l{flex-direction:row-reverse}
+.p.l .t{text-align:right}
+.p .t{display:flex;flex-direction:column;gap:4px;line-height:1}
+.p .t b{font-size:15px;font-weight:600;letter-spacing:.01em}
+.p .t span{font-size:10px;letter-spacing:.14em;color:var(--ink-3)}
+.p.me .t b{color:var(--brass)}
+.p .mono-av,.p .av{width:36px;height:36px}
+.p.open .t b{font-size:13px;font-weight:400;color:var(--ink-3);letter-spacing:.14em}
+.p.open .ph{width:36px;height:36px;border-radius:99px;border:1px dashed oklch(.90 .02 92/.20);flex:none}
+.p.open{opacity:.9;transition:opacity .2s}
+.p.open:hover{opacity:1}
+.p.open:hover .t b{color:var(--ink-2)}
+.p.open .t span{transition:opacity .18s}
+.p.open .t .ai{position:absolute;opacity:0;color:var(--foil-2)}
+.p.open:hover .t .wait{opacity:0}
+.p.open:hover .t .ai{opacity:1}
+
+.plan .foot{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:11.5px;
+  color:var(--ink-3);letter-spacing:.04em}
+
+/* ── 右：印出來的規則 ──────────────────────────────────── */
+.sheet{width:376px;flex:none;border-left:1px solid var(--hair);
+  padding:26px 34px 26px;display:flex;flex-direction:column}
+.sheethd{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:2px}
+.sheethd h2{font-family:"Bodoni Moda",Georgia,serif;font-size:23px;font-weight:600;letter-spacing:-.005em}
+.lnk{font-size:12px;color:var(--ink-3);padding:6px 2px;position:relative;transition:color .18s}
+.lnk::after{content:"";position:absolute;left:0;right:0;bottom:4px;height:1px;background:var(--hair);
+  transition:background .18s}
+.lnk:hover{color:var(--ink)}
+.lnk:hover::after{background:var(--brass)}
+.sheetsub{margin:0 0 20px;font-size:11.5px;color:var(--ink-3)}
+
+.sect{margin-bottom:16px}
+.sect>.cap{display:block;margin-bottom:6px}
+.r{display:flex;align-items:baseline;gap:0;padding:7px 0}
+.r .k{font-size:12.5px;color:var(--ink-3);flex:none}
+.r .d{flex:1;margin:0 9px;border-bottom:1px dotted oklch(.90 .02 92/.26);translate:0 -4px}
+.r .v{font-size:13px;color:var(--ink);flex:none}
+.r .v small{color:var(--ink-3);font-size:11px}
+
+.tot{margin:auto 0 0;padding-top:18px;border-top:1px solid var(--hair);
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  font-size:12px;color:var(--ink-3)}
+.tot b{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:500;color:var(--ink-2);
+  font-variant-numeric:tabular-nums}
+.go{margin-top:16px}
+.sheetft{margin:11px 0 0;font-size:11px;color:var(--ink-3);text-align:center;letter-spacing:.03em}
+
+/* ── 設定：同一張紙翻過來，整頁就是規則表 ───────────────── */
+.edit{display:none;flex:1;min-height:0;flex-direction:column;padding:10px clamp(22px,3.4vw,52px) 30px}
+body.set .edit{display:flex}
+body.set .body{display:none}
+.edithd{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  padding-bottom:16px;border-bottom:1px solid var(--hair)}
+.edithd h2{font-family:"Bodoni Moda",Georgia,serif;font-size:34px;font-weight:600;letter-spacing:-.01em}
+.edithd .meta{margin:6px 0 0;font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
+.edithd .meta b{color:var(--ink-2);font-weight:500;font-family:"IBM Plex Mono",monospace}
+.cols{flex:1;display:grid;grid-template-columns:1fr 1px 1fr;gap:0 clamp(28px,3.6vw,58px);
+  padding-top:6px;overflow:auto}
+.cols .rule{width:1px;background:var(--hair);height:100%}
+.f{display:flex;align-items:baseline;gap:20px;padding:22px 0;border-bottom:1px solid var(--hair-2)}
+.f>label{width:88px;flex:none;font-size:12.5px;color:var(--ink-3);padding-top:1px}
+.f .pick{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4px;flex:1}
+.ch{font-size:13.5px;color:var(--ink-3);padding:4px 6px;position:relative;transition:color .18s}
+.ch::after{content:"";position:absolute;left:6px;right:6px;bottom:1px;height:1px;background:transparent;
+  transition:background .18s}
+.ch:hover{color:var(--ink-2)}
+.ch[aria-pressed=true]{color:var(--ink)}
+.ch[aria-pressed=true]::after{background:var(--brass)}
+.sep{color:var(--hair);font-size:11px;user-select:none}
+.f .note{width:100%;margin:7px 0 0;font-size:11.5px;line-height:1.6;color:var(--ink-3)}
+.editft{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+  padding-top:16px;border-top:1px solid var(--hair)}
+.nums{display:flex;gap:34px}
+.nums .k{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.nums .v{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:500;line-height:1;
+  font-variant-numeric:tabular-nums}
+.editft .tail{font-size:11.5px;color:var(--ink-3);text-align:right;max-width:38ch}
+.doneline{display:flex;gap:10px;align-items:center}
+.done{padding:9px 22px;border-radius:99px;font-size:12.5px;color:var(--ink);
+  background:var(--glass);box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair)}
+.done:hover{background:oklch(.98 .012 92/.13)}
+
+/* ── 座位與刻度的座標：桌子換尺寸時只改這裡 ───────────────── */
+.tick.t1{--x:0px;--y:217px;--r:90deg}
+.tick.t2{--x:-277px;--y:124px;--r:122.5deg}
+.tick.t3{--x:-277px;--y:-124px;--r:237.5deg}
+.tick.t4{--x:0px;--y:-217px;--r:270deg}
+.tick.t5{--x:277px;--y:-124px;--r:312.3deg}
+.tick.t6{--x:277px;--y:124px;--r:47.7deg}
+.p.s1{--x:0px;--y:272px}
+.p.s2{--x:-330px;--y:158px}
+.p.s3{--x:-330px;--y:-158px}
+.p.s4{--x:0px;--y:-272px}
+.p.s5{--x:330px;--y:-158px}
+.p.s6{--x:330px;--y:158px}
+
+/* ── 房主 / 客人 ───────────────────────────────────────── */
+.g-only{display:none}
+body.guest .g-only{display:block}
+body.guest span.g-only,body.guest .byhost{display:inline}
+body.guest .h-only{display:none}
+.byhost{font-size:10px;letter-spacing:.16em;color:var(--ink-3);padding:6px 0}
+/* 你是誰，桌上只有一個人是銅色 */
+.p.s1 .t b{color:var(--brass)}
+body.guest .p.s1 .t b{color:var(--ink)}
+body.guest .p.s2 .t b{color:var(--brass)}
+/* 客人不能放 AI，空位就只是空位 */
+body.guest .p.open .t .ai{display:none}
+body.guest .p.open:hover .t .wait{opacity:1}
+.waiting{margin-top:16px;font-size:13px;color:var(--ink-2);text-align:center;line-height:1.5}
+.waiting span{display:block;font-size:11px;color:var(--ink-3);margin-top:4px;letter-spacing:.03em}
+.waiting .pulse{display:inline-block;width:5px;height:5px;border-radius:99px;background:var(--brass);
+  margin:0 8px 0 0;vertical-align:2px;animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.35;box-shadow:0 0 0 0 oklch(.845 .128 84/0)}
+  50%{opacity:1;box-shadow:0 0 0 4px oklch(.845 .128 84/.10)}}
+@media (prefers-reduced-motion:reduce){.waiting .pulse{animation:none;opacity:.8}}
+
+/* ── 手機：整張座位表縮成一頁的上半，規則接在下面 ───────────── */
+@media (max-width:760px){
+  .top{padding:14px 16px 0}
+  .top .you .nm{display:none}
+  .body{flex-direction:column;overflow:auto}
+  .plan{flex:none;padding:10px 16px 0;place-items:start center}
+  .diagram{width:300px;height:260px}
+  .ring::after{inset:7px}
+  .mid{gap:7px}
+  .mid .code{font-size:46px}
+  .mid .copy{font-size:11px;padding:5px 10px}
+  .tick{width:14px}
+  .tick.t1{--x:0px;--y:130px}
+  .tick.t2{--x:-123px;--y:75px}
+  .tick.t3{--x:-123px;--y:-75px}
+  .tick.t4{--x:0px;--y:-130px}
+  .tick.t5{--x:123px;--y:-75px}
+  .tick.t6{--x:123px;--y:75px}
+  .p,.p.l{flex-direction:column;gap:6px;text-align:center}
+  .p.l .t{text-align:center}
+  .p .t{gap:3px}
+  .p .t b{font-size:12.5px}
+  .p .t span{font-size:9px;letter-spacing:.1em}
+  .p .mono-av,.p .av,.p.open .ph{width:30px;height:30px}
+  .p.open .t b{font-size:11px}
+  .p.s1{--x:0px;--y:174px}
+  .p.s2{--x:-142px;--y:100px}
+  .p.s3{--x:-142px;--y:-100px}
+  .p.s4{--x:0px;--y:-174px}
+  .p.s5{--x:142px;--y:-100px}
+  .p.s6{--x:142px;--y:100px}
+  .plan .foot{position:static;margin:96px 0 0;font-size:11px}
+  .sheet{width:auto;border-left:0;border-top:1px solid var(--hair);
+    margin-top:16px;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+  .sheethd h2{font-size:20px}
+  .sect{margin-bottom:12px}
+  .tot{margin-top:14px}
+  .sheet .go{position:sticky;bottom:10px;z-index:3}
+  /* 設定頁：兩欄併一欄 */
+  .edit{padding:8px 16px 24px}
+  .edithd{flex-direction:column;align-items:flex-start;gap:12px}
+  .edithd h2{font-size:26px}
+  .doneline{width:100%;justify-content:space-between}
+  .cols{grid-template-columns:1fr;padding-top:0}
+  .cols .rule{display:none}
+  .f{flex-direction:column;gap:8px;padding:16px 0}
+  .f>label{width:auto}
+  .editft{flex-direction:column;align-items:flex-start;gap:10px;
+    position:sticky;bottom:0;background:linear-gradient(to top,var(--felt-deep) 76%,transparent);
+    padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  .nums{gap:26px}
+  .editft .tail{text-align:left}
+}
+/*==HTML==*/
+<div class="pg">
+  <header class="top">
+    <div class="mk"><b>11</b><u>UP &amp; DOWN</u></div>
+    <div class="you">
+      <button class="ghost">離開房間</button>
+      <span class="nm"><span class="h-only">Francis</span><span class="g-only">阿哲</span></span>
+      <img class="av h-only" src="__AV__" alt="">
+      <span class="mono-av g-only">哲</span>
+    </div>
+  </header>
+
+  <div class="body">
+    <section class="plan">
+      <div class="diagram">
+        <div class="ring"></div>
+
+        <span class="tick t1"></span>
+        <span class="tick open t2"></span>
+        <span class="tick open t3"></span>
+        <span class="tick t4"></span>
+        <span class="tick open t5"></span>
+        <span class="tick t6"></span>
+
+        <div class="mid">
+          <span class="cap">房號</span>
+          <span class="code">7K2M</span>
+          <button class="copy"><i></i>按一下複製，貼給朋友</button>
+        </div>
+
+        <div class="p s1" data-seat="host">
+          <img class="av" src="__AV__" alt="">
+          <div class="t"><b>Francis</b><span>房主<span class="h-only"> · 你</span></span></div>
+        </div>
+        <div class="p l s2" data-seat="mate">
+          <div class="mono-av">哲</div>
+          <div class="t"><b>阿哲</b><span><span class="h-only">在線上</span><span class="g-only">你</span></span></div>
+        </div>
+        <div class="p l open s3">
+          <div class="ph"></div>
+          <div class="t"><b>空位</b><span style="position:relative"><span class="wait">等人進來</span><span class="ai">放一個 AI</span></span></div>
+        </div>
+        <div class="p s4">
+          <div class="mono-av">圓</div>
+          <div class="t"><b>小圓</b><span>在線上</span></div>
+        </div>
+        <div class="p open s5">
+          <div class="ph"></div>
+          <div class="t"><b>空位</b><span style="position:relative"><span class="wait">等人進來</span><span class="ai">放一個 AI</span></span></div>
+        </div>
+        <div class="p open s6">
+          <div class="ph"></div>
+          <div class="t"><b>空位</b><span style="position:relative"><span class="wait">等人進來</span><span class="ai">放一個 AI</span></span></div>
+        </div>
+      </div>
+      <p class="foot">誰進來誰就是一位，最多十個人 · 開打之後這桌就鎖起來</p>
+    </section>
+
+    <aside class="sheet">
+      <div class="sheethd">
+        <h2>這一桌的規則</h2>
+        <button class="lnk h-only" id="toSet">設定</button>
+        <span class="byhost g-only">房主決定</span>
+      </div>
+      <p class="sheetsub h-only">你是房主，只有你改得動。</p>
+      <p class="sheetsub g-only">房主 Francis 可以改，改了你這邊會即時跟著變。</p>
+
+      <div class="sect">
+        <span class="cap">叫墩</span>
+        <div class="r"><span class="k">方式</span><i class="d"></i><span class="v">依序公開叫</span></div>
+        <div class="r"><span class="k">末位限制</span><i class="d"></i><span class="v">the hook</span></div>
+      </div>
+      <div class="sect">
+        <span class="cap">牌</span>
+        <div class="r"><span class="k">牌組</span><i class="d"></i><span class="v">雙副</span></div>
+        <div class="r"><span class="k">最小點數</span><i class="d"></i><span class="v">7 <small>以上</small></span></div>
+        <div class="r"><span class="k">鬼牌</span><i class="d"></i><span class="v">不放</span></div>
+      </div>
+      <div class="sect">
+        <span class="cap">計分</span>
+        <div class="r"><span class="k">叫中</span><i class="d"></i><span class="v">10＋叫</span></div>
+        <div class="r"><span class="k">叫 0 中了</span><i class="d"></i><span class="v">5 分</span></div>
+        <div class="r"><span class="k">沒叫中</span><i class="d"></i><span class="v">扣差額</span></div>
+      </div>
+
+      <div class="sect">
+        <span class="cap">這樣算</span>
+        <div class="r"><span class="k">叫 3，拿 3</span><i class="d"></i><span class="v">＋13</span></div>
+        <div class="r"><span class="k">叫 0，拿 0</span><i class="d"></i><span class="v">＋5</span></div>
+        <div class="r"><span class="k">叫 3，拿 4</span><i class="d"></i><span class="v">−1</span></div>
+      </div>
+
+      <div class="tot">
+        <span>64 張牌 · 4 個人</span>
+        <span><b>11</b> 張到頂 · <b>21</b> 局</span>
+      </div>
+      <button class="go h-only">開始</button>
+      <p class="sheetft h-only">三個人就位 · 兩人以上隨時可以開</p>
+      <div class="waiting g-only"><span class="pulse"></span>等 Francis 按開始
+        <span>你已經入座了，牌一發就開始</span></div>
+    </aside>
+  </div>
+
+  <!-- 設定：整頁就是規則表 -->
+  <div class="edit">
+    <div class="edithd">
+      <div>
+        <h2>這一桌的規則</h2>
+        <p class="meta">房號 <b>7K2M</b> · 3 人就座 · 64 張牌</p>
+      </div>
+      <div class="doneline">
+        <span class="sheetsub" style="margin:0">改了桌上每個人都會即時看到</span>
+        <button class="done" id="toView">完成</button>
+      </div>
+    </div>
+
+    <div class="cols">
+      <section>
+        <span class="cap" style="display:block;margin:22px 0 4px">叫墩</span>
+        <div class="f"><label>方式</label>
+          <div class="pick">
+            <button class="ch" aria-pressed="true">依序公開叫</button><i class="sep">／</i><button class="ch">同時叫墩</button>
+            <p class="note">從起始玩家開始一位一位叫，後面的人看得到前面叫了多少。</p>
+          </div></div>
+        <div class="f"><label>末位限制</label>
+          <div class="pick">
+            <button class="ch" aria-pressed="true">the hook</button><i class="sep">／</i><button class="ch">不限制</button>
+            <p class="note">最後一位不得讓總叫墩數剛好等於總墩數：每一局一定有人要叫不中。</p>
+          </div></div>
+        <span class="cap" style="display:block;margin:30px 0 4px">牌</span>
+        <div class="f"><label>牌組</label>
+          <div class="pick"><button class="ch">單副</button><i class="sep">／</i><button class="ch" aria-pressed="true">雙副</button>
+            <p class="note">兩副牌。同點同花撞在同一墩時，先出的那張贏。</p></div></div>
+        <div class="f"><label>最小點數</label>
+          <div class="pick"><button class="ch">9</button><i class="sep">／</i><button class="ch" aria-pressed="true">7</button><i class="sep">／</i><button class="ch">6</button><i class="sep">／</i><button class="ch">5</button><i class="sep">／</i><button class="ch">4</button><i class="sep">／</i><button class="ch">3</button><i class="sep">／</i><button class="ch">2</button></div></div>
+        <div class="f"><label>鬼牌</label>
+          <div class="pick"><button class="ch" aria-pressed="true">不放</button><i class="sep">／</i><button class="ch">放兩張</button></div></div>
+      </section>
+
+      <i class="rule"></i>
+
+      <section>
+        <span class="cap" style="display:block;margin:22px 0 4px">計分</span>
+        <div class="f"><label>叫中得分</label>
+          <div class="pick"><button class="ch" aria-pressed="true">10＋叫</button><i class="sep">／</i><button class="ch">10×叫</button><i class="sep">／</i><button class="ch">10＋叫²</button>
+            <p class="note">叫 3 中了 13 分。叫大墩沒有溢價，所以永遠叫最可能中的那個數。</p></div></div>
+        <div class="f"><label>叫 0 中了</label>
+          <div class="pick"><button class="ch" aria-pressed="true">5 分</button><i class="sep">／</i><button class="ch">5＋該局張數</button>
+            <p class="note">不管幾張牌都是 5 分——叫 0 是不得已，不是策略。</p></div></div>
+        <div class="f"><label>沒叫中</label>
+          <div class="pick"><button class="ch" aria-pressed="true">扣差額</button><i class="sep">／</i><button class="ch">扣 10×差</button><i class="sep">／</i><button class="ch">扣差額²</button>
+            <p class="note">叫 3 拿 4 扣 1 分。罰得很輕，所以去破壞別人很便宜。</p></div></div>
+        <div class="f" style="border:0"><label>這樣算</label>
+          <div class="pick" style="display:block">
+            <div class="r"><span class="k">叫 3，拿 3</span><i class="d"></i><span class="v">＋13</span></div>
+            <div class="r"><span class="k">叫 0，拿 0</span><i class="d"></i><span class="v">＋5</span></div>
+            <div class="r"><span class="k">叫 3，拿 4</span><i class="d"></i><span class="v">−1</span></div>
+            <div class="r"><span class="k">叫 3，拿 0</span><i class="d"></i><span class="v">−3</span></div>
+          </div></div>
+      </section>
+    </div>
+
+    <div class="editft">
+      <div class="nums">
+        <div><div class="k">牌數</div><div class="v">64</div></div>
+        <div><div class="k">最多每人</div><div class="v">11</div></div>
+        <div><div class="k">總局數</div><div class="v">21</div></div>
+      </div>
+      <p class="tail">六十四張牌、四個人，階梯走得到 11 張、共 21 局。</p>
+    </div>
+  </div>
+</div>
+
+<div class="dev">
+  <button data-v="room" aria-pressed="true">開房</button>
+  <button data-v="set" id="devSet">設定</button>
+  <i></i>
+  <button data-r="host" aria-pressed="true">房主</button>
+  <button data-r="guest">客人</button>
+</div>
+<script>
+const setv = v => {
+  document.body.classList.toggle("set", v === "set");
+  document.querySelectorAll(".dev button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v));
+};
+const setrole = r => {
+  document.body.classList.toggle("guest", r === "guest");
+  if(r === "guest") setv("room");              /* 客人沒有設定頁：規則在右欄已經全看得到 */
+  document.getElementById("devSet").disabled = r === "guest";
+  document.querySelectorAll(".dev [data-r]").forEach(b => b.setAttribute("aria-pressed", b.dataset.r === r));
+};
+document.querySelector(".dev").onclick = e => {
+  const b = e.target.closest("button");
+  if(!b) return;
+  if(b.dataset.v) setv(b.dataset.v); else setrole(b.dataset.r);
+};
+document.getElementById("toSet").onclick = () => setv("set");
+document.getElementById("toView").onclick = () => setv("room");
+document.addEventListener("click", e => {
+  const o = e.target.closest(".ch");
+  if(!o) return;
+  o.parentElement.querySelectorAll(".ch").forEach(b => b.setAttribute("aria-pressed", "false"));
+  o.setAttribute("aria-pressed", "true");
+});
+if(location.search.includes("nodev")) document.querySelector(".dev").hidden = true;
+if(location.search.includes("guest")) setrole("guest");
+if(location.search.includes("set")) setv("set");
+</script>
