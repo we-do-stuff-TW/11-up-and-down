@@ -23,12 +23,44 @@ type Seat = { name: string; kind: "open" | "human" | "ai"; pid: string | null; a
 
 const PEAK_CAP = 11;
 const AFK_MS = 30_000;
+/* 鬼牌自成一門「花色」：不屬於任何一門，比王牌還大，整桌固定兩張 */
+const JS = 4, JOKER_N = 2;
 
-function buildDeck(decks: number, minRank: number): Card[] {
+/* 這一桌的規則。每一項都是獨立的旋鈕，預設就是原本玩的那套；
+   房主在等待房間裡改，改完存在 cfg 裡跟著牌局走。 */
+type Rules = {
+  n: number; decks: number; minRank: number; jokers: number;
+  bidMode: "seq" | "sim"; hook: number;
+  hit: "plus" | "x10" | "sq"; zero: "flat" | "hand"; miss: "diff" | "x10" | "sq";
+};
+const RULE_DEFAULTS: Omit<Rules, "n"> = {
+  decks: 2, minRank: 7, jokers: 0, bidMode: "seq", hook: 1,
+  hit: "plus", zero: "flat", miss: "diff",
+};
+const ONE_OF = <T extends string>(v: unknown, list: readonly T[], dflt: T): T =>
+  list.includes(v as T) ? (v as T) : dflt;
+/** 房主送上來的東西一律當成陌生人：只認得的欄位、只認得的值 */
+function cleanCfg(raw: unknown, keepN = 0): Rules {
+  const c = (raw ?? {}) as Record<string, unknown>;
+  return {
+    n: Math.max(0, Math.min(10, (c.n as number | undefined) ?? keepN | 0)),
+    decks: c.decks === 1 ? 1 : 2,
+    minRank: Math.max(2, Math.min(9, Number(c.minRank ?? 7) | 0)),
+    jokers: c.jokers ? 1 : 0,
+    bidMode: ONE_OF(c.bidMode, ["seq", "sim"] as const, "seq"),
+    hook: c.hook === 0 || c.hook === false ? 0 : 1,
+    hit: ONE_OF(c.hit, ["plus", "x10", "sq"] as const, "plus"),
+    zero: ONE_OF(c.zero, ["flat", "hand"] as const, "flat"),
+    miss: ONE_OF(c.miss, ["diff", "x10", "sq"] as const, "diff"),
+  };
+}
+
+function buildDeck(decks: number, minRank: number, jokers: number): Card[] {
   const d: Card[] = [];
   for (let n = 0; n < decks; n++)
     for (let s = 0; s < 4; s++)
       for (let r = minRank; r <= 14; r++) d.push({ s, r, id: `${n}-${s}-${r}` });
+  if (jokers) for (let j = 0; j < JOKER_N; j++) d.push({ s: JS, r: 15, id: `j-${j}` });
   return d;
 }
 function shuffle<T>(a: T[]): T[] {
@@ -39,7 +71,8 @@ function shuffle<T>(a: T[]): T[] {
   }
   return a;
 }
-const deckSizeOf = (decks: number, minRank: number) => (15 - minRank) * 4 * decks;
+const deckSizeOf = (decks: number, minRank: number, jokers: number) =>
+  (15 - minRank) * 4 * decks + (jokers ? JOKER_N : 0);
 const maxHand = (size: number, n: number) =>
   Math.max(1, Math.min(PEAK_CAP, Math.floor((size - 1) / n)));
 function ladderFor(peak: number): number[] {
@@ -49,11 +82,14 @@ function ladderFor(peak: number): number[] {
   return l;
 }
 function legalCards(hand: Card[], led: number | null): Card[] {
-  if (led === null || led === undefined) return hand.slice();
-  const f = hand.filter((c) => c.s === led);
-  return f.length ? f : hand.slice();
+  // 鬼牌不屬於任何花色：它永遠出得掉，別人領它出來時桌上也沒有花色要跟
+  if (led === null || led === undefined || led === JS) return hand.slice();
+  const f = hand.filter((c) => c.s === led || c.s === JS);
+  return f.some((c) => c.s === led) ? f : hand.slice();
 }
 function beats(a: Card, b: Card, trump: number | null, led: number | null): boolean {
+  // 鬼牌比王牌還大；同一墩兩張鬼牌，先出的（b）留著
+  if (a.s === JS || b.s === JS) return a.s === JS && b.s !== JS;
   const at = a.s === trump, bt = b.s === trump;
   if (at !== bt) return at;
   if (at) return a.r > b.r;
@@ -62,33 +98,59 @@ function beats(a: Card, b: Card, trump: number | null, led: number | null): bool
   return a.r > b.r; // 同點同花：先出的留著，後出的不算贏
 }
 function sortHand(h: Card[], trump: number | null) {
-  h.sort((a, b) => Number(b.s === trump) - Number(a.s === trump) || a.s - b.s || b.r - a.r);
+  h.sort((a, b) =>
+    Number(b.s === JS) - Number(a.s === JS) ||
+    Number(b.s === trump) - Number(a.s === trump) || a.s - b.s || b.r - a.r);
 }
-function roundPoints(bid: number, got: number): number {
-  if (bid === got) return bid === 0 ? 5 : 10 + bid;
-  return -Math.abs(got - bid);
+/* 計分是三個獨立的旋鈕：叫中怎麼算、叫 0 怎麼算、沒中罰多少 */
+function roundPoints(bid: number, got: number, hs: number, C: Rules): number {
+  if (bid === got) {
+    if (bid === 0) return C.zero === "hand" ? 5 + hs : 5;
+    return C.hit === "x10" ? 10 * bid : C.hit === "sq" ? 10 + bid * bid : 10 + bid;
+  }
+  const d = Math.abs(got - bid);
+  return C.miss === "x10" ? -10 * d : C.miss === "sq" ? -(d * d) : -d;
+}
+/** 已經公開的叫墩加總（-1 是同時叫墩裡「放好了還蓋著」，不算數） */
+function bidSum(R: Room): number {
+  let t = 0;
+  for (let i = 0; i < R.cfg.n; i++) { const b = R.bids[i]; if (typeof b === "number" && b >= 0) t += b; }
+  return t;
+}
+/** the hook：最後一位不得讓總叫墩數等於總墩數。回傳被擋掉的那個數，沒有就 -1 */
+function hookBlocked(R: Room, seat: number): number {
+  if (!R.cfg.hook || R.cfg.bidMode === "sim" || R.phase !== "bid") return -1;
+  if (seat !== (R.starter + R.cfg.n - 1) % R.cfg.n) return -1;
+  for (let i = 0; i < R.cfg.n; i++)
+    if (i !== seat && (R.bids[i] === null || R.bids[i] === undefined)) return -1;
+  const left = R.hs - bidSum(R);
+  return left >= 0 && left <= R.hs ? left : -1;
 }
 
 /* ════════════ AI ════════════ */
-function aiBid(hand: Card[], trump: number | null, hs: number, n: number): number {
+function aiBid(hand: Card[], trump: number | null, hs: number, n: number, no = -1): number {
   let e = 0;
   for (const c of hand) {
-    if (c.s === trump) e += c.r >= 13 ? 0.92 : c.r >= 11 ? 0.68 : c.r >= 9 ? 0.45 : 0.3;
+    if (c.s === JS) e += 0.97;   // 鬼牌幾乎是一墩現金
+    else if (c.s === trump) e += c.r >= 13 ? 0.92 : c.r >= 11 ? 0.68 : c.r >= 9 ? 0.45 : 0.3;
     else e += c.r === 14 ? 0.78 : c.r === 13 ? 0.5 : c.r === 12 ? 0.27 : 0.07;
   }
   e = (e * 4) / n + (Math.random() - 0.5) * 0.5;
-  return Math.max(0, Math.min(hs, Math.round(e)));
+  let v = Math.max(0, Math.min(hs, Math.round(e)));
+  // 被 hook 擋下來就往旁邊挪一格
+  if (v === no) v = (v + 1 <= hs && (e >= v || v === 0)) ? v + 1 : Math.max(0, v - 1);
+  return v;
 }
 function aiCard(
   hand: Card[], trick: { p: number; card: Card }[],
   led: number | null, trump: number | null, need: number,
 ): Card {
   const legal = legalCards(hand, led);
-  const val = (c: Card) => (c.s === trump ? 100 : 0) + c.r;
+  const val = (c: Card) => (c.s === JS ? 200 : c.s === trump ? 100 : 0) + c.r;
   const asc = legal.slice().sort((a, b) => val(a) - val(b));
   if (trick.length === 0) {
     if (need > 0) {
-      const tr = asc.filter((c) => c.s === trump);
+      const tr = asc.filter((c) => c.s === trump || c.s === JS);
       return tr.length ? tr[tr.length - 1] : asc[asc.length - 1];
     }
     return asc[0];
@@ -104,7 +166,7 @@ function aiCard(
 /* ════════════ 房間狀態 ════════════ */
 type Room = {
   code: string; rev: number;
-  cfg: { n: number; decks: number; minRank: number };
+  cfg: Rules;
   ladder: number[]; seats: Seat[];
   phase: string; ri: number; hs: number; starter: number;
   trump: number | null; trump_card: Card | null;
@@ -163,11 +225,12 @@ async function deal(sb: SupabaseClient, R: Room) {
   const n = R.ladder[R.ri];
   R.hs = n;
   R.starter = R.ri % R.cfg.n;
-  const deck = shuffle(buildDeck(R.cfg.decks, R.cfg.minRank));
+  const deck = shuffle(buildDeck(R.cfg.decks, R.cfg.minRank, R.cfg.jokers));
   const hands: Card[][] = Array.from({ length: R.cfg.n }, () => []);
   for (let k = 0; k < R.cfg.n; k++) hands[(R.starter + k) % R.cfg.n] = deck.splice(0, n);
   R.trump_card = deck.length ? deck.shift()! : null;
-  R.trump = R.trump_card ? R.trump_card.s : null;
+  // 翻到鬼牌：這局無王，但那兩張鬼牌照樣最大
+  R.trump = R.trump_card && R.trump_card.s !== JS ? R.trump_card.s : null;
   for (const h of hands) sortHand(h, R.trump);
   R.bids = Array(R.cfg.n).fill(null);
   R.won = Array(R.cfg.n).fill(0);
@@ -180,9 +243,30 @@ async function deal(sb: SupabaseClient, R: Room) {
   );
 }
 
-function applyBid(R: Room, seat: number, v: number): boolean {
-  if (R.phase !== "bid" || R.turn !== seat) return false;
+async function applyBid(sb: SupabaseClient, R: Room, seat: number, v: number): Promise<boolean> {
+  if (R.phase !== "bid") return false;
   if (!(Number.isInteger(v) && v >= 0 && v <= R.hs)) return false;
+
+  if (R.cfg.bidMode === "sim") {
+    // 同時叫墩：數字先寫進 hands（那張表 RLS 開著、一條 policy 都沒有，誰都讀不到），
+    // rooms 上只留一個 -1 表示「這位放好了」。全桌放完才一次翻開。
+    if (R.bids[seat] !== null && R.bids[seat] !== undefined) return false;
+    await sb.from("hands").update({ bid: v })
+      .eq("code", R.code).eq("ri", R.ri).eq("seat", seat);
+    R.bids[seat] = -1;
+    for (let i = 0; i < R.cfg.n; i++) if (R.bids[i] === null || R.bids[i] === undefined) return true;
+    const { data } = await sb.from("hands").select("seat,bid").eq("code", R.code).eq("ri", R.ri);
+    const sealed = new Map((data ?? []).map((r: { seat: number; bid: number | null }) => [r.seat, r.bid]));
+    for (let i = 0; i < R.cfg.n; i++) {
+      const b = sealed.get(i);
+      R.bids[i] = typeof b === "number" && b >= 0 && b <= R.hs ? b : 0;
+    }
+    R.phase = "play"; R.turn = R.leader;
+    return true;
+  }
+
+  if (R.turn !== seat) return false;
+  if (v === hookBlocked(R, seat)) return false;
   R.bids[seat] = v;
   let done = true;
   for (let k = 0; k < R.cfg.n; k++) {
@@ -191,6 +275,17 @@ function applyBid(R: Room, seat: number, v: number): boolean {
   }
   if (done) { R.phase = "play"; R.turn = R.leader; }
   return true;
+}
+
+/** 幾個人在座就幾個人玩：座位一動，人數、階梯、分數欄一起跟上 */
+function reseat(R: Room) {
+  const old = R.score ?? [];
+  R.cfg.n = R.seats.length;
+  R.ladder = ladderFor(maxHand(
+    deckSizeOf(R.cfg.decks, R.cfg.minRank, R.cfg.jokers), Math.max(1, R.cfg.n)));
+  R.score = R.seats.map((_, i) => old[i] ?? 0);
+  R.bids = R.seats.map(() => null);
+  R.won = R.seats.map(() => 0);
 }
 async function applyPlay(sb: SupabaseClient, R: Room, seat: number, cardId: string): Promise<boolean> {
   if (R.phase !== "play" || R.turn !== seat) return false;
@@ -213,7 +308,7 @@ function resolveTrick(R: Room) {
   if (R.played >= R.hs) {
     const cells = [];
     for (let i = 0; i < R.cfg.n; i++) {
-      const pts = roundPoints(R.bids[i] as number, R.won[i]);
+      const pts = roundPoints(R.bids[i] as number, R.won[i], R.hs, R.cfg);
       R.score[i] += pts;
       cells.push({ bid: R.bids[i], got: R.won[i], pts, hit: R.bids[i] === R.won[i] });
     }
@@ -350,21 +445,17 @@ Deno.serve(async (req) => {
 
     /* ---- create ---- */
     if (action === "create") {
-      const cfg = (body as { cfg?: Room["cfg"] }).cfg ?? { n: 4, decks: 2, minRank: 7 };
-      cfg.n = Math.max(2, Math.min(10, cfg.n | 0));
-      cfg.decks = cfg.decks === 1 ? 1 : 2;
-      cfg.minRank = Math.max(2, Math.min(9, cfg.minRank | 0));
+      // 開房的時候桌上只有房主。人數不是設定出來的，是進來幾個人就幾個人。
+      const cfg = cleanCfg((body as { cfg?: unknown }).cfg);
+      cfg.n = 1;
       const name = String((body as { name?: string }).name || "房主").slice(0, 10);
-      const ladder = ladderFor(maxHand(deckSizeOf(cfg.decks, cfg.minRank), cfg.n));
-      const seats: Seat[] = Array.from({ length: cfg.n }, (_, i) =>
-        i === 0
-          ? { name, kind: "human" as const, pid, av: prof.avatar }
-          : { name: `座位 ${i + 1}`, kind: "open" as const, pid: null });
+      const ladder = ladderFor(maxHand(deckSizeOf(cfg.decks, cfg.minRank, cfg.jokers), 1));
+      const seats: Seat[] = [{ name, kind: "human", pid, av: prof.avatar }];
       for (let t = 0; t < 6; t++) {
         const code = randCode();
         const { data, error } = await sb.from("rooms").insert({
           code, cfg, ladder, seats, host_pid: pid,
-          score: Array(cfg.n).fill(0), bids: [], won: [],
+          score: [0], bids: [null], won: [0],
           seen: { [pid]: Date.now() }, step_at: Date.now(),
         }).select().maybeSingle();
         if (data) return json({ ok: true, pid, room: data, hand: [] });
@@ -395,23 +486,59 @@ Deno.serve(async (req) => {
         return json({ ok: true, pid, room: R, hand: await mine() });
       }
 
-      case "sit": {
-        if (R.phase !== "lobby") return json({ error: "牌局已經開始，等這局結束再入座" }, 409);
-        const i = (body as { seat?: number }).seat ?? -1;
-        if (i < 0 || i >= R.cfg.n) return json({ error: "沒有這個座位" }, 400);
+      // 舊版客端還在用 sit（挑座位）。部署函式與推前端之間一定有一小段空窗，
+      // 這條別名讓那段時間線上的舊頁面照樣坐得下來——座位改成動態之後，
+      // 「挑第幾號位子」已經沒有意義，一律當成 join。
+      case "sit":
+      // 幾個人進來就幾個人玩：不必挑位子，來了就多一張椅子
+      case "join": {
+        if (seatOf(R, pid) >= 0) return json({ ok: true, pid, room: R, hand: await mine() });
+        if (R.phase !== "lobby") return json({ error: "牌局已經開始，等這局結束再進來" }, 409);
+        if (R.seats.length >= 10) return json({ error: "這桌滿了（最多 10 人）" }, 409);
         const name = String((body as { name?: string }).name || "玩家").slice(0, 10);
-        if (R.seats[i].kind === "human" && R.seats[i].pid !== pid)
-          return json({ error: "這個位子有人了" }, 409);
-        for (const s of R.seats) if (s.pid === pid) { s.pid = null; s.kind = "open"; s.name = "座位"; s.av = null; }
-        R.seats[i] = { name, kind: "human", pid, av: prof.avatar };
+        R.seats.push({ name, kind: "human", pid, av: prof.avatar });
+        reseat(R);
+        return await ok(await persist(sb, R, false));
+      }
+
+      case "addai": {
+        if (R.phase !== "lobby") return json({ error: "牌局已經開始" }, 409);
+        if (!canDirect(R, pid)) return json({ error: "只有房主能加人" }, 403);
+        if (R.seats.length >= 10) return json({ error: "這桌滿了（最多 10 人）" }, 409);
+        R.seats.push({ name: `AI ${R.seats.length + 1}`, kind: "ai", pid: null, av: null });
+        reseat(R);
+        return await ok(await persist(sb, R, false));
+      }
+
+      case "unseat": {
+        if (R.phase !== "lobby") return json({ error: "牌局已經開始" }, 409);
+        if (!canDirect(R, pid)) return json({ error: "只有房主能移除座位" }, 403);
+        const i = (body as { seat?: number }).seat ?? -1;
+        if (i < 0 || i >= R.seats.length) return json({ error: "沒有這個座位" }, 400);
+        if (R.seats[i].pid && R.seats[i].pid === R.host_pid)
+          return json({ error: "房主不能把自己移掉" }, 409);
+        R.seats.splice(i, 1);
+        reseat(R);
+        return await ok(await persist(sb, R, false));
+      }
+
+      // 規則只有房主改得動，而且只在開打之前。改完存進 cfg，跟著這一桌走。
+      case "cfg": {
+        if (R.phase !== "lobby") return json({ error: "開打之後不能改規則" }, 409);
+        if (!canDirect(R, pid)) return json({ error: "只有房主能改規則" }, 403);
+        R.cfg = cleanCfg((body as { cfg?: unknown }).cfg, R.seats.length);
+        reseat(R);
         return await ok(await persist(sb, R, false));
       }
 
       case "start": {
         if (R.phase !== "lobby") return json({ error: "已經開始了" }, 409);
         if (!canDirect(R, pid)) return json({ error: "只有房主能開始" }, 403);
+        if (R.seats.length < 2) return json({ error: "至少要兩個人，可以加 AI 湊" }, 409);
         R.seats = R.seats.map((s, i) =>
-          s.kind === "human" ? s : { name: `AI ${i + 1}`, kind: "ai" as const, pid: null, av: null });
+          s.kind === "human" ? s : { name: s.name || `AI ${i + 1}`, kind: "ai" as const, pid: null, av: null });
+        reseat(R);
+        R.score = Array(R.cfg.n).fill(0);
         await deal(sb, R);
         return await ok(await persist(sb, R));
       }
@@ -419,7 +546,7 @@ Deno.serve(async (req) => {
       case "bid": {
         const seat = seatOf(R, pid);
         if (seat < 0) return json({ error: "你不在座位上" }, 403);
-        if (!applyBid(R, seat, (body as { v?: number }).v ?? -1))
+        if (!await applyBid(sb, R, seat, (body as { v?: number }).v ?? -1))
           return json({ error: "現在不能叫墩" }, 409);
         return await ok(await persist(sb, R));
       }
@@ -459,9 +586,15 @@ Deno.serve(async (req) => {
         const firstPlay = R.phase === "play" && R.played === 0 && !R.trick.length;
         const playWait = firstPlay ? Math.max(sp * 0.9, 2800) : sp * 0.9;
         let moved = false;
-        if (R.phase === "bid" && aiSeat(R, R.turn) && since > sp * 0.8) {
-          const h = await readHand(sb, code, R.ri, R.turn);
-          moved = applyBid(R, R.turn, aiBid(h, R.trump, R.hs, R.cfg.n));
+        if (R.phase === "bid" && since > sp * 0.8) {
+          // 同時叫墩沒有「輪到誰」：挑一個還沒放好的 AI，一次放一個，節奏跟依序叫一樣
+          const seat = R.cfg.bidMode === "sim"
+            ? R.seats.findIndex((_, i) => aiSeat(R, i) && (R.bids[i] === null || R.bids[i] === undefined))
+            : (aiSeat(R, R.turn) ? R.turn : -1);
+          if (seat >= 0) {
+            const h = await readHand(sb, code, R.ri, seat);
+            moved = await applyBid(sb, R, seat, aiBid(h, R.trump, R.hs, R.cfg.n, hookBlocked(R, seat)));
+          }
         } else if (R.phase === "play" && aiSeat(R, R.turn) && since > playWait) {
           const h = await readHand(sb, code, R.ri, R.turn);
           const need = (R.bids[R.turn] as number) - R.won[R.turn];
@@ -478,7 +611,16 @@ Deno.serve(async (req) => {
       }
 
       case "leave": {
-        for (const s of R.seats) if (s.pid === pid) { s.pid = null; s.kind = "open"; s.name = "座位"; s.av = null; }
+        if (R.phase === "lobby") {
+          const i = R.seats.findIndex((s) => s.pid === pid);
+          if (i >= 0) { R.seats.splice(i, 1); reseat(R); }
+          // 房主走了，房主身分交給還在座的第一個真人
+          if (R.host_pid === pid)
+            R.host_pid = R.seats.find((s) => s.kind === "human" && s.pid)?.pid ?? null;
+        } else {
+          // 牌局中不能抽掉椅子（位序會整排位移），交給 AI 代打
+          for (const s of R.seats) if (s.pid === pid) { s.pid = null; s.kind = "open"; s.name = "座位"; s.av = null; }
+        }
         return await ok(await persist(sb, R, false));
       }
     }
