@@ -253,7 +253,7 @@ input{font:inherit}
 .hist .vs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hist .pts{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
 /* ================= 版面 ================= */
-.main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) clamp(306px,25vw,374px);min-height:0}
+.main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) clamp(330px,28vw,430px);min-height:0}
 @media (max-width:960px){ .main{grid-template-columns:minmax(0,1fr)} }
 
 .table{
@@ -667,54 +667,82 @@ body.is3d .av{width:16px;height:16px}
 .ledger-head{display:flex;align-items:baseline;gap:9px;padding:13px 16px 10px}
 .ledger-head h2{font-size:10px;letter-spacing:.17em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
 .ledger-head .of{margin-left:auto;font-size:10.5px;color:var(--ink-3);font-family:"IBM Plex Mono",monospace}
-.ledger-scroll{overflow:auto;flex:1;max-height:min(66vh,640px);padding:0 8px 14px}
+.ledger-scroll{overflow:auto;flex:1;max-height:min(66vh,640px);padding:0 12px 18px}
 
+/* 一格只記那一局的得分失分。不記「拿幾墩／叫幾墩」——桌上的座位牌正在講那件事，
+   計分表是打完之後的帳。少了那兩個數字，欄寬夠用了，字才放得大。
+   設計三案與定案理由在 design/score/r2/README.md。 */
 table.score{border-collapse:collapse;width:100%;table-layout:fixed;
   font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
-table.score col.c-sz{width:36px}
-table.score col.c-tr{width:24px}
-table.score th,table.score td{padding:4px 5px;text-align:right;white-space:nowrap;overflow:hidden}
+table.score col.c-gut{width:66px}
+
+/* 表頭＝總分。整張表只有這一排是亮的 */
 table.score thead th{
   position:sticky;top:0;z-index:2;
   background:var(--felt-deep);
-  border-bottom:1px solid var(--hair);
-  font-size:10.5px;font-weight:500;color:var(--ink-3);
-  font-family:"Archivo",sans-serif;letter-spacing:.02em;
+  /* border-collapse 的邊框不跟著 sticky 走（會留在表格原本的位置），用 inset 陰影畫這條線 */
+  box-shadow:inset 0 -1px 0 var(--hair);
+  padding:6px 7px 13px;text-align:right;white-space:nowrap;
 }
+table.score thead th .nm{
+  display:block;font-family:"Archivo",sans-serif;font-size:10.5px;font-weight:500;
+  letter-spacing:.06em;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;
+}
+/* 自己那一欄把名字提亮就好。銅色留給「誰在領先」，兩個訊號不搶同一種顏色 */
+table.score thead th.me .nm{color:var(--ink)}
+table.score thead th.gut{text-align:left}
+table.score thead th.gut .nm{font-size:9.5px;letter-spacing:.2em;text-transform:uppercase}
 table.score thead th .tot{
-  display:block;font-family:"IBM Plex Mono",monospace;
-  font-size:14px;color:var(--ink);font-weight:500;letter-spacing:0;
+  display:block;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;
+  font-size:34px;line-height:1.05;letter-spacing:-.015em;color:var(--ink);
+  font-variant-numeric:tabular-nums;
 }
 table.score thead th .tot.lead{color:var(--brass)}
 table.score thead th .tot.up{animation:tot .5s var(--e-out)}
 @keyframes tot{0%{color:var(--brass);transform:translateY(-3px)}100%{color:var(--ink);transform:none}}
-table.score td{border-bottom:1px solid var(--hair-2);font-size:11px;color:var(--ink-3)}
-table.score tr.now td{color:var(--ink-2)}
-table.score tr.now .sz span{color:var(--brass)}
-.rd{text-align:left;color:var(--ink-3);font-size:10.5px;opacity:.75}
-.sz{position:relative;text-align:left;padding-left:9px}
-.szbar{
-  position:absolute;left:0;top:50%;translate:0 -50%;height:15px;width:var(--w);
-  background:oklch(.90 .02 92 / .07);border-radius:2px;
+
+table.score td{
+  position:relative;padding:0 8px;height:41px;
+  text-align:right;white-space:nowrap;border-bottom:1px solid var(--hair-2);
 }
-/* 進行中的那一局：左側一道黃銅細線，跟階梯上亮起的那一格同一個意思 */
-table.score tr.now .sz::before{
-  content:"";position:absolute;left:0;top:22%;bottom:22%;width:2px;border-radius:1px;
+/* 局數那一欄：張數、王牌，底下一條長度＝那一局幾張。整疊看下來就是 1→11→1 */
+table.score td.gut{text-align:left;padding-left:10px;color:var(--ink-3)}
+td.gut .sz{position:relative;font-size:14px;color:var(--ink-2)}
+td.gut .tsuit{position:relative;margin-left:7px;width:12px;height:12px}
+td.gut .nt{position:relative;margin-left:6px;font-size:10px;letter-spacing:.1em;opacity:.8}
+.szbar{
+  position:absolute;left:10px;bottom:7px;height:2px;width:var(--w);
+  border-radius:1px;background:oklch(.90 .02 92 / .22);
+}
+/* 正的一定是叫中、負的一定是沒中——正負號已經說完，不再另外標記號、也不上綠色 */
+.p{font-size:19px;color:var(--ink-2);letter-spacing:-.01em}
+.p.neg{color:var(--bad)}
+.p.best{color:var(--ink)}          /* 那一局賺最多的人：只提亮一階，不加底也不加框 */
+.dot{color:oklch(.700 .016 92 / .45)}
+
+/* 進行中的那一局還沒有分數可記，只標「你在這裡」 */
+table.score tr.now td{background:oklch(.98 .012 92 / .045)}
+table.score tr.now td.gut::after{
+  content:"";position:absolute;left:0;top:19%;bottom:19%;width:2px;border-radius:1px;
   background:var(--brass);z-index:1;
 }
-.sz span{position:relative;color:var(--ink-2)}
+table.score tr.now td.gut .sz{color:var(--brass)}
+table.score tr.now td.gut .szbar{background:var(--brass);opacity:.5}
+table.score tr.ahead td.gut{color:oklch(.700 .016 92 / .4)}
+table.score tr.ahead .szbar{opacity:.45}
 table.score tbody tr:hover td{background:oklch(.90 .02 92 / .035)}
-.cell .b{opacity:.5}
-/* 叫中／沒中：數字前面一個小點，跟座位牌上那排軌跡同一套記號 */
-.cell.hit::before,.cell.miss::before{
-  content:"";display:inline-block;width:4px;height:4px;border-radius:1px;margin-right:5px;vertical-align:1px;
-  background:var(--good);
-}
-.cell.miss::before{height:2px;background:var(--bad);opacity:.7;vertical-align:2px}
-.cell.hit{color:var(--good)}
-.cell .pt{margin-left:4px;color:var(--ink-2)}
-.cell.hit .pt{color:var(--good)}
-.cell.miss .pt{color:var(--bad)}
+
+/* 人一多欄就窄，字級跟著降一階。一格只有一個數字，所以降到十個人還讀得完 */
+table.score.tight td{padding:0 5px;height:37px}
+table.score.tight .p{font-size:15.5px}
+table.score.tight thead th{padding:6px 5px 11px}
+table.score.tight thead th .tot{font-size:25px}
+table.score.tighter td{padding:0 3px;height:34px}
+table.score.tighter .p{font-size:13.5px}
+table.score.tighter thead th{padding:6px 3px 10px}
+table.score.tighter thead th .tot{font-size:19px}
+table.score.tighter thead th .nm{font-size:9.5px;letter-spacing:0}
+table.score.tighter col.c-gut{width:54px}
 .tsuit{width:10px;height:10px;fill:var(--ink-3)}
 .tsuit.r{fill:var(--bad)}
 
@@ -4350,44 +4378,49 @@ function renderHand(me){
   }).replace('class="card', 'class="card' + (mine && ok[c.id] ? " legal" : ""))).join(""));
 }
 
+/* 把進行中的那一局捲到中間。只捲計分表自己的容器——用 scrollIntoView 會連整頁一起捲，
+   在手機的直式版面那等於每一輪結束都把人拉到計分表去。
+   窄螢幕的計分表是浮層，關著的時候高度是 0，這裡算出來會是 0；所以打開的那一刻要再叫一次。 */
+function centerLedger(){
+  const tr = $("score").querySelector("tr.now"), box = $("score").parentNode;
+  if(!tr || !box || !box.clientHeight) return;
+  const a = tr.getBoundingClientRect(), b = box.getBoundingClientRect();
+  box.scrollTop += (a.top - b.top) - (b.height - a.height) / 2;
+}
 function renderLedger(){
-  const maxSize = Math.max.apply(null, G.ladder);
-  let h = '<colgroup><col class="c-sz"><col class="c-tr">' +
-    '<col span="' + G.cfg.n + '"></colgroup>' +
-    '<thead><tr><th class="rd">張</th><th class="rd">王</th>';
+  const n = G.cfg.n, maxSize = Math.max.apply(null, G.ladder), me = mySeat();
   const top = Math.max.apply(null, G.score.map(v => v || 0));
-  for(let i=0;i<G.cfg.n;i++)
-    h += '<th>' + seatLabel(i).replace("（你）", "") + '<span class="tot' +
+  /* 人一多欄就窄，整張表降一階字級。class 掛在表上，不跟著 innerHTML 重寫 */
+  const sc = $("score");
+  sc.classList.toggle("tight", n >= 7);
+  sc.classList.toggle("tighter", n >= 9);
+
+  let h = '<colgroup><col class="c-gut"><col span="' + n + '"></colgroup>' +
+    '<thead><tr><th class="gut"><span class="nm">局</span></th>';
+  for(let i=0;i<n;i++)
+    h += '<th' + (i === me ? ' class="me"' : '') + '><span class="nm">' +
+      seatLabel(i).replace("（你）", "") + '</span><span class="tot' +
       (G.log.length && (G.score[i]||0) === top ? " lead" : "") + '">' + (G.score[i]||0) + '</span></th>';
   h += '</tr></thead><tbody>';
   G.ladder.forEach(function(size, i){
     const row = G.log[i], now = i === G.ri;
-    h += '<tr class="' + (now ? "now" : "") + '" title="第 ' + (i+1) + ' 局">' +
-      '<td class="sz"><span class="szbar" style="--w:' + Math.round(size/maxSize*100) + '%"></span>' +
-      '<span>' + size + '</span></td><td class="rd">' +
-      (row ? (row.trump === null ? "—" : pip(row.trump, "tsuit"))
-           : (now && G.trumpCard ? pip(G.trump, "tsuit") : "")) + '</td>';
-    for(let k=0;k<G.cfg.n;k++){
-      if(row){
-        const c = row.cells[k];
-        h += '<td class="cell ' + (c.hit ? "hit" : "miss") + '">' + c.got +
-          '<span class="b">/' + c.bid + '</span><span class="pt">' +
-          (c.pts >= 0 ? "+" : "−") + Math.abs(c.pts) + '</span></td>';
-      }else if(now && typeof G.bids[k] === "number" && G.bids[k] >= 0){
-        h += '<td class="cell">' + G.won[k] + '<span class="b">/' + G.bids[k] + '</span></td>';
-      }else h += '<td class="cell"><span class="b">·</span></td>';
+    /* 王牌：打完的那幾局照紀錄，進行中那局要等牌翻出來，還沒到的局什麼都不寫 */
+    const tr = row ? row.trump : (now && G.trumpCard ? G.trump : undefined);
+    /* 一局裡賺最多的那個人，數字提亮一階 */
+    const best = row ? Math.max.apply(null, row.cells.map(c => c.pts)) : null;
+    h += '<tr class="' + (now ? "now" : row ? "" : "ahead") + '" title="第 ' + (i+1) + ' 局">' +
+      '<td class="gut"><span class="szbar" style="--w:' + (6 + Math.round(size/maxSize*30)) + 'px"></span>' +
+      '<span class="sz">' + size + '</span>' +
+      (tr === undefined ? "" : tr === null ? '<span class="nt">無王</span>' : pip(tr, "tsuit")) + '</td>';
+    for(let k=0;k<n;k++){
+      if(!row){ h += '<td><span class="dot">·</span></td>'; continue; }
+      const p = row.cells[k].pts;
+      h += '<td><span class="p' + (p < 0 ? " neg" : p === best ? " best" : "") + '">' +
+        (p >= 0 ? "+" : "−") + Math.abs(p) + '</span></td>';
     }
     h += '</tr>';
   });
-  if(setHTML($("score"), h + '</tbody>')){
-    /* 只捲計分表自己的容器。用 scrollIntoView 會連整頁一起捲——
-       在手機的直式版面，那等於每一輪結束都把人拉到計分表去 */
-    const tr = $("score").querySelector("tr.now"), box = $("score").parentNode;
-    if(tr && box){
-      const a = tr.getBoundingClientRect(), b = box.getBoundingClientRect();
-      box.scrollTop += (a.top - b.top) - (b.height - a.height) / 2;
-    }
-  }
+  if(setHTML($("score"), h + '</tbody>')) centerLedger();
   $("ledgerOf").textContent = G.cfg.decks + " 副 · " + G.deckSize + " 張 · " + G.cfg.n + " 人";
 }
 
@@ -4830,6 +4863,8 @@ function showFinal(){
 function setScore(open){
   document.body.classList.toggle("score-open", open);
   $("btnScore").setAttribute("aria-expanded", open ? "true" : "false");
+  /* 剛打開才量得到高度：這時候才捲得到進行中的那一局 */
+  if(open) centerLedger();
 }
 $("btnScore").onclick = function(){ setScore(!document.body.classList.contains("score-open")); };
 $("scoreClose").onclick = function(){ setScore(false); };

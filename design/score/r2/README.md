@@ -43,7 +43,15 @@ Francis 看完第一輪：**方向選 A（記分簿）**，但每一格的「拿
 3. 附帶一條：各案都寫 `table.sc td{text-align:right}`，特異性比 `_base.css` 的 `td.gut` 高，
    局數欄會被拉成靠右。`_base.css` 那條要寫成 `table.sc td.gut` 才壓得住。
 
-## 挑完之後
+## 定案：甲（已經接進 docs）
+
+Francis 選甲。`renderLedger()` 與「計分表」那段 CSS 都換掉了，右欄從
+`clamp(306px,25vw,374px)` 放寬到 `clamp(330px,28vw,430px)`。
+分級的 class（`tight` / `tighter`）掛在 `#score` 這個 table 上、不跟著 innerHTML 重寫，
+由 `G.cfg.n` 決定。順手修掉一個舊毛病：窄螢幕的計分表是浮層，關著的時候容器高度是 0，
+所以「捲到進行中那一局」算出來永遠是 0——打開的那一刻要再叫一次（`centerLedger()`）。
+
+## 原本挑完之後要做的事（留著當紀錄）
 
 接 `docs/index.html` 的 `renderLedger()` 與「計分表」那段 CSS。
 `.main` 的右欄 `clamp(306px,25vw,374px)` 要放寬——三案都是照 420px 畫的。
