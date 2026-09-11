@@ -1512,8 +1512,8 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
     <span class="lb-stat" id="lbStat"></span>
   </button>
 
-  <h1 class="lb-ask">加入誰的桌？</h1>
-  <p class="lb-tip">房號是四碼，開桌的人畫面上就有</p>
+  <h1 class="lb-ask" id="lbAsk">加入誰的桌？</h1>
+  <p class="lb-tip" id="lbTip">房號是四碼，開桌的人畫面上就有</p>
 
   <div class="lb-code" id="lcode">
     <input id="lcIn" maxlength="4" autocomplete="off" autocapitalize="characters"
@@ -1531,6 +1531,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   <div class="lb-alt">
     <button class="lb-al" id="lbHost">開一桌</button>
     <button class="lb-al" id="lbSolo">一個人打</button>
+    <button class="lb-al" id="lbDrop" hidden>不回去了</button>
   </div>
 
   <footer class="lb-ft">
@@ -2904,6 +2905,31 @@ const MY = {
 const NET = {code:null, chan:null, sb:null, state:"ok", err:"", busy:false, queued:0, tail:null};
 /* 登入用的 access token 存一份在記憶體裡，快過期了才回去換（見 accessToken） */
 const TOK = {v:null, exp:0};
+/* 關掉分頁不等於離開房間——座位、手牌、分數都還在伺服器上，只是三十秒後換 AI 代打。
+   所以這台裝置記住最後坐下的房號，下次開起來就問一句「要不要回去」。
+   記 uid 是因為同一台電腦會換人登入；記時間是因為隔了一天的那一桌不必再問。 */
+const ROOM_KEY = "ud.room", ROOM_TTL = 12*3600*1000;
+let ROOM_SAVED = "", ROOM_AT = 0;
+function rememberRoom(code){
+  if(!code) return;
+  const now = Date.now();
+  /* 牌局中每一列都會經過這裡，同一間房一分鐘寫一次就夠新了 */
+  if(code === ROOM_SAVED && now - ROOM_AT < 60000) return;
+  ROOM_SAVED = code; ROOM_AT = now;
+  try{ localStorage.setItem(ROOM_KEY, JSON.stringify({code:code, uid:MY.uid || "", at:now})); }catch(e){}
+}
+function forgetRoom(){
+  ROOM_SAVED = ""; ROOM_AT = 0;
+  try{ localStorage.removeItem(ROOM_KEY); }catch(e){}
+}
+function savedRoom(){
+  let v = null;
+  try{ v = JSON.parse(localStorage.getItem(ROOM_KEY) || "null"); }catch(e){}
+  if(!v || !/^[A-Z0-9]{4}$/.test(v.code || "")) return "";
+  if(Date.now() - (v.at || 0) > ROOM_TTL) return "";
+  if(MY.uid && v.uid && v.uid !== MY.uid) return "";   /* 這台電腦換人登入了 */
+  return v.code;
+}
 let G = null, MODE = "solo", SPEED_KEY = "mid", SPEED = TUNE.speeds.mid, applying = false;
 /* 出牌速度的家在設定頁。狀態只有這一份，選了就記在這台裝置上。 */
 function setSpeed(k){
@@ -3146,6 +3172,9 @@ function applyRow(row, hand){
   G = g; MODE = "net"; NET.code = row.code;
   const s = mySeat();
   if(s >= 0) G.hands[s] = MYHAND;
+  /* 只記「我還坐在裡面」的那一桌。被移除、或牌局中把位子交給 AI 之後，
+     伺服器回的那一列裡就沒有我了——那一桌不該再問「要不要回去」。 */
+  if(s >= 0) rememberRoom(row.code); else forgetRoom();
   render();
   /* 開房頁開著就跟著更新；開打之後（phase 不再是 lobby）那張自動開的要收掉 */
   if(!$("room").hidden){
@@ -3159,6 +3188,7 @@ function applyRow(row, hand){
 function subscribe(code){
   unsubscribe();
   NET.code = code;
+  rememberRoom(code);
   if(!NET.sb) return;
   NET.chan = NET.sb.channel("room-" + code, {config:{broadcast:{self:false}}})
     .on("postgres_changes",
@@ -3320,6 +3350,31 @@ async function authBoot(){
   const d = await api("hello", {});
   if(d && d.pid) MY.pid = d.pid;
   render();
+  offerReturn();
+}
+
+/* 上次是關掉分頁走的？先確認那一桌還在、位子還是你的，大廳才改口問「要不要回去」。
+   這一趟直接讀 rooms（那張表本來就公開讀，realtime 訂的也是它），不走 state——
+   state 會順手蓋一次 seen，等於還沒回去就先告訴那一桌「他在線上」，
+   輪到你的時候整桌會停在那裡等一個根本沒打開牌桌的人。 */
+async function offerReturn(){
+  const code = savedRoom();
+  if(!code || MODE === "net" || !NET.sb) return;
+  if(!$("lobby") || $("lobby").hidden) return;
+  let row = null, seated = true;
+  try{
+    const r = await NET.sb.from("rooms").select("seats,phase").eq("code", code).maybeSingle();
+    /* 讀失敗（網路、權限）跟「那一桌沒有你」是兩件事：前者要照問，後者才是不問。
+       supabase-js 讀不到的時候是回一個 error，不是丟出來的——不擋的話會被當成位子沒了。 */
+    if(r && r.error) throw r.error;
+    row = r && r.data;
+    seated = !!row && (row.seats || []).some(function(s){
+      return s && s.kind === "human" && s.pid && s.pid === MY.pid;
+    });
+    if(!seated) forgetRoom();          /* 房間沒了，或位子已經讓出去了：不必問 */
+  }catch(e){}                          /* 讀不到就照問，最壞是按下去才知道回不去 */
+  if(seated && MODE !== "net" && !$("lobby").hidden)
+    setResume(code, row && row.phase);
 }
 
 async function createRoom(cfg){
@@ -3334,6 +3389,13 @@ async function joinRoom(code){
   if(!d) throw new Error(NET.err || ("找不到房號 " + code));
   subscribe(code);
   return d;
+}
+/* 大廳出去的那一步：還在等人就停在開房頁，牌已經在打（中途回來的人）就直接進牌桌。
+   不這樣分的話，回來的人會先看到一張等待中的座位表，要等下一次推播才自己收掉。 */
+function enterRoom(){
+  closeLobby();
+  if(G && MODE === "net" && G.phase !== "lobby"){ closeRoom(); return; }
+  openRoom(true);
 }
 
 /* ================= 動作 ================= */
@@ -4836,6 +4898,7 @@ async function handleNet(a){
       if(d) closeRoom();                     /* 沒成功就留在原地，錯誤訊息印在規則欄底下 */
     }else if(a === "leave"){
       if(NET.code) await api("leave", {code:NET.code});
+      forgetRoom();
       unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
       MYHAND = []; MYHAND_RI = -1;
       closeRoom();
@@ -4954,6 +5017,7 @@ $("btnSignOut").onclick = async function(){
   const b = $("btnSignOut");
   b.disabled = true; b.textContent = "登出中…";
   try{ if(NET.code) await api("leave", {code:NET.code}); }catch(e){}
+  forgetRoom();
   try{ if(NET.sb) await NET.sb.auth.signOut(); }catch(e){}
   try{ localStorage.removeItem("ud.name"); }catch(e){}
   gotoLogin(true);
@@ -5170,6 +5234,7 @@ function buildIdleTable(){
 function openLobby(){
   document.body.classList.add("in-lobby");
   $("lobby").hidden = false;
+  setResume("");
   lbErr("");
   paintLobbyMe();
   loadLobbyStats();
@@ -5227,7 +5292,7 @@ function paintLobbyStat(){
 function paintCode(){
   const inp = $("lcIn");
   if(!inp) return;
-  const v = inp.value, on = document.activeElement === inp;
+  const v = inp.value, on = document.activeElement === inp && !inp.disabled;
   const cells = $("lcode").querySelectorAll(".lb-cell");
   for(let i=0;i<cells.length;i++){
     cells[i].textContent = v[i] || "";
@@ -5249,22 +5314,46 @@ $("lcIn").addEventListener("keydown", function(e){
 
 function lbLock(on){
   lbBusy = on;
-  ["lbHost", "lbSolo"].forEach(function(id){ const b = $(id); if(b) b.disabled = on; });
+  ["lbHost", "lbSolo", "lbDrop"].forEach(function(id){ const b = $(id); if(b) b.disabled = on; });
+  paintCode();
+}
+
+/* 「要不要回剛才那一桌」不另外開一個面板：大廳本來就是問你要去哪的那一頁，
+   換掉標題、把房號填進那四張牌位、進去變回去，或者底下只剩「不回去了」。 */
+let lbBack = "";
+function setResume(code, phase){
+  lbBack = code || "";
+  const on = !!lbBack, inp = $("lcIn");
+  $("lbAsk").textContent = on ? "回剛才那一桌？" : "加入誰的桌？";
+  $("lbTip").textContent = on
+    ? (phase && phase !== "lobby" ? "位子還留著——你不在的時候 AI 先幫你打" : "位子還留著，那一桌還在等人")
+    : "房號是四碼，開桌的人畫面上就有";
+  $("lbGo").textContent = on ? "回去" : "進去";
+  inp.value = on ? lbBack : "";
+  inp.disabled = on;            /* 這時候四張牌位只是在報房號，不收鍵盤 */
+  $("lbDrop").hidden = !on;
+  $("lbHost").hidden = on;
+  $("lbSolo").hidden = on;
   paintCode();
 }
 
 $("lbGo").onclick = async function(){
-  const code = $("lcIn").value;
+  const code = lbBack || $("lcIn").value;
   if(code.length !== 4 || lbBusy) return;
   lbLock(true); lbErr("");
-  try{ await joinRoom(code); closeLobby(); openRoom(true); }
-  catch(e){ lbErr(NET.err || ("找不到房號 " + code)); }
+  try{ await joinRoom(code); enterRoom(); }
+  catch(e){
+    const msg = NET.err || ("找不到房號 " + code);
+    /* 回不去的那一桌（散了、位子讓出去了、又開打了）不要再問第二次 */
+    if(lbBack){ forgetRoom(); setResume(""); }
+    lbErr(msg);
+  }
   lbLock(false);
 };
 $("lbHost").onclick = async function(){
   if(lbBusy) return;
   lbLock(true); lbErr("");
-  try{ await createRoom(rules(draft)); closeLobby(); openRoom(true); }
+  try{ await createRoom(rules(draft)); enterRoom(); }
   catch(e){ lbErr(NET.err || "開房失敗"); }
   lbLock(false);
 };
@@ -5276,6 +5365,22 @@ $("lbSolo").onclick = function(){
   buildIdleTable();
   closeLobby(); openRoom(true);
 };
+/* 不回去了＝真的離開：位子讓出來，朋友那邊才不會一直坐著一個離線的人。
+   （伺服器那邊 leave 在等待中是抽掉椅子，牌局中是把位子交給 AI。）
+   回應會經過 applyRow 把 MODE 設回 net，所以答應完要自己把桌子收乾淨。 */
+$("lbDrop").onclick = async function(){
+  if(lbBusy) return;
+  const code = lbBack;
+  lbLock(true);
+  setResume(""); forgetRoom();          /* 畫面先回到一般大廳，不等伺服器 */
+  try{ if(code) await api("leave", {code:code}); }catch(e){}
+  unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
+  MYHAND = []; MYHAND_RI = -1;
+  buildIdleTable();
+  lbLock(false);
+  try{ $("lcIn").focus({preventScroll:true}); }catch(e){}
+};
+
 /* 這幾個直接借用工具列那幾顆，peer session 之後改那邊的行為也跟著變 */
 $("lbMe").onclick    = function(){ openPg("me"); };
 $("lbRules").onclick = function(){ $("btnRules").click(); };
