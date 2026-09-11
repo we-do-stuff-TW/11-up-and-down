@@ -5946,7 +5946,9 @@ function placeOverlays(){
   document.querySelectorAll("#seats .seat").forEach(function(el){
     const i = +el.dataset.seat;
     const a = seatAnchor(i);
-    const bw = el.offsetWidth / 2 + 6, bh = el.offsetHeight / 2 + 6;
+    /* 用 scrollWidth：叫 8、9 墩時那一排點會把整列撐得比名牌本身寬，
+       只量 offsetWidth 的話最右邊那塊會被夾到剛好切掉「還差 n」那幾個字 */
+    const bw = Math.max(el.offsetWidth, el.scrollWidth) / 2 + 6, bh = Math.max(el.offsetHeight, el.scrollHeight) / 2 + 6;
     /* 直式螢幕上自己那塊釘在右下角：自己坐哪裡不需要空間提示，
        投影出來反而會壓在手牌或狀態列上。釘右邊是因為左邊那塊放了牌庫 */
     const q = (S.portrait && i === S.me)
