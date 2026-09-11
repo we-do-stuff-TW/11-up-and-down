@@ -542,8 +542,26 @@ Deno.serve(async (req) => {
       const s = seatOf(R, pid);
       return s < 0 || R.ri < 0 ? [] : await readHand(sb, code, R.ri, s, H);
     };
-    const ok = async (room: Room | null) =>
-      json({ ok: true, pid, room: room ?? R, hand: await mine() });
+    /* persist 寫不進去有兩種，以前混為一談，兩種都回 `room ?? R`——
+       把記憶體裡那份「沒有存進去」的狀態當成真的送回客端。客端的 applyRow 只擋
+       `cur > inc`（比較舊的那一列），rev 沒變的話 `cur === inc` 就照單全收：
+       畫面顯示成功、資料庫沒有這回事，重新整理就打回原形。
+       （2026-09-11 就是這樣：migration 還沒跑，「再來一場」整條路假裝成功。）
+
+       現在回頭讀一次，把兩種分開：
+       · 別人先寫了（rev 被搶走，兩個客端同時敲 tick 很常見）——良性，
+         把資料庫裡那份真的送回去，客端跟上就好。不帶 hand：那一份是照 R.ri 讀的，
+         局數要是已經換了會被 applyRow 貼上新的 ri 標籤，變成拿舊手牌當新的；
+         不帶的話 applyRow 自己會去補一次 state。
+       · rev 沒動——那就是真的寫失敗（欄位不存在、約束擋下來）。老實回錯誤，
+         客端該退回的退回、該說話的說話。 */
+    const ok = async (room: Room | null) => {
+      if (room) return json({ ok: true, pid, room, hand: await mine() });
+      const { data } = await sb.from("rooms").select("*").eq("code", R.code).maybeSingle();
+      const fresh = data as Room | null;
+      if (fresh && (fresh.rev ?? 0) > R.rev) return json({ ok: true, pid, room: fresh });
+      return json({ error: "這一步沒有寫進去，再試一次" }, 409);
+    };
 
     switch (action) {
       case "state": {
