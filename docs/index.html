@@ -3736,9 +3736,13 @@ function renderStatus(me){
   if(NET.err){ setHTML(el, '<span class="msg" style="color:var(--bad)">' + NET.err + '</span>'); return; }
 
   if(G.phase === "lobby"){
-    setHTML(el, '<span class="msg">房間已開好，房號 <b class="code">' + NET.code + '</b></span>' +
-      '<span class="hint">把房號給朋友，他們在自己的裝置上開這一頁輸入即可</span>' +
-      '<span class="bidrow"><button class="btn primary" id="btnLobby">看座位</button></span>');
+    /* 大廳那張空桌也是 phase:"lobby"，但它沒有房號——不要對著沒開的房間報房號 */
+    setHTML(el, NET.code
+      ? '<span class="msg">房間已開好，房號 <b class="code">' + NET.code + '</b></span>' +
+        '<span class="hint">把房號給朋友，他們在自己的裝置上開這一頁輸入即可</span>' +
+        '<span class="bidrow"><button class="btn primary" id="btnLobby">看座位</button></span>'
+      : '<span class="msg">還沒開局</span>' +
+        '<span class="bidrow"><button class="btn primary" id="btnLobby">回大廳</button></span>');
     return;
   }
   if(MODE === "net" && !amHost() && !liveCids()[G.host]){
@@ -4054,7 +4058,8 @@ document.addEventListener("click", function(e){
   if(un && un.tagName === "BUTTON"){ api("unseat", {code:NET.code, seat:+un.dataset.unseat}); return; }
   if(e.target.id === "btnNext"){ nextRound(); return; }
   if(e.target.id === "btnFinal"){ showFinal(); return; }
-  if(e.target.id === "btnLobby"){ openNet(); return; }
+  /* 這顆在連線時是「看座位」、單人時是「回大廳」，跟頂列那顆走同一條路 */
+  if(e.target.id === "btnLobby"){ if(MODE === "net") openNet(); else openLobby(); return; }
   const sp = e.target.closest("#speed button");
   if(sp){
     SPEED_KEY = sp.dataset.sp;
