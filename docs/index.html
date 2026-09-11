@@ -2529,7 +2529,9 @@ const MY = {
   pid:null,
   name:(function(){ try{ return localStorage.getItem("ud.name") || ""; }catch(e){ return ""; } })()
 };
-const NET = {code:null, chan:null, sb:null, state:"ok", err:"", busy:false};
+const NET = {code:null, chan:null, sb:null, state:"ok", err:"", busy:false, queued:0, tail:null};
+/* 登入用的 access token 存一份在記憶體裡，快過期了才回去換（見 accessToken） */
+const TOK = {v:null, exp:0};
 let G = null, MODE = "solo", SPEED_KEY = "mid", SPEED = TUNE.speeds.mid, applying = false;
 let MYHAND = [], MYHAND_RI = -1;
 
@@ -2620,7 +2622,9 @@ setInterval(function(){
    其他人不敲——四個人都敲的話呼叫次數會是四倍，而且沒有任何好處。
    敲的人關掉分頁，他的 seen 會過期，下一位自動遞補。 */
 setInterval(function(){
-  if(MODE !== "net" || !G || NET.busy || !NET.code) return;
+  /* 通道上有東西（在跑的、排隊的）就等下一輪。420ms 後還是會再來一次，
+     這裡搶進去只會多一個沒必要的呼叫——「next」尤其不能連放兩發 */
+  if(MODE !== "net" || !G || NET.busy || NET.queued || !NET.code) return;
   const rounding = G.phase === "roundend";
   if(!rounding){
     if(G.phase !== "bid" && G.phase !== "play" && G.phase !== "trickend") return;
@@ -2641,8 +2645,21 @@ setInterval(function(){
 }, 10000);
 
 /* ================= 伺服器 ================= */
-async function api(action, args){
-  if(NET.busy) return null;
+/* 玩家按下去的那一下永遠不能消失。
+   以前這裡是「有別的呼叫在跑就 return null」——tick 每 420ms 一次、每次要跑快一秒，
+   那把鎖幾乎常態鎖著，你出的那張牌就這樣被默默丟掉，看起來像卡了兩秒。
+   現在改成排隊：玩家的動作一定會送出去，只是可能晚一點輪到（畫面早就先演了）。
+   tick 與 state 是背景噪音，有東西在排隊就跳過這一次，反正下一輪馬上又來。 */
+const BG = {tick:1, state:1};
+function api(action, args){
+  if(BG[action] && (NET.busy || NET.queued)) return Promise.resolve(null);
+  NET.queued++;
+  const run = function(){ return call(action, args); };
+  const done = function(d){ NET.queued--; return d; };
+  NET.tail = (NET.tail || Promise.resolve()).then(run, run).then(done, function(){ return done(null); });
+  return NET.tail;
+}
+async function call(action, args){
   NET.busy = true;
   try{
     /* Authorization 帶的是「你」，不是 anon key——anon key 誰都有，那不叫身分 */
@@ -2672,10 +2689,42 @@ async function api(action, args){
   }finally{ NET.busy = false; }
 }
 
+/* ================= 樂觀先走 =================
+   自己按下去的那一手，先用本機引擎演完、先畫出來，再送去伺服器。
+   出牌合不合法，用的全是自己手上看得到的資訊——本機算出來的跟伺服器算出來的
+   是同一份規則，所以「演錯了要退回去」幾乎不會發生；真的被打回票
+   （斷線太久座位被 AI 接手、別人先一步）才退回按之前的樣子。
+   這是連線遊戲的標準做法：網路不該出現在「按下去有反應」這條路上。 */
+let OPT = null;                           /* 還沒被伺服器確認的那一手，退回去用 */
+function snapshot(){
+  return {g:JSON.parse(JSON.stringify(G)), hand:MYHAND.slice()};
+}
+function rollback(s){
+  if(!s) return;
+  G = s.g; MYHAND = s.hand;
+  const i = mySeat();
+  if(i >= 0) G.hands[i] = MYHAND;
+  OPT = null;
+  render();
+}
+/* 伺服器這一列跟畫面上這一格是同一個畫面嗎？（本機已經演過了，它只是來蓋章）
+   是的話時間戳要留著，不然每一手的動畫都會在伺服器回話的那一刻從頭再跑一次。 */
+function sameBeat(g, row){
+  if(!g || g.phase !== row.phase || g.ri !== row.ri || g.played !== row.played) return false;
+  const a = g.trick || [], b = row.trick || [];
+  if(a.length !== b.length) return false;
+  for(let i=0;i<a.length;i++) if(a[i].p !== b[i].p || a[i].card.id !== b[i].card.id) return false;
+  const x = g.bids || [], y = row.bids || [];
+  if(x.length !== y.length) return false;
+  for(let i=0;i<x.length;i++) if(x[i] !== y[i]) return false;
+  return true;
+}
+
 /* 伺服器的一列 → 畫面要的形狀。唯一的差別：手牌只有自己那份。 */
 function applyRow(row, hand){
   if(!row || !row.cfg) return;
   if(G && MODE === "net" && NET.code === row.code && (G.rev||0) > (row.rev||0)) return;
+  OPT = null;                             /* 伺服器講話了，本機那份預測就作廢 */
 
   let needHand = false;
   if(hand !== undefined && hand !== null){ MYHAND = hand; MYHAND_RI = row.ri; }
@@ -2692,7 +2741,8 @@ function applyRow(row, hand){
     host:row.host_pid, rev:row.rev, seen:row.seen || {},
     deckSize:deckSizeOf(row.cfg.decks, row.cfg.minRank, row.cfg.jokers),
     at:(G && MODE === "net" && NET.code === row.code &&
-        (G.rev||0) === (row.rev||0) && G.phase === row.phase) ? G.at : Date.now(),
+        (((G.rev||0) === (row.rev||0) && G.phase === row.phase) || sameBeat(G, row)))
+      ? G.at : Date.now(),
     hands:[]
   };
   for(let i=0;i<g.cfg.n;i++) g.hands[i] = [];
@@ -2709,11 +2759,50 @@ function subscribe(code){
   unsubscribe();
   NET.code = code;
   if(!NET.sb) return;
-  NET.chan = NET.sb.channel("room-" + code)
+  NET.chan = NET.sb.channel("room-" + code, {config:{broadcast:{self:false}}})
     .on("postgres_changes",
         {event:"*", schema:"public", table:"rooms", filter:"code=eq." + code},
         function(p){ if(p && p.new) applyRow(p.new); })
+    .on("broadcast", {event:"move"}, function(p){ peerMove(p && p.payload); })
     .subscribe();
+}
+/* 對手的畫面：資料庫那一列要繞一圈（寫進去、WAL、realtime 再推出來）才會到別人那邊，
+   差不多一秒。broadcast 不碰資料庫，五十毫秒就到。所以按下去的同時也直接喊一聲，
+   別人先把牌畫上桌——權威永遠是伺服器那一列，它一到就整個蓋掉。 */
+function sendMove(m){
+  if(!NET.chan || MODE !== "net") return;
+  try{ NET.chan.send({type:"broadcast", event:"move", payload:m}); }catch(e){}
+}
+/* 這是別人家的瀏覽器喊過來的，不是伺服器講的話。只拿來提早畫一格畫面，而且只接
+   「現在本來就輪到他、桌上還沒有那張牌」的那一手；對不上就當沒聽見。
+   最壞的情況是有人亂喊，讓你多看一秒不存在的牌，隨後那一列到了就蓋掉。 */
+function peerMove(m){
+  if(!m || MODE !== "net" || !G || OPT) return;
+  const s = m.seat;
+  if(!(s >= 0 && s < G.cfg.n) || s === mySeat()) return;
+  if(m.t === "bid"){
+    if(G.phase !== "bid") return;
+    if(G.bids[s] !== null && G.bids[s] !== undefined) return;
+    if(rules(G.cfg).bidMode === "sim"){ G.bids[s] = -1; G.at = Date.now(); }
+    else{
+      if(G.turn !== s) return;
+      if(!(typeof m.v === "number" && m.v >= 0 && m.v <= G.hs)) return;
+      if(!applyBid(G, s, m.v)) return;
+    }
+    render();
+    return;
+  }
+  if(m.t !== "play" || G.phase !== "play" || G.turn !== s) return;
+  const c = m.card;
+  if(!c || typeof c.id !== "string" || typeof c.s !== "number" || typeof c.r !== "number") return;
+  if(G.trick.some(t => t.card.id === c.id)) return;
+  /* 別人的手牌本機沒有（那正是重點），所以這裡不能走 applyPlay——直接把牌放上檯面 */
+  if(G.trick.length === 0) G.led = c.s;
+  G.trick.push({p:s, card:{s:c.s, r:c.r, id:c.id}});
+  if(G.trick.length === G.cfg.n) G.phase = "trickend";
+  else G.turn = (s + 1) % G.cfg.n;
+  G.at = Date.now();
+  render();
 }
 function unsubscribe(){
   if(NET.chan && NET.sb) NET.sb.removeChannel(NET.chan);
@@ -2751,13 +2840,19 @@ function gotoLogin(stale){
     try{ NET.sb.auth.signOut({scope:"local"}).then(jump, jump); }catch(e){ jump(); }
   }else jump();
 }
-/* 每次呼叫伺服器都拿一次：過期的話 getSession 會自己換一張新的 */
+/* getSession 每一次都要搶 storage 的鎖、讀一次 localStorage；一秒鐘敲好幾次伺服器的
+   時候那是白付的成本。token 存一份在記憶體裡，剩不到一分鐘才回去換——
+   過期的話 getSession 本來就會自己換一張新的。 */
 async function accessToken(){
   if(!NET.sb) return null;
+  if(TOK.v && Date.now() < TOK.exp) return TOK.v;
   try{
     const r = await NET.sb.auth.getSession();
-    return (r && r.data && r.data.session && r.data.session.access_token) || null;
-  }catch(e){ return null; }
+    const s = r && r.data && r.data.session;
+    TOK.v = (s && s.access_token) || null;
+    TOK.exp = TOK.v ? (s.expires_at ? s.expires_at * 1000 : Date.now() + 3600000) - 60000 : 0;
+    return TOK.v;
+  }catch(e){ TOK.v = null; TOK.exp = 0; return null; }
 }
 /* Google 給的名字太長，桌上放不下；使用者自己取過名字就不覆蓋 */
 function adoptUser(u){
@@ -2804,6 +2899,8 @@ async function authBoot(){
   }catch(e){}
 
   NET.sb.auth.onAuthStateChange(function(ev, sess){
+    /* 換了一張 session（自動續期、登出、換帳號）：記憶體裡那份快取就不算數了 */
+    TOK.v = null; TOK.exp = 0;
     if(ev === "SIGNED_OUT" || !sess){ gotoLogin(); return; }
     adoptUser(sess.user);
   });
@@ -2832,11 +2929,21 @@ async function joinRoom(code){
 function doBid(v){
   const s = mySeat();
   if(s < 0 || !G || G.phase !== "bid") return;
-  if(rules(G.cfg).bidMode === "sim"){
+  const sim = rules(G.cfg).bidMode === "sim";
+  if(sim){
     if(G.bids[s] !== null && G.bids[s] !== undefined) return;   /* 一局只放一次 */
   }else if(G.turn !== s || v === hookBlocked(G, s)) return;
-  if(MODE === "solo"){ applying = true; applyBid(G, s, v); applying = false; push(); }
-  else api("bid", {code:NET.code, v:v});
+  if(MODE === "solo"){ applying = true; applyBid(G, s, v); applying = false; push(); return; }
+
+  const snap = snapshot();
+  /* 同時叫墩：數字是秘密，本機只放一個「我放好了」的記號（跟伺服器一樣記 -1），
+     真正的數字等全桌都放好了伺服器一起翻開。依序叫的數字本來就攤在桌上，直接演。 */
+  if(sim){ G.bids[s] = -1; G.at = Date.now(); }
+  else if(!applyBid(G, s, v)) return;
+  OPT = snap;
+  render();
+  sendMove({t:"bid", seat:s, v:sim ? -1 : v});
+  api("bid", {code:NET.code, v:v}).then(function(d){ if(!d && OPT === snap) rollback(snap); });
 }
 /* 一局打完就自己接下一局；打完最後一局就收桌 */
 function nextRound(){
@@ -2849,13 +2956,24 @@ function nextRound(){
 function doPlay(cardId, el){
   const s = mySeat();
   if(s < 0 || !G || G.phase !== "play" || G.turn !== s) return;
+  /* 先問本機引擎這一手出不出得掉，出得掉才讓牌離開手上。
+     以前是不管送不送得出去都先把牌淡掉，送不出去的時候牌就這樣消失在半空中。 */
+  const snap = MODE === "net" ? snapshot() : null;
+  applying = true;
+  const ok = applyPlay(G, s, cardId);
+  applying = false;
+  if(!ok) return;
+  /* 起飛點要在重畫之前量——重畫會把這張牌的 DOM 換掉 */
   if(el && !REDUCED){
     const r = el.getBoundingClientRect();
     PLAY_FROM = {seat:s, x:r.left + r.width/2, y:r.top + r.height/2, w:r.width, at:Date.now()};
     el.classList.add("is-leaving");
   }
-  if(MODE === "solo"){ applying = true; applyPlay(G, s, cardId); applying = false; push(); }
-  else api("play", {code:NET.code, card:cardId});
+  if(MODE === "solo"){ push(); return; }
+  OPT = snap;
+  render();
+  sendMove({t:"play", seat:s, card:G.trick[G.trick.length-1].card});
+  api("play", {code:NET.code, card:cardId}).then(function(d){ if(!d && OPT === snap) rollback(snap); });
 }
 
 /* ================= 畫面 ================= */
