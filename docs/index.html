@@ -3092,6 +3092,20 @@ async function call(action, args){
    （斷線太久座位被 AI 接手、別人先一步）才退回按之前的樣子。
    這是連線遊戲的標準做法：網路不該出現在「按下去有反應」這條路上。 */
 let OPT = null;                           /* 還沒被伺服器確認的那一手，退回去用 */
+/* 「本機已經先演到下一格了」的記號。
+   為什麼需要它：伺服器每寫一次就把 rev 加一，而同一個 rev 的那一列會走兩條路到我這裡——
+   HTTP 回應（0.3 秒）和 realtime 推播（約 1 秒）。我按下去的那一手就卡在這兩者中間：
+   牌已經在檯面上了，遲到的那一列卻還是出牌前的樣子。照舊只擋「rev 比較小」的話，
+   它會被當成新消息套進來，牌從檯面上消失，等真正的那一列到了再重演一次——
+   看起來就是「出牌後頓一下，然後又出了一次，聲音重複」。
+   所以：本機先演過的時候，同一個 rev 的那一列一律不理。rev 只增不減（伺服器那邊有樂觀鎖），
+   同一個 rev 永遠不會是更新的狀態，丟掉不會漏東西。
+   六秒是保險絲：萬一那一手最後沒被伺服器接受、又沒走到退回（例如對手亂廣播），
+   時間到就自己解除，不會把畫面鎖在過去。 */
+let AHEAD = 0;
+const AHEAD_TTL = 6000;
+function ahead(){ AHEAD = Date.now(); }
+function isAhead(){ return AHEAD > 0 && Date.now() - AHEAD < AHEAD_TTL; }
 function snapshot(){
   return {g:JSON.parse(JSON.stringify(G)), hand:MYHAND.slice()};
 }
@@ -3100,7 +3114,7 @@ function rollback(s){
   G = s.g; MYHAND = s.hand;
   const i = mySeat();
   if(i >= 0) G.hands[i] = MYHAND;
-  OPT = null;
+  OPT = null; AHEAD = 0;
   render();
 }
 /* 伺服器這一列跟畫面上這一格是同一個畫面嗎？（本機已經演過了，它只是來蓋章）
@@ -3119,8 +3133,12 @@ function sameBeat(g, row){
 /* 伺服器的一列 → 畫面要的形狀。唯一的差別：手牌只有自己那份。 */
 function applyRow(row, hand){
   if(!row || !row.cfg) return;
-  if(G && MODE === "net" && NET.code === row.code && (G.rev||0) > (row.rev||0)) return;
-  OPT = null;                             /* 伺服器講話了，本機那份預測就作廢 */
+  if(G && MODE === "net" && NET.code === row.code){
+    const cur = G.rev||0, inc = row.rev||0;
+    if(cur > inc) return;                 /* 過期的那一列 */
+    if(cur === inc && isAhead()) return;  /* 同一格，可是本機已經演到下一格了 */
+  }
+  OPT = null; AHEAD = 0;                  /* 伺服器講話了，本機那份預測就作廢 */
 
   let needHand = false;
   if(hand !== undefined && hand !== null){ MYHAND = hand; MYHAND_RI = row.ri; }
@@ -3189,6 +3207,7 @@ function peerMove(m){
       if(!(typeof m.v === "number" && m.v >= 0 && m.v <= G.hs)) return;
       if(!applyBid(G, s, m.v)) return;
     }
+    ahead();
     render();
     return;
   }
@@ -3202,6 +3221,7 @@ function peerMove(m){
   if(G.trick.length === G.cfg.n) G.phase = "trickend";
   else G.turn = (s + 1) % G.cfg.n;
   G.at = Date.now();
+  ahead();
   render();
 }
 function unsubscribe(){
@@ -3348,7 +3368,7 @@ function doBid(v){
      真正的數字等全桌都放好了伺服器一起翻開。依序叫的數字本來就攤在桌上，直接演。 */
   if(sim){ G.bids[s] = -1; G.at = Date.now(); }
   else if(!applyBid(G, s, v)) return;
-  OPT = snap;
+  OPT = snap; ahead();
   render();
   sendMove({t:"bid", seat:s, v:sim ? -1 : v});
   api("bid", {code:NET.code, v:v}).then(function(d){ if(!d && OPT === snap) rollback(snap); });
@@ -3378,7 +3398,7 @@ function doPlay(cardId, el){
     el.classList.add("is-leaving");
   }
   if(MODE === "solo"){ push(); return; }
-  OPT = snap;
+  OPT = snap; ahead();
   render();
   sendMove({t:"play", seat:s, card:G.trick[G.trick.length-1].card});
   api("play", {code:NET.code, card:cardId}).then(function(d){ if(!d && OPT === snap) rollback(snap); });
