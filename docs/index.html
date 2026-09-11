@@ -598,18 +598,6 @@ body.is3d .av{width:16px;height:16px}
 .die.sealed .num{color:var(--ink-3);font-size:12px}
 
 /* 規則區塊：等待房間裡所有人都看得到，只有房主按得動 */
-.rules-panel{margin-top:14px;padding-top:12px;border-top:1px solid var(--hair)}
-.rules-panel h3{
-  margin:0 0 10px;font-size:12px;font-weight:500;letter-spacing:.08em;
-  color:var(--ink-3);display:flex;align-items:center;gap:8px;
-}
-.rules-panel h3 .badge{font-size:10px;letter-spacing:.04em}
-.rules-panel .field{margin-bottom:9px}
-.rules-panel .sub{margin:4px 0 0;font-size:11px;line-height:1.5;color:var(--ink-3)}
-.ruleval{
-  font-size:13px;color:var(--ink-1);padding:5px 0;
-  font-variant-numeric:tabular-nums;
-}
 .slot .btn{padding:3px 9px;font-size:11px}
 
 /* 下一局自己會開始：用一條走完的線代替倒數字 */
@@ -900,15 +888,6 @@ body.in-lobby .app{display:none}
 
 /* ================= 連線 ================= */
 .code{font-family:"IBM Plex Mono",monospace;font-weight:500;letter-spacing:.2em;color:var(--brass)}
-.roomcode{
-  display:block;text-align:center;
-  font-family:"Bodoni Moda",Georgia,serif;
-  font-size:60px;font-weight:700;letter-spacing:.18em;
-  color:var(--ink);padding:6px 0 2px;text-indent:.18em;line-height:1.05;
-}
-.roomhint{text-align:center;color:var(--ink-3);font-size:11px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:22px}
-.slots{display:grid;margin-bottom:10px}
-.slot{
   display:flex;align-items:center;gap:12px;
   padding:12px 4px;border-bottom:1px solid var(--hair-2);
 }
@@ -919,23 +898,17 @@ body.in-lobby .app{display:none}
 .slot.mine .who{color:var(--brass)}
 .slot .badge{font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);border:1px solid var(--hair);border-radius:99px;padding:2px 7px}
 .slot .badge.host{color:var(--brass);border-color:oklch(.845 .128 84 / .4)}
-.nameinput,.codeinput{
+.nameinput{
   width:100%;padding:10px 13px;border-radius:12px;
   border:1px solid var(--hair);background:var(--glass);color:var(--ink);
   transition:border-color .16s;
 }
-.nameinput:focus,.codeinput:focus{outline:none;border-color:var(--brass)}
-.nameinput::placeholder,.codeinput::placeholder{color:var(--ink-3);opacity:.6}
-.codeinput{
-  font-family:"Bodoni Moda",Georgia,serif;font-size:32px;font-weight:700;
-  letter-spacing:.26em;text-align:center;text-transform:uppercase;text-indent:.26em;
-}
+.nameinput:focus{outline:none;border-color:var(--brass)}
+.nameinput::placeholder{color:var(--ink-3);opacity:.6}
 .err{color:var(--bad);font-size:12.5px;min-height:18px;margin-top:7px}
 .spectate{padding:11px 0;border-top:1px solid var(--hair-2);border-bottom:1px solid var(--hair-2);font-size:12.5px;color:var(--ink-3);max-width:62ch}
 .fair{margin-top:16px;padding-top:14px;border-top:1px solid var(--hair-2);font-size:12px;color:var(--ink-3);line-height:1.6;max-width:64ch}
 .fair b{color:var(--ink-2);font-weight:600}
-.mode-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
-.mode-row .btn{flex:1;min-width:140px;text-align:center;padding:13px}
 
 /* ================= 窄螢幕 ================= */
 @media (max-width:700px){
@@ -955,6 +928,213 @@ body.in-lobby .app{display:none}
   .sheet h2{font-size:23px}
   .readout{gap:14px}
   .readout .v{font-size:22px}
+}
+
+/* ================= 開房頁 =================
+   開一桌之後、還沒發牌之前的那一頁。桌子不做木頭跟絨布，是一張線稿座位表：
+   橢圓上每個位子一道刻度，房號擺正中央，人進來就是多一個名牌。
+   設定＝同一張紙翻面，整頁變規則表。三案比較與定案理由在 design/room/README.md。 */
+body.in-room .app{display:none}
+.room{
+  position:fixed;inset:0;z-index:50;          /* 跟大廳同一層；浮層是 60，蓋得過 */
+  display:flex;flex-direction:column;
+  animation:lbIn .3s var(--e-out) both;
+}
+@media (prefers-reduced-motion:reduce){.room{animation:none}}
+
+.rm-top{display:flex;align-items:center;justify-content:space-between;gap:20px;
+  padding:22px clamp(22px,2.6vw,36px) 0}
+.rm-mk{display:flex;align-items:baseline;gap:13px;line-height:1}
+.rm-mk b{font-family:"Bodoni Moda",Georgia,serif;font-size:23px;font-weight:700}
+.rm-mk u{text-decoration:none;font-size:8.5px;font-weight:600;letter-spacing:.34em;color:var(--ink-3)}
+.rm-right{display:flex;align-items:center;gap:10px}
+.rm-ghost{padding:6px 12px;border-radius:99px;font-size:12px;color:var(--ink-3);
+  transition:color .18s,background .18s}
+.rm-ghost:hover{color:var(--ink);background:oklch(1 0 0/.05)}
+.rm-id{display:flex;align-items:center;gap:10px;padding:4px 6px;border-radius:99px}
+.rm-id .nm{font-size:13px;color:var(--ink-2);transition:color .18s}
+.rm-id:hover .nm{color:var(--ink)}
+.rm-id img,.rm-id .disc{width:26px;height:26px;font-size:11px}
+/* 沒有照片就寫名字的第一個字 */
+.disc{display:grid;place-items:center;border-radius:99px;flex:none;
+  font-size:13px;font-weight:600;color:var(--ink-2);
+  background:linear-gradient(160deg in oklab,oklch(1 0 0/.10),oklch(1 0 0/.035));
+  box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair)}
+
+.rm-body{flex:1;display:flex;min-height:0}
+
+/* ---- 座位表：一張線稿，不是一張擬真的桌子 ---- */
+.rm-plan{flex:1;position:relative;display:grid;place-items:center;min-width:0;padding:20px 40px 40px}
+.rm-dia{position:relative;width:min(680px,100%);height:434px}
+.rm-ring{position:absolute;inset:0;border-radius:50%;border:1px solid oklch(.845 .128 84/.30);
+  background:radial-gradient(78% 84% at 50% 46% in oklab,oklch(1 0 0/.028),transparent 72%)}
+.rm-ring::after{content:"";position:absolute;inset:9px;border-radius:50%;
+  border:1px solid oklch(.845 .128 84/.10)}
+/* 桌邊的刻度：每個位子在橢圓上都有一道 */
+.rm-tick{position:absolute;left:50%;top:50%;width:19px;height:1px;background:var(--foil-2);
+  opacity:.45;translate:calc(-50% + var(--x)) calc(-50% + var(--y));rotate:var(--r)}
+.rm-tick.open{background:var(--ink-3);opacity:.3}
+
+.rm-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;pointer-events:none}
+.rm-mid .cap{font-size:9.5px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-3)}
+.rm-code{font-family:"Bodoni Moda",Georgia,serif;font-size:84px;font-weight:600;line-height:1;
+  letter-spacing:.1em;text-indent:.1em;color:var(--ink)}
+.rm-copy{pointer-events:auto;display:flex;align-items:center;gap:8px;font-size:11.5px;
+  color:var(--ink-3);padding:7px 13px;border-radius:99px;transition:color .18s,background .18s}
+.rm-copy:hover{background:oklch(1 0 0/.05);color:var(--ink-2)}
+.rm-copy i{width:3px;height:3px;border-radius:99px;background:var(--foil-2);display:block;flex:none}
+
+/* 坐了人的位子：一個頭像加兩行字，不做框 */
+.rm-p,.rm-slot{position:absolute;left:50%;top:50%;
+  translate:calc(-50% + var(--x)) calc(-50% + var(--y));
+  display:flex;align-items:center;gap:10px;white-space:nowrap}
+.rm-p.l,.rm-slot.l{flex-direction:row-reverse}
+.rm-p.l .t,.rm-slot.l .t{text-align:right}
+.rm-p .t,.rm-slot .t{display:flex;flex-direction:column;gap:4px;line-height:1}
+.rm-p .t b{font-size:15px;font-weight:600;letter-spacing:.01em}
+.rm-p .t span{font-size:10px;letter-spacing:.14em;color:var(--ink-3)}
+.rm-p.is-me .t b{color:var(--brass)}
+.rm-p img,.rm-p .disc{width:36px;height:36px;border-radius:99px;object-fit:cover;flex:none;
+  box-shadow:0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.3)}
+.rm-kick{opacity:0;font-size:10px;color:var(--ink-3);padding:3px 6px;border-radius:8px;
+  margin-left:7px;transition:opacity .18s,color .18s,background .18s}
+.rm-p:hover .rm-kick{opacity:1}
+.rm-kick:hover{color:var(--bad);background:oklch(1 0 0/.05)}
+/* 空位：虛線的頭像圈，滑上去（房主）才變成放 AI */
+.rm-slot{opacity:.9;transition:opacity .2s}
+.rm-slot .ph{width:36px;height:36px;border-radius:99px;flex:none;
+  border:1px dashed oklch(.90 .02 92/.20)}
+.rm-slot .t b{font-size:13px;font-weight:400;letter-spacing:.14em;color:var(--ink-3)}
+.rm-slot .t>span{font-size:10px;letter-spacing:.1em;color:var(--ink-3);position:relative}
+.rm-slot .ai{position:absolute;left:0;opacity:0;color:var(--foil-2);transition:opacity .18s}
+.rm-slot.l .ai{left:auto;right:0}
+.rm-slot .wait{transition:opacity .18s}
+.rm-slot:hover{opacity:1}
+.rm-slot:hover .t b{color:var(--ink-2)}
+button.rm-slot:hover .wait{opacity:0}
+button.rm-slot:hover .ai{opacity:1}
+
+.rm-foot{position:absolute;left:0;right:0;bottom:22px;text-align:center;
+  font-size:11.5px;color:var(--ink-3);letter-spacing:.04em}
+
+/* ---- 右欄：印出來的規則 ---- */
+.rm-sheet{width:376px;flex:none;border-left:1px solid var(--hair);
+  padding:26px 34px;display:flex;flex-direction:column;overflow-y:auto}
+.rm-hd{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:2px}
+.rm-hd h2{font-family:"Bodoni Moda",Georgia,serif;font-size:23px;font-weight:600;letter-spacing:-.005em}
+.rm-lnk{font-size:12px;color:var(--ink-3);padding:6px 2px;position:relative;transition:color .18s}
+.rm-lnk::after{content:"";position:absolute;left:0;right:0;bottom:4px;height:1px;
+  background:var(--hair);transition:background .18s}
+.rm-lnk:hover{color:var(--ink)}
+.rm-lnk:hover::after{background:var(--brass)}
+.rm-by{font-size:10px;letter-spacing:.16em;color:var(--ink-3)}
+.rm-sub{margin:0 0 20px;font-size:11.5px;color:var(--ink-3)}
+.rm-sect{margin-bottom:16px}
+.rm-sect>.cap,.rm-cols .cap{display:block;margin-bottom:6px;font-size:9.5px;font-weight:600;
+  letter-spacing:.26em;text-transform:uppercase;color:var(--ink-3)}
+.rm-r{display:flex;align-items:baseline;padding:7px 0}
+.rm-r .k{font-size:12.5px;color:var(--ink-3);flex:none}
+.rm-r .d{flex:1;margin:0 9px;border-bottom:1px dotted oklch(.90 .02 92/.26);translate:0 -4px}
+.rm-r .v{font-size:13px;color:var(--ink);flex:none}
+.rm-tot{margin:auto 0 0;padding-top:18px;border-top:1px solid var(--hair);
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  font-size:12px;color:var(--ink-3)}
+.rm-tot b{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:500;color:var(--ink-2);
+  font-variant-numeric:tabular-nums}
+/* 整頁唯一的高對比 CTA */
+.rm-go{display:block;width:100%;margin-top:16px;text-align:center;
+  padding:14px 28px;border-radius:99px;font-size:15px;font-weight:600;letter-spacing:.06em;
+  background:linear-gradient(178deg in oklab,var(--brass),var(--brass-2));color:#241906;
+  box-shadow:inset 0 1px 0 oklch(1 0 0/.5),0 2px 6px rgba(0,0,0,.3),0 14px 34px oklch(.845 .128 84/.22);
+  transition:transform .18s var(--e-out),box-shadow .22s}
+.rm-go:hover:not(:disabled){box-shadow:inset 0 1px 0 oklch(1 0 0/.5),0 2px 6px rgba(0,0,0,.3),0 18px 46px oklch(.845 .128 84/.34)}
+.rm-go:active:not(:disabled){transform:scale(.985)}
+.rm-go:disabled{opacity:.34;cursor:default;box-shadow:inset 0 1px 0 oklch(1 0 0/.4),0 1px 3px rgba(0,0,0,.24)}
+.rm-note{margin:11px 0 0;font-size:11px;color:var(--ink-3);text-align:center;letter-spacing:.03em}
+.rm-err{margin:11px 0 0;font-size:12px;color:var(--bad);text-align:center}
+.rm-waitfor{margin-top:16px;font-size:13px;color:var(--ink-2);text-align:center;line-height:1.5}
+.rm-waitfor span{display:block;font-size:11px;color:var(--ink-3);margin-top:4px}
+.rm-waitfor i{display:inline-block;width:5px;height:5px;border-radius:99px;background:var(--brass);
+  margin-right:8px;vertical-align:2px;animation:rmPulse 2.4s ease-in-out infinite}
+@keyframes rmPulse{0%,100%{opacity:.35}50%{opacity:1;box-shadow:0 0 0 4px oklch(.845 .128 84/.10)}}
+@media (prefers-reduced-motion:reduce){.rm-waitfor i{animation:none;opacity:.8}}
+
+/* ---- 設定：同一張紙翻面，整頁就是規則表 ---- */
+.rm-edit{flex:1;min-height:0;display:flex;flex-direction:column;
+  padding:10px clamp(22px,3.4vw,52px) 30px}
+.rm-ehd{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  padding-bottom:16px;border-bottom:1px solid var(--hair)}
+.rm-ehd h2{font-family:"Bodoni Moda",Georgia,serif;font-size:34px;font-weight:600;letter-spacing:-.01em}
+.rm-meta{margin:6px 0 0;font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
+.rm-meta b{color:var(--ink-2);font-weight:500;font-family:"IBM Plex Mono",monospace}
+.rm-doneline{display:flex;gap:12px;align-items:center}
+.rm-done{padding:9px 22px;border-radius:99px;font-size:12.5px;color:var(--ink);
+  background:var(--glass);box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair)}
+.rm-done:hover{background:oklch(.98 .012 92/.13)}
+.rm-cols{flex:1;display:grid;grid-template-columns:1fr 1px 1fr;gap:0 clamp(28px,3.6vw,58px);
+  padding-top:6px;overflow:auto}
+.rm-cols .cap{margin:22px 0 4px}
+.rm-rule{width:1px;background:var(--hair);height:100%}
+.rm-f{display:flex;align-items:baseline;gap:20px;padding:20px 0;border-bottom:1px solid var(--hair-2)}
+.rm-f>label{width:88px;flex:none;font-size:12.5px;color:var(--ink-3)}
+.rm-pick{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4px;flex:1}
+/* 選項不做膠囊也不做框：選中的那個下面一條銅線 */
+.rm-ch{font-size:13.5px;color:var(--ink-3);padding:4px 6px;position:relative;transition:color .18s}
+.rm-ch::after{content:"";position:absolute;left:6px;right:6px;bottom:1px;height:1px;
+  background:transparent;transition:background .18s}
+.rm-ch:hover{color:var(--ink-2)}
+.rm-ch[aria-pressed="true"]{color:var(--ink)}
+.rm-ch[aria-pressed="true"]::after{background:var(--brass)}
+.rm-sep{color:var(--hair);font-size:11px;user-select:none}
+.rm-pick .n{width:100%;margin:7px 0 0;font-size:11.5px;line-height:1.6;color:var(--ink-3)}
+.rm-eft{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+  padding-top:16px;border-top:1px solid var(--hair)}
+.rm-nums{display:flex;gap:34px}
+.rm-nums .k{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.rm-nums .v{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:500;line-height:1;
+  font-variant-numeric:tabular-nums}
+.rm-eft .tail{font-size:11.5px;color:var(--ink-3);text-align:right;max-width:38ch}
+
+@media (max-width:760px){
+  .rm-top{padding:14px 16px 0}
+  .rm-id .nm{display:none}
+  .rm-body{flex-direction:column;overflow:auto}
+  .rm-plan{flex:none;padding:38px 16px 0;place-items:start center}   /* 上緣要留給最上面那個人的名牌 */
+  .rm-dia{width:246px;height:230px}
+  .rm-ring::after{inset:7px}
+  .rm-tick{width:14px}
+  .rm-mid{gap:7px}
+  .rm-code{font-size:46px}
+  .rm-copy{font-size:11px;padding:5px 10px}
+  .rm-p,.rm-p.l,.rm-slot,.rm-slot.l{flex-direction:column;gap:6px;text-align:center}
+  .rm-p.l .t,.rm-slot.l .t{text-align:center}
+  .rm-p .t,.rm-slot .t{gap:3px}
+  .rm-p .t b{font-size:12.5px}
+  .rm-p .t span{font-size:9px;letter-spacing:.1em}
+  .rm-p img,.rm-p .disc,.rm-slot .ph{width:30px;height:30px}
+  .rm-slot .t b{font-size:11px}
+  .rm-slot .ai,.rm-slot.l .ai{left:50%;right:auto;translate:-50% 0}
+  .rm-foot{position:static;margin:74px 0 0;font-size:11px}
+  .rm-sheet{width:auto;border-left:0;border-top:1px solid var(--hair);margin-top:16px;
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+  .rm-hd h2{font-size:20px}
+  .rm-sect{margin-bottom:12px}
+  .rm-tot{margin-top:14px}
+  .rm-go{position:sticky;bottom:10px;z-index:3}
+  .rm-edit{padding:8px 16px calc(24px + env(safe-area-inset-bottom))}
+  .rm-ehd{flex-direction:column;align-items:flex-start;gap:12px}
+  .rm-ehd h2{font-size:26px}
+  .rm-doneline{width:100%;justify-content:space-between}
+  .rm-cols{grid-template-columns:1fr;padding-top:0}
+  .rm-rule{display:none}
+  .rm-f{flex-direction:column;gap:8px;padding:16px 0}
+  .rm-f>label{width:auto}
+  .rm-eft{flex-direction:column;align-items:flex-start;gap:10px;position:sticky;bottom:0;
+    background:linear-gradient(to top,var(--felt-deep) 76%,transparent);
+    padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  .rm-nums{gap:26px}
+  .rm-eft .tail{text-align:left}
 }
 
 /* ================= 立體模式 ================= */
@@ -1220,6 +1400,27 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   </footer>
 </div>
 
+<!-- 開房頁：開一桌之後、還沒發牌之前。座位表、房號、這一桌的規則，全部由 paintRoom() 畫。 -->
+<div class="room" id="room" hidden>
+  <header class="rm-top">
+    <div class="rm-mk"><b>11</b><u>UP &amp; DOWN</u></div>
+    <div class="rm-right">
+      <button class="rm-ghost" data-net="leave">離開房間</button>
+      <button class="rm-id" id="rmMe"></button>
+    </div>
+  </header>
+
+  <div class="rm-body" id="rmBody">
+    <section class="rm-plan">
+      <div class="rm-dia" id="rmDia"></div>
+      <p class="rm-foot" id="rmFoot"></p>
+    </section>
+    <aside class="rm-sheet" id="rmSheet"></aside>
+  </div>
+
+  <div class="rm-edit" id="rmEdit" hidden></div>
+</div>
+
 <div class="overlay" id="setupOv" hidden>
   <div class="sheet">
     <h2>牌桌設定</h2>
@@ -1264,15 +1465,6 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
       <button class="btn" id="btnSignOut">登出</button>
       <button class="btn primary" id="meClose">關閉</button>
     </div>
-  </div>
-</div>
-
-<div class="overlay" id="netOv" hidden>
-  <div class="sheet">
-    <h2>和朋友玩</h2>
-    <p class="sub" id="netSub">每個人用自己的裝置開這一頁，輸入同一組房號就能同桌。</p>
-    <div id="netBody"></div>
-    <div class="sheet-actions" id="netActions"></div>
   </div>
 </div>
 
@@ -2750,7 +2942,11 @@ function applyRow(row, hand){
   const s = mySeat();
   if(s >= 0) G.hands[s] = MYHAND;
   render();
-  if(!$("netOv").hidden) paintNet();
+  /* 開房頁開著就跟著更新；開打之後（phase 不再是 lobby）那張自動開的要收掉 */
+  if(!$("room").hidden){
+    if(G.phase !== "lobby" && roomAuto) closeRoom();
+    else paintRoom();
+  }
   if(needHand && row.phase !== "lobby") api("state", {code:row.code});
 }
 
@@ -4008,7 +4204,7 @@ function pushName(){
   const i = mySeat();
   if(i < 0) return;
   clearTimeout(nameTimer);
-  nameTimer = setTimeout(function(){ api("sit", {code:NET.code, seat:i}).then(paintNet); }, 600);
+  nameTimer = setTimeout(function(){ api("sit", {code:NET.code, seat:i}).then(paintRoom); }, 600);
 }
 
 /* ================= 帳號 ================= */
@@ -4078,80 +4274,255 @@ async function loadHistory(force){
     }).join("") + '</ul>';
 }
 
-/* ================= 連線面板 ================= */
-let netView = "menu", joinCode = "";
-function openNet(){ netView = (MODE === "net") ? "lobby" : "menu"; paintNet(); $("netOv").hidden = false; }
-function paintNet(){
-  const body = $("netBody"), acts = $("netActions");
-  const nameField = '<div class="field"><label>你的名字</label>' +
-    '<input class="nameinput" id="inName" maxlength="10" placeholder="桌上顯示的名字" value="' +
-    MY.name.replace(/"/g, "&quot;") + '"></div>';
+/* ================= 開房頁 =================
+   開一桌之後、還沒發牌之前的那一頁：座位表、房號、這一桌的規則。
+   規則的欄位、選項文字、那句「選了會怎樣」都是 RULE_UI 同一份，分數例子直接呼叫
+   roundPoints()——介面跟引擎不可能各說各話。三案與定案理由在 design/room/README.md。 */
+let roomView = "seats";   /* seats：座位表 · rules：設定（同一張紙翻面） */
+let roomAuto = false;     /* true＝開房流程開的，開打就自己收掉；false＝牌局中按「看座位」開的 */
+let roomErr = "";
 
-  if(NET.state === "pending"){
-    $("netSub").textContent = "";
-    body.innerHTML = '<div class="fair">正在連線…</div>';
-    acts.innerHTML = '<button class="btn" data-net="close">取消</button>';
-    return;
-  }
-  if(NET.state === "none"){
-    $("netSub").textContent = "";
-    body.innerHTML = '<div class="warn">連線元件沒載入成功，現在只能單人對 AI。重新整理一次通常就好了。</div>';
-    acts.innerHTML = '<button class="btn primary" data-net="close">關閉</button>';
-    return;
-  }
-  if(netView === "menu"){
-    $("netSub").textContent = "每個人用自己的裝置開這一頁，輸入同一組房號就能同桌。";
-    body.innerHTML = nameField +
-      '<div class="mode-row"><button class="btn primary" data-net="create">開一間新房</button>' +
-      '<button class="btn" data-net="tojoin">用房號加入</button></div>' +
-      '<div class="fair"><b>發牌在伺服器上發生。</b>你的手牌只會送到你自己的裝置，別人的牌從頭到尾沒離開過資料庫——房主也看不到。<br><br>大家各自用 Google 登入，換裝置回來還是同一個位子。</div>';
-    acts.innerHTML = '<button class="btn" data-net="close">取消</button>';
-    return;
-  }
-  if(netView === "join"){
-    $("netSub").textContent = "輸入朋友給你的 4 碼房號。";
-    body.innerHTML = nameField + '<div class="field"><label>房號</label>' +
-      '<input class="codeinput" id="inCode" maxlength="4" placeholder="○○○○" value="' + joinCode + '"></div>' +
-      '<div class="err" id="joinErr"></div>';
-    acts.innerHTML = '<button class="btn" data-net="menu">返回</button>' +
-      '<button class="btn primary" data-net="join">加入</button>';
-    setTimeout(function(){ const c = $("inCode"); if(c) c.focus(); }, 40);
-    return;
-  }
-  $("netSub").textContent = "把房號給朋友，他們在自己的裝置上開這一頁輸入即可。幾個人進來就幾個人玩。";
-  const live = liveCids();
-  const host = amHost(), lobby = G.phase === "lobby";
-  const slots = G.seats.map(function(s, i){
-    const isMe = s.cid && s.cid === MY.pid, ai = s.kind !== "human";
-    return '<div class="slot ' + (isMe ? "mine" : "") + '"><span class="n">' + (i+1) + '</span>' +
-      (!ai && s.av ? '<img class="av" src="' + esc(s.av) + '" alt="" referrerpolicy="no-referrer" onerror="this.hidden=true">' : "") +
-      (!ai ? '<span class="dot ' + (live[s.cid] ? "on" : "") + '"></span>' : "") +
-      '<span class="who ' + (ai ? "open" : "") + '">' + esc(s.name) +
-      (isMe ? "（你）" : "") + (ai ? " · AI" : "") + '</span>' +
-      (G.host === s.cid ? '<span class="badge host">房主</span>' : "") +
-      (host && lobby && s.cid !== G.host ? '<button class="btn" data-unseat="' + i + '">移除</button>' : "") +
-      '</div>';
-  }).join("");
-  body.innerHTML = '<div class="roomcode">' + NET.code + '</div>' +
-    '<div class="roomhint">給朋友輸入這四個字</div>' + nameField +
-    '<div class="slots">' + slots + '</div>' +
-    (host && lobby && G.seats.length < 10
-      ? '<div class="mode-row"><button class="btn" data-net="addai">加一個 AI 玩家</button></div>' : "") +
-    '<div class="rules-panel"><h3>這一桌的規則' +
-      (!lobby ? '<span class="badge">開打了，鎖住</span>'
-              : host ? '<span class="badge host">你可以改</span>'
-                     : '<span class="badge">房主決定</span>') + '</h3>' +
-      ruleBlock(G.cfg, host && lobby) + ruleReadout(G.cfg, G.cfg.n) + '</div>' +
-    (lobby
-      ? (host ? '<div class="fair">按「開始」就照現在這張桌子發牌。至少要兩個人，人不夠就加 AI 湊。</div>'
-              : '<div class="fair">等房主按開始。</div>')
-      : '<div class="fair">牌局進行中，要等這一場打完才能進來。</div>');
-  acts.innerHTML = '<button class="btn" data-net="leave">離開房間</button>' +
-    (host && lobby
-      ? '<button class="btn primary" data-net="begin">開始</button>'
-      : '<button class="btn primary" data-net="close">回到牌桌</button>');
+function openRoom(auto){
+  roomAuto = !!auto; roomView = "seats"; roomErr = "";
+  document.body.classList.add("in-room");
+  $("room").hidden = false;
+  paintRoom();
+}
+function closeRoom(){
+  document.body.classList.remove("in-room");
+  $("room").hidden = true;
 }
 
+/* 你永遠坐在正下方，下一位在你左手邊——跟出牌方向一致。
+   名牌沿著橢圓的**法線**往外推：法線不是半徑方向，斜角那四個位子照半徑推會浮在桌子中間。 */
+function roomRing(n){
+  const sm = matchMedia("(max-width:760px)").matches;
+  /* 半徑讀實際畫出來的盒子，不寫死：視窗一窄橢圓跟著縮，刻度才不會離開那條線 */
+  const box = $("rmDia");
+  const rx = ((box && box.clientWidth) || (sm ? 246 : 680)) / 2;
+  const ry = ((box && box.clientHeight) || (sm ? 230 : 434)) / 2;
+  const off = sm ? 26 : 56;
+  /* 手機上名牌會被螢幕邊切掉，左右夾住 */
+  const lim = sm ? Math.max(90, (document.documentElement.clientWidth - 92) / 2) : 1e9;
+  const out = [];
+  for(let k=0;k<n;k++){
+    const t = (90 + k * 360 / n) * Math.PI / 180;
+    const ex = rx * Math.cos(t), ey = ry * Math.sin(t);
+    let ux = Math.cos(t) / rx, uy = Math.sin(t) / ry;
+    const m = Math.hypot(ux, uy) || 1;
+    ux /= m; uy /= m;
+    out.push({
+      x: Math.round(Math.max(-lim, Math.min(lim, ex + off * ux))), y: Math.round(ey + off * uy),
+      tx: Math.round(ex), ty: Math.round(ey),
+      deg: (Math.atan2(uy, ux) * 180 / Math.PI).toFixed(1),
+      left: ux < -0.35                       /* 左半邊的名牌要靠右對齊 */
+    });
+  }
+  return out;
+}
+/* 頭像：有照片放照片，沒有就寫名字第一個字。名字是別人給的字，一律 esc */
+function roomFace(name, av){
+  return av
+    ? '<img src="' + esc(av) + '" alt="" referrerpolicy="no-referrer" onerror="this.hidden=true">'
+    : '<span class="disc">' + esc(String(name || "？").slice(0,1)) + '</span>';
+}
+
+function paintRoom(){
+  if($("room").hidden || !G || MODE !== "net" || !NET.code) return;
+  const me = mySeat(), host = amHost(), live = liveCids();
+  const lobby = G.phase === "lobby";
+  const n = G.seats.length;
+  const ghost = lobby && n < 10;             /* 還能再進來的話，桌邊留一個空位 */
+  const pts = roomRing(n + (ghost ? 1 : 0));
+  const base = me < 0 ? 0 : me;
+
+  let h = '<div class="rm-ring"></div>';
+  pts.forEach(function(p, k){
+    h += '<span class="rm-tick' + (k >= n ? " open" : "") + '" style="--x:' + p.tx +
+      'px;--y:' + p.ty + 'px;--r:' + p.deg + 'deg"></span>';
+  });
+  h += '<div class="rm-mid"><span class="cap">房號</span>' +
+    '<span class="rm-code">' + esc(NET.code) + '</span>' +
+    '<button class="rm-copy" data-room="copy"><i></i><span id="rmCopy">按一下複製，貼給朋友</span></button></div>';
+
+  G.seats.forEach(function(s, i){
+    const p = pts[(i - base + n) % n];
+    if(!p) return;
+    const isMe = s.cid && s.cid === MY.pid, ai = s.kind !== "human";
+    const tag = [];
+    if(G.host === s.cid) tag.push("房主");
+    if(isMe) tag.push("你");
+    if(ai) tag.push("AI");
+    else if(!live[s.cid]) tag.push("離線");
+    else if(!tag.length) tag.push("在線上");
+    h += '<div class="rm-p' + (isMe ? " is-me" : "") + (p.left ? " l" : "") +
+      '" style="--x:' + p.x + 'px;--y:' + p.y + 'px">' +
+      roomFace(s.name, !ai && s.av) +
+      '<span class="t"><b>' + (esc(s.name) || ("座位 " + (i+1))) + '</b><span>' + tag.join(" · ") +
+      (host && lobby && s.cid !== G.host
+        ? '<button class="rm-kick" data-unseat="' + i + '">移除</button>' : "") +
+      '</span></span></div>';
+  });
+
+  if(ghost){
+    const p = pts[n], tagName = host ? "button" : "div";
+    h += '<' + tagName + ' class="rm-slot' + (p.left ? " l" : "") +
+      '" style="--x:' + p.x + 'px;--y:' + p.y + 'px"' + (host ? ' data-net="addai"' : "") + '>' +
+      '<span class="ph"></span><span class="t"><b>空位</b><span>' +
+      '<span class="wait">等人進來</span>' +
+      (host ? '<span class="ai">放一個 AI</span>' : "") +
+      '</span></span></' + tagName + '>';
+  }
+
+  setHTML($("rmDia"), h);
+  $("rmFoot").textContent = lobby
+    ? "誰進來誰就是一位，最多十個人 · 開打之後這桌就鎖起來"
+    : "牌局進行中，這桌已經鎖起來了";
+  paintRoomMe();
+  paintRoomSheet();
+  paintRoomEdit();
+  $("rmBody").hidden = roomView === "rules";
+  $("rmEdit").hidden = roomView !== "rules";
+}
+function paintRoomMe(){
+  setHTML($("rmMe"), '<span class="nm">' + esc(MY.name || MY.gname || "你") + '</span>' +
+    roomFace(MY.name || MY.gname, MY.av));
+}
+
+/* 規則欄跟設定頁都從 RULE_UI 長出來，桌上這一份 cfg 是唯一的事實 */
+const RM_ROW = {bidMode:"方式"};                 /* 群組已經叫「叫墩」了，列名就不要再重複 */
+const RM_GROUPS = [["叫墩", ["bidMode","hook"]],
+                   ["牌",   ["decks","minRank","jokers"]],
+                   ["計分", ["hit","zero","miss"]]];
+const ruleField = k => RULE_UI.filter(f => f.k === k)[0];
+function ruleNow(f, C){
+  const cur = String(C[f.k]);
+  const hit = f.opts.filter(o => String(o.v) === cur)[0];
+  return (hit && hit.t) || cur;
+}
+/* 這一桌的牌夠不夠、階梯走得到哪 */
+function roomNumbers(C){
+  const size = deckSizeOf(C.decks, C.minRank, C.jokers);
+  const peak = maxHand(size, Math.max(1, G.seats.length));
+  return {size:size, peak:peak, rounds:peak*2 - 1};
+}
+function paintRoomSheet(){
+  const C = rules(G.cfg), host = amHost(), lobby = G.phase === "lobby";
+  const N = roomNumbers(C), hs = G.hs || 5;
+  let h = '<div class="rm-hd"><h2>這一桌的規則</h2>' +
+    (host && lobby
+      ? '<button class="rm-lnk" data-room="rules">設定</button>'
+      : '<span class="rm-by">' + (lobby ? "房主決定" : "開打了，鎖住") + '</span>') +
+    '</div><p class="rm-sub">' +
+    (host && lobby ? "你是房主，只有你改得動。"
+      : lobby ? "房主可以改，改了你這邊會即時跟著變。"
+              : "牌局進行中，規則不能再動。") + '</p>';
+  RM_GROUPS.forEach(function(g){
+    h += '<div class="rm-sect"><span class="cap">' + g[0] + '</span>' +
+      g[1].map(function(k){
+        const f = ruleField(k);
+        return f ? '<div class="rm-r"><span class="k">' + (RM_ROW[k] || f.label) +
+          '</span><i class="d"></i><span class="v">' + ruleNow(f, C) + '</span></div>' : "";
+      }).join("") + '</div>';
+  });
+  /* 分數不是寫死的字，是拿這一桌的規則實際算一次 */
+  h += '<div class="rm-sect"><span class="cap">這樣算</span>' +
+    [[3,3],[0,0],[3,4]].map(function(e){
+      const p = roundPoints(e[0], e[1], hs, C);
+      return '<div class="rm-r"><span class="k">叫 ' + e[0] + '，拿 ' + e[1] + '</span>' +
+        '<i class="d"></i><span class="v">' + (p >= 0 ? "＋" : "−") + Math.abs(p) + '</span></div>';
+    }).join("") + '</div>' +
+    '<div class="rm-tot"><span>' + N.size + ' 張牌 · ' + G.seats.length + ' 個人</span>' +
+    '<span><b>' + N.peak + '</b> 張到頂 · <b>' + N.rounds + '</b> 局</span></div>';
+
+  if(lobby && host)
+    h += '<button class="rm-go" data-net="begin"' + (G.seats.length < 2 ? " disabled" : "") + '>開始</button>' +
+      '<p class="rm-note">' +
+      (G.seats.length < 2 ? "至少要兩個人，人不夠就放 AI 湊" : "兩人以上隨時可以開") + '</p>';
+  else if(lobby)
+    h += '<div class="rm-waitfor"><i></i>等房主按開始<span>你已經入座了，牌一發就開始</span></div>';
+  else
+    h += '<button class="rm-go" data-room="back">回到牌桌</button>';
+  if(roomErr) h += '<p class="rm-err">' + esc(roomErr) + '</p>';
+  setHTML($("rmSheet"), h);
+}
+function paintRoomEdit(){
+  const C = rules(G.cfg), N = roomNumbers(C), hs = G.hs || 5;
+  const field = function(k){
+    const f = ruleField(k);
+    if(!f) return "";
+    const cur = String(C[f.k]);
+    const note = f.note && f.note[C[f.k]];
+    return '<div class="rm-f"><label>' + (RM_ROW[k] || f.label) + '</label><div class="rm-pick">' +
+      f.opts.map(function(o){
+        return '<button class="rm-ch" data-rule="' + f.k + '" data-v="' + o.v + '" aria-pressed="' +
+          (String(o.v) === cur ? "true" : "false") + '">' + o.t + '</button>';
+      }).join('<i class="rm-sep">／</i>') +
+      (note ? '<p class="n">' + note + '</p>' : "") + '</div></div>';
+  };
+  setHTML($("rmEdit"),
+    '<div class="rm-ehd"><div><h2>這一桌的規則</h2>' +
+      '<p class="rm-meta">房號 <b>' + esc(NET.code) + '</b> · ' + G.seats.length + ' 人就座 · ' +
+      N.size + ' 張牌</p></div>' +
+      '<div class="rm-doneline"><span class="rm-sub" style="margin:0">改了桌上每個人都會即時看到</span>' +
+      '<button class="rm-done" data-room="seats">完成</button></div></div>' +
+    '<div class="rm-cols"><section>' +
+      '<span class="cap">叫墩</span>' + field("bidMode") + field("hook") +
+      '<span class="cap">牌</span>' + field("decks") + field("minRank") + field("jokers") +
+    '</section><i class="rm-rule"></i><section>' +
+      '<span class="cap">計分</span>' + field("hit") + field("zero") + field("miss") +
+      '<span class="cap">這樣算</span>' +
+      [[3,3],[0,0],[3,4],[3,0]].map(function(e){
+        const p = roundPoints(e[0], e[1], hs, C);
+        return '<div class="rm-r"><span class="k">叫 ' + e[0] + '，拿 ' + e[1] + '</span>' +
+          '<i class="d"></i><span class="v">' + (p >= 0 ? "＋" : "−") + Math.abs(p) + '</span></div>';
+      }).join("") +
+    '</section></div>' +
+    '<div class="rm-eft"><div class="rm-nums">' +
+      '<div><div class="k">牌數</div><div class="v">' + N.size + '</div></div>' +
+      '<div><div class="k">最多每人</div><div class="v">' + N.peak + '</div></div>' +
+      '<div><div class="k">總局數</div><div class="v">' + N.rounds + '</div></div></div>' +
+      '<p class="tail">' +
+      (N.peak < PEAK_CAP
+        ? "這副牌走不到 11 張：" + G.seats.length + " 人要打完 1→11→1 至少需要 " +
+          (G.seats.length * PEAK_CAP + 1) + " 張，現在只有 " + N.size +
+          " 張，頂點降到 " + N.peak + " 張、共 " + N.rounds + " 局。"
+        : N.size + " 張牌、" + G.seats.length + " 個人，階梯走得到 " + N.peak +
+          " 張、共 " + N.rounds + " 局。") +
+      '</p></div>');
+}
+/* 房號要能一鍵貼給朋友；沒有 clipboard API（http、舊瀏覽器）就退回 execCommand */
+function copyRoomCode(){
+  const say = function(t){ const el = $("rmCopy"); if(el) el.textContent = t; };
+  const ok = function(){
+    say("複製好了，貼給朋友");
+    setTimeout(function(){ say("按一下複製，貼給朋友"); }, 1800);
+  };
+  const fail = function(){ say("複製不了，手動抄一下"); };
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText)
+      navigator.clipboard.writeText(NET.code).then(ok, fail);
+    else{
+      const t = document.createElement("textarea");
+      t.value = NET.code; t.style.position = "fixed"; t.style.opacity = "0";
+      document.body.appendChild(t); t.select();
+      document.execCommand("copy"); t.remove(); ok();
+    }
+  }catch(e){ fail(); }
+}
+function handleRoom(a){
+  if(a === "rules"){ roomView = "rules"; paintRoom(); }
+  else if(a === "seats"){ roomView = "seats"; paintRoom(); }
+  else if(a === "back"){ closeRoom(); }
+  else if(a === "copy") copyRoomCode();
+}
+/* 視窗換方向／換寬度時，座位在橢圓上的座標要重算 */
+let roomResize = 0;
+addEventListener("resize", function(){
+  if($("room").hidden) return;
+  clearTimeout(roomResize);
+  roomResize = setTimeout(paintRoom, 160);
+});
 /* ================= 事件 ================= */
 document.addEventListener("input", function(e){
   /* 名字有兩個入口（連線面板、帳號面板），走同一條路 */
@@ -4160,10 +4531,6 @@ document.addEventListener("input", function(e){
     try{ localStorage.setItem("ud.name", MY.name); }catch(err){}
     paintMeChip();
     pushName();
-  }
-  if(e.target.id === "inCode"){
-    joinCode = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0,4);
-    e.target.value = joinCode;
   }
 });
 document.addEventListener("click", function(e){
@@ -4178,7 +4545,7 @@ document.addEventListener("click", function(e){
   if(e.target.id === "btnNext"){ nextRound(); return; }
   if(e.target.id === "btnFinal"){ showFinal(); return; }
   /* 這顆在連線時是「看座位」、單人時是「回大廳」，跟頂列那顆走同一條路 */
-  if(e.target.id === "btnLobby"){ if(MODE === "net") openNet(); else openLobby(); return; }
+  if(e.target.id === "btnLobby"){ if(MODE === "net") openRoom(false); else openLobby(); return; }
   const sp = e.target.closest("#speed button");
   if(sp){
     SPEED_KEY = sp.dataset.sp;
@@ -4188,40 +4555,32 @@ document.addEventListener("click", function(e){
     });
     return;
   }
+  const rm = e.target.closest("[data-room]");
+  if(rm){ handleRoom(rm.dataset.room); return; }
   const na = e.target.closest("[data-net]");
   if(na) handleNet(na.dataset.net);
 });
 
+/* 房間裡的三個動作。開一桌／用房號加入已經是大廳的事，這裡不再管。 */
 async function handleNet(a){
-  const err = $("joinErr");
+  roomErr = "";
   try{
-    if(a === "close") $("netOv").hidden = true;
-    else if(a === "menu"){ netView = "menu"; paintNet(); }
-    else if(a === "tojoin"){ netView = "join"; paintNet(); }
-    else if(a === "create"){
-      if(!MY.name) MY.name = "房主";
-      await createRoom(rules(draft));
-      netView = "lobby"; paintNet();
-    }else if(a === "addai"){
+    if(a === "addai"){
       await api("addai", {code:NET.code});
-      paintNet();
-    }else if(a === "join"){
-      if(joinCode.length !== 4){ if(err) err.textContent = "房號是 4 個字"; return; }
-      if(!MY.name) MY.name = "玩家";
-      await joinRoom(joinCode);
-      netView = "lobby"; paintNet();
+      paintRoom();
     }else if(a === "begin"){
       const d = await api("start", {code:NET.code});
-      if(d) $("netOv").hidden = true;
+      if(d) closeRoom();                     /* 沒成功就留在原地，錯誤訊息印在規則欄底下 */
     }else if(a === "leave"){
       if(NET.code) await api("leave", {code:NET.code});
       unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
       MYHAND = []; MYHAND_RI = -1;
-      startSolo(); $("netOv").hidden = true;
+      closeRoom();
+      buildIdleTable(); openLobby(); loadLobbyStats(true);
     }
   }catch(ex){
-    if(err) err.textContent = (ex && ex.message) || "操作失敗，請再試一次";
-    else { NET.err = (ex && ex.message) || "操作失敗"; render(); }
+    roomErr = (ex && ex.message) || "操作失敗，請再試一次";
+    paintRoom();
   }
 }
 
@@ -4291,12 +4650,13 @@ $("rulesClose").onclick = function(){ $("rulesOv").hidden = true; };
    回大廳要重建一張空桌：沒有王牌桌子才會退回石板灰（paintTable 的 TABLE_NONE），
    「還沒發牌就還沒有顏色」這件事兩條路都要成立。單人局本來就不記戰績，丟掉沒有損失。 */
 $("btnRoom").onclick = function(){
-  if(MODE === "net"){ openNet(); return; }
+  if(MODE === "net"){ openRoom(false); return; }
   buildIdleTable(); openLobby();
 };
 $("btnSetup").onclick = function(){ openSetup(); };
 $("setupCancel").onclick = function(){ $("setupOv").hidden = true; };
 $("btnMe").onclick = openMe;
+$("rmMe").onclick = openMe;
 $("meClose").onclick = function(){ $("meOv").hidden = true; };
 $("btnSignOut").onclick = async function(){
   const b = $("btnSignOut");
@@ -4317,7 +4677,12 @@ $("endLobby").onclick = function(){
   loadLobbyStats(true);   /* 剛打完一場，數字要重讀 */
 };
 document.addEventListener("keydown", function(e){
-  if(e.key === "Escape"){ $("rulesOv").hidden = true; $("setupOv").hidden = true; $("prefOv").hidden = true; $("netOv").hidden = true; $("meOv").hidden = true; setScore(false); }
+  if(e.key === "Escape"){
+    $("rulesOv").hidden = true; $("setupOv").hidden = true; $("prefOv").hidden = true;
+    $("meOv").hidden = true; setScore(false);
+    /* 開房頁沒有 Esc 可關——那是「離開房間」才做的事；設定頁 Esc 退回座位表 */
+    if(!$("room").hidden && roomView === "rules"){ roomView = "seats"; paintRoom(); }
+  }
 });
 
 /* ================= 單人設定 ================= */
@@ -4384,8 +4749,13 @@ function ruleReadout(cfg, n){
 /* 規則按鈕有兩個家：牌桌設定（單人，改本機的 draft）與等待房間（連線，送給伺服器） */
 function onRulePick(el, k, v){
   if(el.closest("#setupOv")){ draft[k] = ruleCast(k, v); paintSetup(); return; }
-  if(MODE === "net" && NET.code && amHost() && G && G.phase === "lobby")
-    api("cfg", {code:NET.code, cfg:Object.assign(rules(G.cfg), {[k]:ruleCast(k, v)})});
+  if(MODE === "net" && NET.code && amHost() && G && G.phase === "lobby"){
+    const cfg = Object.assign(rules(G.cfg), {[k]:ruleCast(k, v)});
+    /* 先在本機改：規則是房主自己按的，等伺服器繞一圈回來才動會慢半拍。
+       送出去的那份才是真的，applyRow 回來會原封覆蓋。 */
+    G.cfg = cfg; paintRoom();
+    api("cfg", {code:NET.code, cfg:cfg});
+  }
 }
 
 const draft = Object.assign({n:4}, RULE_DEFAULTS);
@@ -4582,14 +4952,14 @@ $("lbGo").onclick = async function(){
   const code = $("lcIn").value;
   if(code.length !== 4 || lbBusy) return;
   lbLock(true); lbErr("");
-  try{ await joinRoom(code); closeLobby(); openNet(); }
+  try{ await joinRoom(code); closeLobby(); openRoom(true); }
   catch(e){ lbErr(NET.err || ("找不到房號 " + code)); }
   lbLock(false);
 };
 $("lbHost").onclick = async function(){
   if(lbBusy) return;
   lbLock(true); lbErr("");
-  try{ await createRoom(rules(draft)); closeLobby(); openNet(); }
+  try{ await createRoom(rules(draft)); closeLobby(); openRoom(true); }
   catch(e){ lbErr(NET.err || "開房失敗"); }
   lbLock(false);
 };
