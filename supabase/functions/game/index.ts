@@ -416,10 +416,12 @@ function remember(uid: string, pid: string) {
 }
 
 /* ════════════ 戰績 ════════════ */
-/** 一場打完，每個有帳號的座位留一列。同一場重複呼叫只會留下第一次寫進去的那份。 */
+/** 一場打完，每個有帳號的座位留一列。同一場重複呼叫只會留下第一次寫進去的那份。
+ *  對 AI 打的那種一個人的局不留紀錄——大廳的「一個人打」根本不經過伺服器，
+ *  但開一桌只加 AI 自己打也是同一件事，所以條件寫在「桌上有幾個真人」上。 */
 async function saveResults(sb: SupabaseClient, R: Room) {
   const pids = R.seats.filter((s) => s.kind === "human" && s.pid).map((s) => s.pid as string);
-  if (!pids.length) return;
+  if (pids.length < 2) return;
   const { data: ps } = await sb.from("players").select("pid,user_id").in("pid", pids);
   const uidOf = new Map((ps ?? []).map((p: { pid: string; user_id: string | null }) => [p.pid, p.user_id]));
 

@@ -910,12 +910,26 @@ body.in-lobby .app{display:none}
 .rules .note{padding:11px 0;border-top:1px solid var(--hair-2);border-bottom:1px solid var(--hair-2);margin:14px 0;color:var(--ink-3)}
 .rules strong{color:var(--ink);font-weight:600}
 
-.final{width:100%;border-collapse:collapse;margin:8px 0 16px;font-family:"IBM Plex Mono",monospace}
-.final td{padding:9px 6px;border-bottom:1px solid var(--hair-2);font-variant-numeric:tabular-nums;color:var(--ink-2)}
-.final .pos{color:var(--ink-3);width:28px}
-.final .nm{font-family:"Archivo",sans-serif;color:var(--ink)}
-.final .pv{text-align:right;font-weight:500;font-size:17px;color:var(--ink)}
-.final tr.win .pv,.final tr.win .nm{color:var(--brass)}
+/* 收桌只講前三名：第一名整個亮起來，二三名是它的註腳。剩下的人在計分表裡，
+   要看按「看計分表」——收桌那一刻要記住的是誰贏了，不是一張八列的表。 */
+.podium{list-style:none;margin:16px 0 14px;padding:0}
+.podium li{display:flex;align-items:baseline;gap:16px;padding:11px 2px;
+  border-bottom:1px solid var(--hair-2)}
+.podium li:first-child{border-top:1px solid var(--hair-2)}
+.podium .pl{flex:none;width:32px;font-family:"Bodoni Moda",Georgia,serif;font-size:23px;
+  font-weight:600;line-height:1;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.podium .pn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:15px;color:var(--ink)}
+.podium .pv{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:17px;font-weight:500;color:var(--ink-2)}
+.podium .p1{padding:16px 2px 17px}
+.podium .p1 .pl{font-size:40px;color:var(--brass)}
+.podium .p1 .pn{font-size:21px;font-weight:600;color:var(--brass);letter-spacing:.01em}
+.podium .p1 .pv{font-size:23px;color:var(--brass)}
+/* 沒進前三名的話底下補一行自己的——收桌最想知道的還是「我第幾」 */
+.endmine{margin:0 0 16px;padding:0 2px;font-size:13px;color:var(--ink-3)}
+.endmine b{color:var(--ink-2);font-weight:500;font-family:"IBM Plex Mono",monospace}
+.endmsg{margin:0 0 10px;padding:0 2px;font-size:12.5px;color:var(--bad)}
 
 /* ================= 連線 ================= */
 .code{font-family:"IBM Plex Mono",monospace;font-weight:500;letter-spacing:.2em;color:var(--brass)}
@@ -1268,6 +1282,15 @@ button.rm-slot:hover .ai{opacity:1}
 .pg-quiet{padding:8px 16px;border-radius:99px;font-size:12.5px;color:var(--ink-3);
   transition:color .18s,background .18s}
 .pg-quiet:hover{color:var(--bad);background:oklch(1 0 0/.05)}
+/* 離開遊戲：跟登出同一條線、同一顆安靜的按鈕。按下去才長出那句話與「留下」——
+   確認不另外開浮層，牌局中再蓋一層會把人剛才在看的東西擋掉。 */
+.pg-out.asking{justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.pg-say{margin:0;font-size:12.5px;color:var(--ink-3)}
+.pg-outb{display:flex;gap:4px;align-items:center;margin-left:auto}
+.pg-quiet.warn{color:var(--bad)}
+.pg-quiet.warn:hover{background:oklch(.64 .17 25/.14)}
+/* 上面那一排「音效」底下本來就有一條線，這裡不要再畫第二條 */
+#prefQuit{border-top:0;padding-top:0;margin-top:26px}
 
 /* ---- 設定：牌面預覽直接躺在那一排底下，不另外做一塊面 ---- */
 .pg .preview{background:none;border-radius:0;padding:16px 0 2px;margin:0}
@@ -1656,6 +1679,17 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
           </div>
         </div>
 
+        <!-- 牌局中才出現。這是「這一局我不打了」的出口，不是登出——走的跟房間裡
+             「離開房間」同一條路：伺服器把位子讓出來（牌局中不抽椅子，改 AI 代打），
+             所以這一場不會有你那一列進 results。 -->
+        <div class="pg-out" id="prefQuit" hidden>
+          <p class="pg-say" id="quitSay" hidden>離開之後這一局就不算了，戰績上不會有這一場。</p>
+          <span class="pg-outb">
+            <button class="pg-quiet" id="quitNo" hidden>留下</button>
+            <button class="pg-quiet" id="btnQuit">離開遊戲</button>
+          </span>
+        </div>
+
       </section>
 
       <!-- ---- 規則：一份印出來的說明，兩欄中間一條線 ---- -->
@@ -1716,10 +1750,13 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   <div class="sheet">
     <h2>牌局結束</h2>
     <p class="sub" id="endSub"></p>
-    <table class="final" id="endTable"></table>
+    <ol class="podium" id="endTop"></ol>
+    <p class="endmine" id="endMine" hidden></p>
+    <p class="endmsg" id="endErr" hidden></p>
     <div class="sheet-actions">
       <button class="btn" id="endClose">看計分表</button>
-      <button class="btn primary" id="endBack">回到房間</button>
+      <button class="btn" id="endBack">返回房間</button>
+      <button class="btn primary" id="endAgain">再來一局</button>
     </div>
   </div>
 </div>
@@ -4178,6 +4215,12 @@ function render(){
     if(G.phase === "trickend") scheduleCollect();
     if(was === "roundend" || G.phase === "roundend") tallyScores();
     if(G.phase === "over") showFinal();
+    /* 收桌浮層開著的時候，別人按了「再來一局」或「返回房間」：這一桌已經不在 over 了，
+       浮層不收掉的話會蓋在新的一局上面。退回等待狀態就跟著回到房間，全桌待在同一頁。 */
+    if(was === "over" && G.phase !== "over" && !restarting){
+      $("endOv").hidden = true;
+      if(MODE === "net" && G.phase === "lobby" && $("room").hidden) openRoom(true);
+    }
   /* 定格中又重畫了：牌是剛換上去的 DOM，身上的 --px/--py 沒了，重新量一次補回去。
      連線模式每 420ms 敲一次伺服器，敲一次就重畫一次，不補的話會看到那張牌跳一下 */
   }else if(G.phase === "trickend" && $("trick").classList.contains("is-won")) pushWinner();
@@ -4942,7 +4985,7 @@ async function handleNet(a){
   if(MODE !== "net"){
     if(a === "addai") soloSeats(1);
     else if(a === "begin"){ closeRoom(); startSolo(); }
-    else if(a === "leave"){ closeRoom(); buildIdleTable(); openLobby(); }
+    else if(a === "leave") await leaveTable();
     return;
   }
   try{
@@ -4953,12 +4996,7 @@ async function handleNet(a){
       const d = await api("start", {code:NET.code});
       if(d) closeRoom();                     /* 沒成功就留在原地，錯誤訊息印在規則欄底下 */
     }else if(a === "leave"){
-      if(NET.code) await api("leave", {code:NET.code});
-      forgetRoom();
-      unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
-      MYHAND = []; MYHAND_RI = -1;
-      closeRoom();
-      buildIdleTable(); openLobby(); loadLobbyStats(true);
+      await leaveTable();
     }
   }catch(ex){
     roomErr = (ex && ex.message) || "操作失敗，請再試一次";
@@ -4966,15 +5004,55 @@ async function handleNet(a){
   }
 }
 
+/* 自己按了「再來一局」的那兩趟中間，這一桌會短暫退回等待狀態。那不是「有人把這一場收了」，
+   浮層與房間都不要跟著動——牌真的發下來，那顆按鈕自己把浮層收掉。 */
+let restarting = false;
+
+/* 回大廳只有這一條路：房間頂列那顆「離開房間／回大廳」，以及牌局中設定頁最下面
+   那顆「離開遊戲」。連線局要讓伺服器把位子讓出來——牌局中不抽椅子（位序會整排位移），
+   那個座位改由 AI 代打，所以這一場結算時已經沒有你，不會有你的那一列進 results。
+   單人局本來就沒有伺服器那一趟，AI 局從頭到尾不寫任何紀錄。
+   `buildIdleTable()` 非做不可：不重擺的話 G.trump 還留著上一局的花色，桌子不會退回石板灰。 */
+async function leaveTable(){
+  $("endOv").hidden = true;
+  if(MODE !== "net"){ closeRoom(); buildIdleTable(); openLobby(); return; }
+  if(NET.code) await api("leave", {code:NET.code});
+  forgetRoom();
+  unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
+  MYHAND = []; MYHAND_RI = -1;
+  closeRoom();
+  buildIdleTable(); openLobby(); loadLobbyStats(true);
+}
+
+/* 收桌。台上只站前三名，其餘的人在計分表裡；自己沒上台就在底下補一行。
+   名次是「同分同名次」，跟伺服器寫進 results 的那一套算法一樣，兩邊不會各說各話。 */
 function showFinal(){
-  const rank = G.seats.map(function(s, i){ return {name:seatLabel(i), sc:G.score[i]}; })
-                      .sort(function(a,b){ return b.sc - a.sc; });
-  const top = rank[0].sc;
-  $("endSub").textContent = G.log.length + " 局打完 · 最高 " + top + " 分";
-  $("endTable").innerHTML = rank.map(function(e, i){
-    return '<tr class="' + (e.sc === top ? "win" : "") + '"><td class="pos">' + (i+1) +
-      '</td><td class="nm">' + e.name + '</td><td class="pv">' + e.sc + '</td></tr>';
-  }).join("");
+  const me = mySeat();
+  const rank = G.seats.map(function(s, i){ return {i:i, name:seatLabel(i), sc:G.score[i] || 0}; });
+  rank.forEach(function(e){
+    e.pos = 1 + rank.filter(function(x){ return x.sc > e.sc; }).length;
+  });
+  rank.sort(function(a, b){ return b.sc - a.sc; });
+  const top = rank.slice(0, 3);
+  /* 單人局不進戰績——收桌這一刻是唯一還說得上這句話的地方 */
+  $("endSub").textContent = G.log.length + " 局打完" + (MODE === "net" ? "" : " · 對 AI，不記戰績");
+  setHTML($("endTop"), top.map(function(e, k){
+    return '<li class="' + (k === 0 ? "p1" : "") + '">' +
+      '<span class="pl">' + e.pos + '</span>' +
+      '<span class="pn">' + e.name + '</span>' +
+      '<span class="pv">' + (e.sc > 0 ? "+" : "") + e.sc + '</span></li>';
+  }).join(""));
+  const mine = me >= 0 ? rank.filter(function(e){ return e.i === me; })[0] : null;
+  const outside = !!mine && top.indexOf(mine) < 0;
+  $("endMine").hidden = !outside;
+  if(outside) setHTML($("endMine"), '你第 <b>' + mine.pos + '</b> / ' + G.seats.length +
+    ' · <b>' + (mine.sc > 0 ? "+" : "") + mine.sc + '</b> 分');
+  /* 再來一局＝直接發牌，所以只有按得動「開始」的人看得到：單人局永遠是你，
+     連線局是房主（房主離線時伺服器讓在座的任何人接手，這裡照同一個條件）。 */
+  const ag = $("endAgain");
+  ag.hidden = !(MODE !== "net" || (me >= 0 && (amHost() || !liveCids()[G.host])));
+  ag.disabled = false; ag.textContent = "再來一局";
+  $("endErr").hidden = true;
   $("endOv").hidden = false;
 }
 
@@ -5048,7 +5126,7 @@ function openPg(tab){
   $("pg").hidden = false;
   $("pgScroll").scrollTop = 0;
 }
-function closePg(){ $("pg").hidden = true; }
+function closePg(){ $("pg").hidden = true; quitAsk = false; }
 $("pgTabs").onclick = function(e){
   const b = e.target.closest(".pg-tab");
   if(!b || b.dataset.pg === pgTab) return;
@@ -5074,7 +5152,30 @@ $("btnSignOut").onclick = async function(){
 };
 $("btnPref").onclick = function(){ openPg("pref"); };
 $("endClose").onclick = function(){ $("endOv").hidden = true; };
-/* 打完就是回到原本那間房間——座位、規則、房主都還在，再按一次「開始」就是下一場。
+/* 再來一局＝同一桌、同一批人、同一份規則，直接發牌，不經過房間那一站。
+   連線局是兩趟：again 把房間退回等待狀態，start 才發牌——伺服器沒有「重開一場」
+   這個動作，硬要加一個就得把兩邊的狀態機都改，這裡走現成的那兩顆。
+   兩趟中間這一桌會短暫回到 lobby——`restarting` 就是為了讓畫面不要跟著跳回房間，
+   浮層一直留到牌發下來才收，看起來就是「按了就發牌」。 */
+$("endAgain").onclick = async function(){
+  if(MODE !== "net"){ startSolo(); return; }
+  const b = $("endAgain"), err = $("endErr");
+  b.disabled = true; b.textContent = "發牌中…"; err.hidden = true;
+  restarting = true;
+  let bad = "";
+  try{
+    /* 上一次按失敗的話這一桌已經退回等待狀態了，again 那一趟就不用再跑一次 */
+    if(G.phase === "over" && !await api("again", {code:NET.code}))
+      bad = NET.err || "這一桌回不到等待狀態，再試一次";
+    else if(!await api("start", {code:NET.code}))
+      bad = NET.err || "發不了牌，先回房間看看";
+  }catch(ex){ bad = (ex && ex.message) || "開不了下一場，再試一次"; }
+  restarting = false;
+  if(!bad){ $("endOv").hidden = true; loadLobbyStats(true); return; }
+  b.disabled = false; b.textContent = "再來一局";
+  err.textContent = bad; err.hidden = false;
+};
+/* 返回房間＝回到原本那間房間——座位、規則、房主都還在，再按一次「開始」就是下一場。
    連線局要請伺服器把房間退回等待狀態（again）；單人局自己把桌子重擺一次就好
    （不重擺的話 G.trump 還留著上一局的花色，桌子不會退回石板灰）。 */
 $("endBack").onclick = function(){
@@ -5185,7 +5286,33 @@ function paintPref(){
   $("deckPreview").innerHTML =
     [[14,0],[13,1],[12,0],[7,2]].map(p => cardHTML({r:p[0], s:p[1], id:"pv" + p[0] + p[1]})).join("") +
     '<div class="pvback"><div class="back"></div></div>';
+  paintQuit();
 }
+
+/* 「離開遊戲」只在桌上真的有一場在打的時候出現。大廳有自己的去處，等待中的房間
+   那扇門叫「離開房間」——同一頁上不要有兩個講同一件事的出口。 */
+let quitAsk = false;
+function inMatch(){ return !!G && G.phase !== "lobby" && $("lobby").hidden; }
+function paintQuit(){
+  const box = $("prefQuit");
+  if(!box) return;
+  const on = inMatch();
+  box.hidden = !on;
+  if(!on) quitAsk = false;
+  box.classList.toggle("asking", quitAsk);
+  $("quitSay").hidden = !quitAsk;
+  $("quitNo").hidden = !quitAsk;
+  /* 安靜到最後一刻：紅色留給「確定離開」，平常那顆跟登出一樣是灰的 */
+  $("btnQuit").classList.toggle("warn", quitAsk);
+  $("btnQuit").textContent = quitAsk ? "確定離開" : "離開遊戲";
+}
+$("quitNo").onclick = function(){ quitAsk = false; paintQuit(); };
+/* 第一下長出那句話，第二下才真的走。中間按到別的地方（關掉這一頁）就當作沒按過。 */
+$("btnQuit").onclick = function(){
+  if(!quitAsk){ quitAsk = true; paintQuit(); return; }
+  quitAsk = false; paintQuit(); closePg();
+  leaveTable();
+};
 
 function startSolo(){
   $("endOv").hidden = true;

@@ -65,6 +65,7 @@ deno run --allow-read scripts/engine_test.ts     # 牌局引擎：各種規則�
 deno run --allow-read scripts/rules_test.ts      # 兩份規則對照：畫面 vs 伺服器
 deno run -A          scripts/ui_test.ts         # 出牌的入口：無頭 Chrome 開真的牌桌
 deno run -A          scripts/net_test.ts        # 連線那一段：假伺服器重演各種時序
+deno run -A          scripts/end_test.ts        # 一場牌的兩個出口：收桌、再來一局、離開遊戲
 deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗證
 ```
 
@@ -84,6 +85,9 @@ deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗
   點一下只出一張。立體那段用軟體 WebGL 開真的場景驗射線；three.js 從 CDN 載不到就跳過，
   不讓測試綁在別人的網路上。頁面只插兩個接縫（`<head>` 的門禁、`gotoLogin` 不跳走），
   接縫找不到就直接報錯（`scripts/_browser.ts`）。
+- **`end_test.ts`** 打完真的一整場（十個人二十四張牌＝三局），驗一場牌的兩個出口：收桌台上
+  只站前三名（同分同名次，自己沒上台底下補一行）、「再來一局」直接發牌不經過房間而且分數歸零、
+  設定頁最下面的「離開遊戲」要按兩下才走、走完回到大廳而且桌子退回石板灰。`SHOT=1` 跑會順手截圖。
 - **`net_test.ts`** 重演那些真的網路重現不了的時序：樂觀先走、遲到的同一格（realtime 慢一秒的那條）、
   伺服器蓋章不重演動畫、過期的那一列、六秒保險絲、送不出去要退回、對手廣播、有人亂喊。
   伺服器換成假的（接縫 `window.__call`），每一列什麼時候到、內容是什麼都由測試決定。
