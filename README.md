@@ -55,9 +55,22 @@ docs/index.html                前端（單檔，無建置流程）
 docs/cards/                    J／Q／K 十二張人像（CC0 英式宮廷牌，已裁切重新配色；來源見裡面的 README）
 supabase/functions/game/       牌局伺服器：發牌、驗證出牌、規則、AI
 supabase/migrations/           資料表與 RLS
-updown.html                    Claude artifact 版（單人）
-updown-online.html             Claude artifact 版（組織內多人）
+updown.html                    Claude artifact 版（單人）── 2026-09-11 的快照，不再跟
+updown-online.html             Claude artifact 版（組織內多人）── 同上
 ```
+
+## 那兩份 artifact 版
+
+`updown.html`（單人）與 `updown-online.html`（組織內多人）是 **2026-09-11 的快照**（commit `3af791e`），
+**不再跟著正式版走**。它們用的是 Claude artifact 自己的資料庫（`window.claude.use("db")`），跟 Supabase 無關，
+所以線上牌局不會受它們影響。
+
+停在那一天的意思是：**沒有鬼牌、沒有 the hook、計分不能調、沒有房間規則、沒有 Google 登入、沒有立體牌桌**。
+引擎那 20 支函式裡有 15 支是舊版本。頁面左上角會標「2026-09-11 的版本」，開的人看得到。
+
+以前這裡寫著「改一處就三處一起改」。那條規矩取消了——沒有任何東西在檢查三份有沒有一致，
+而在它被寫下之後，`docs/index.html` 改了 19 次，一次都沒有回頭改它們。與其留一條沒人遵守的規矩，
+不如老實說它們是那一天的樣子。要玩最新規則的人請開正式版。
 
 ## 頁面與牌桌是兩種東西
 
@@ -183,8 +196,8 @@ J／Q／K 的人像是 `docs/cards/` 的英式雙頭人像，啟動時抓成文�
 - **母線是一條混音鏈。** 乾聲與殘響匯進同一條匯流排，經 38Hz 高通、膠水壓縮、限幅、音量。
   十人局一輪發 110 張牌實測峰值 −19.7dB，沒有削波。
 
-音效層那一塊在 `docs/index.html`、`updown.html`、`updown-online.html` 裡是**同一份**
-（`/* 11 Up & Down — 音效層 */` 到那個 `<script>` 結束為止）。**改一處就三處一起改。**
+音效層那一段（`/* 11 Up & Down — 音效層 */` 到那個 `<script>` 結束為止）在三個檔裡各有一份。
+會動的只有 `docs/index.html` 那一份——另外兩份是快照，見下面〈那兩份 artifact 版〉。
 
 要換成錄音（例如買了商用音效庫）不用重寫：
 `SFX.load({ play:["sfx/card_a.wav","sfx/card_b.wav"] })`，

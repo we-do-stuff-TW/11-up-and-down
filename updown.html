@@ -1,4 +1,16 @@
 <title>11 Up &amp; Down</title>
+<!-- ─────────────────────────────────────────────────────────────
+     這一份是 2026-09-11 的快照（commit 3af791e），不再跟著正式版走。
+
+     正式版在 docs/index.html（GitHub Pages）：
+     https://we-do-stuff-tw.github.io/11-up-and-down/
+     那邊之後多了鬼牌、the hook、可調計分、房間規則、Google 登入、立體牌桌，
+     這一份都沒有。要玩最新的規則請開正式版。
+
+     以前這裡寫著「改一處就三處一起改」——那條已經取消了。
+     沒有人在檢查三份有沒有一致，而它實際上已經被忘掉 19 次。
+     這一份的定位改成「那一天的樣子」，不是「另一個要維護的版本」。
+     ───────────────────────────────────────────────────────────── -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -749,10 +761,21 @@ table.score tr.now .sz span{color:var(--brass)}
   </symbol>
 </svg>
 
+<style>
+/* 快照標記：這一份不是正式版，開的人要看得到 */
+.brand .snap{
+  font-size:10.5px;letter-spacing:.08em;line-height:1;white-space:nowrap;
+  color:var(--ink-3);border:1px solid var(--hair);border-radius:999px;
+  padding:3px 8px;opacity:.85;
+}
+@media(max-width:560px){ .brand .snap{display:none} }
+</style>
+
 <div class="app">
   <header class="bar">
     <div class="brand">
       <h1>11 Up &amp; Down</h1>
+      <span class="snap" title="這一份停在 2026-09-11。之後的鬼牌、the hook、可調計分都只在正式版上：https://we-do-stuff-tw.github.io/11-up-and-down/">2026-09-11 的版本</span>
       <span class="pips">
         <svg viewBox="0 0 24 24"><use href="#p-s"/></svg>
         <svg class="r" viewBox="0 0 24 24"><use href="#p-h"/></svg>
