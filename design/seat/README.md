@@ -16,9 +16,10 @@ Francis 說「分數可以拿掉」「需要拿幾墩的設計再給我幾個」
 
 - `index.html` — 三案 ＋ 現況並排，每一欄由上往下是一個人打完一局會經過的六個狀態
   （還沒叫 → 叫 3 → 贏 1 → 剛好 → 超了 → 叫 0），最後一格是叫 8 墩的寬度壓力測試。
+  **C 那一欄跟著 `docs/index.html` 的 `bidPips()` 同步**——原型比出貨的好看是會騙人的。
 - `table.html` — 同樣三案 ＋ 現況，擺回桌上。牌與座位牌都是 1440 寬螢幕上的**真尺寸**，
   這一頁只回答一個問題：夠不夠看得清楚。
-- `_seat.css` / `_seat.js` — 兩頁共用的座位牌畫法。色票與骰子抄 `docs/index.html`
+- `_seat.css` / `_seat.js` — 四頁共用的座位牌畫法。`C()` 與上線那一份一字不差。色票與骰子抄 `docs/index.html`
   （`--felt` 走 `paintTable()` 的 ♠ ＋深局版本，跟打到一半時的桌色一樣）。
 
 ## 三案
@@ -84,3 +85,14 @@ headless 的視窗夾在 500px 壓不下去）。
 
 **還沒解的一條**：390 手機寬時，左右兩個人如果叫到 8 墩以上，那塊牌會蓋到中間那一墩。
 現況也會（143px），C 是 158px，比原本多 15px。真正的解法是窄螢幕的座位牌擺位，不是再把牌縮小。
+
+## 怎麼看
+
+    cd design/seat && python3 -m http.server 8771
+    open http://127.0.0.1:8771/index.html      # 四頁互相連得到
+
+`file://` 直接點開會被同源政策擋住（css/js 是外部檔），所以另外有一份自帶一切的：
+
+    python3 bundle.py     # → dist/index.html、dist/table.html、dist/phone.html，雙擊就開
+
+`dist/` 是產生出來的，沒有進版本管理（`.gitignore`）。

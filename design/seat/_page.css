@@ -41,3 +41,8 @@ header code{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--bra
 .st > i{display:block;font-style:normal;font-size:10.5px;letter-spacing:.12em;
   text-transform:uppercase;color:oklch(1 0 0/.30);margin-bottom:6px}
 
+
+/* 四頁互相連得到的一條細導覽 */
+nav.go{display:flex;gap:18px;flex-wrap:wrap;padding:4px 32px 10px;font-size:12.5px}
+nav.go a{color:var(--brass-2);text-decoration:none;border-bottom:1px solid transparent;padding-bottom:1px}
+nav.go a:hover{border-bottom-color:var(--brass-2)}

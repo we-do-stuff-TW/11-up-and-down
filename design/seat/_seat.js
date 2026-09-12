@@ -51,19 +51,22 @@ function B(s){
 }
 
 /* ── C · 墩位 ───────────────────────────────────────────── */
+/* 這一支跟 docs/index.html 的 bidPips() 一字不差地同步過：定案之後 17add5a 立了
+   「小字如果在解釋旁邊已經看得到的東西就刪」，所以原型本來有的「超 n」與叫 0 那句
+   「一墩都不要」都沒有上線。差在哪標在欄位說明裡，不要讓原型比出貨的好看。 */
 function C(s){
   if(s.bid === null)
     return wrap(s, "", '<div class="seat-row">' + die(null) + '<span class="c-wait">還沒叫</span></div>');
-  if(s.bid === 0 && s.got === 0)
-    return wrap(s, "", '<div class="seat-row">' + die(0) +
-      '<span class="c-none"><b></b>一墩都不要</span></div>');
   const over = Math.max(0, s.got - s.bid), d = s.bid - s.got;
+  if(!s.bid && !over)   /* 叫 0 沒有墩位可以排：骰子上那個 0 就是答案 */
+    return wrap(s, "", '<div class="seat-row">' + die(0) + '</div>');
   let h = "";
   for(let k = 0; k < s.bid; k++) h += '<u class="' + (k < s.got ? "got" : "") + '"></u>';
   for(let k = 0; k < over; k++) h += '<u class="over"></u>';
+  const said = over ? "，超了 " + over + " 墩" : d > 0 ? "，還差 " + d + " 墩" : "，剛好";
   return wrap(s, "", '<div class="seat-row">' + die(s.bid) +
-    '<span class="c-slots' + (d === 0 && !over ? " done" : "") + '">' + h + '</span>' +
-    (over ? '<span class="c-over">超 ' + over + '</span>' : "") + '</div>');
+    '<span class="c-slots' + (d === 0 && !over ? " done" : "") + '" role="img" aria-label="叫 ' +
+      s.bid + ' 墩，已贏 ' + s.got + ' 墩' + said + '">' + h + '</span></div>');
 }
 
 /* ── 現況 ───────────────────────────────────────────────── */

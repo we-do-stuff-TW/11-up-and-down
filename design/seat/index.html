@@ -18,6 +18,12 @@
      每一欄由上往下是同一個人打完一局會經過的六個狀態，最後一格是叫 8 墩的寬度壓力測試。
      <code>?w=1</code> 只看第一欄。</p>
 </header>
+<nav class="go">
+  <a href="index.html">三案並排</a>
+  <a href="table.html">擺回桌上（真尺寸）</a>
+  <a href="phone.html">390 手機寬</a>
+  <a href="measure.html">實際寬高</a>
+</nav>
 <div class="cols" id="cols"></div>
 
 <script src="_seat.js"></script>
@@ -47,10 +53,12 @@ const COLS = [
        "「1／3」大分數，左邊金色的數字每贏一墩就跳一次；差幾用有底色的膠囊講。<br>" +
        "<b>強</b>：兩個數字都在、最省寬度，叫 11 墩也一樣寬。<br><b>弱</b>：要自己減一下。",
    fn:B},
-  {k:"c", h:"C <em>· 墩位</em>",
+  {k:"c", h:"C <em>· 墩位（已上線 1d59d6f）</em>",
    why:"完全不寫數字。<b>叫幾墩就排幾格空墩位</b>，贏一墩就填實一格（中間那道是牌背的腰線）。" +
        "空的還剩幾格＝還差幾墩，數就好。剛好整排轉綠、超了後面長紅格。<br>" +
-       "<b>強</b>：最像桌上真的東西，跟立體房間同一套語言。<br><b>弱</b>：叫 8 墩以上會很寬。",
+       "<b>跟你挑的時候差兩處</b>：「超 n」與叫 0 的「一墩都不要」都沒有上線——" +
+       "定案同時 17add5a 立了「小字如果在解釋旁邊已經看得到的東西就刪」。" +
+       "紅格數得到、骰子上那個 0 就是答案。那句話改寫進 aria-label。",
    fn:C},
 ];
 const only = new URLSearchParams(location.search).get("w");
