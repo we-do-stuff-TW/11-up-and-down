@@ -1079,7 +1079,7 @@ button.rm-slot:hover .ai{opacity:1}
 .rm-lnk:hover::after{background:var(--brass)}
 .rm-by{font-size:10px;letter-spacing:.16em;color:var(--ink-3)}
 .rm-sect{margin-bottom:16px}
-.rm-sect>.cap,.rm-cols .cap{display:block;margin-bottom:6px;font-size:9.5px;font-weight:600;
+.rm-sect>.cap,.rm-ebd .cap{display:block;margin-bottom:6px;font-size:9.5px;font-weight:600;
   letter-spacing:.26em;text-transform:uppercase;color:var(--ink-3)}
 .rm-r{display:flex;align-items:baseline;padding:7px 0}
 .rm-r .k{font-size:12.5px;color:var(--ink-3);flex:none}
@@ -1107,25 +1107,51 @@ button.rm-slot:hover .ai{opacity:1}
 @keyframes rmPulse{0%,100%{opacity:.35}50%{opacity:1;box-shadow:0 0 0 4px oklch(.845 .128 84/.10)}}
 @media (prefers-reduced-motion:reduce){.rm-waitfor i{animation:none;opacity:.8}}
 
-/* ---- 設定：同一張紙翻面，整頁就是規則表 ---- */
-.rm-edit{flex:1;min-height:0;display:flex;flex-direction:column;
-  padding:10px clamp(22px,3.4vw,52px) 30px}
-.rm-ehd{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
-  padding-bottom:16px;border-bottom:1px solid var(--hair)}
-.rm-ehd h2{font-family:"Bodoni Moda",Georgia,serif;font-size:34px;font-weight:600;letter-spacing:-.01em}
-.rm-meta{margin:6px 0 0;font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
-.rm-meta b{color:var(--ink-2);font-weight:500;font-family:"IBM Plex Mono",monospace}
-.rm-doneline{display:flex;gap:12px;align-items:center}
+/* ---- 設定：從「設定」那兩個字底下長出來的側窗 ----
+   前一版是整頁換掉：座位表消失，八個規則分兩欄攤在整個螢幕上，中間一大片空白——
+   選項不多，攤得太開反而更難選。現在收成一個貼在右欄原位的視窗，
+   高度只取內容所需（撐滿就又變成一頁了），左邊的座位表一格也沒被蓋到：
+   牌數與局數本來就是「幾個人」算出來的，改規則時看得到誰在座。
+   三案比較與取捨寫在 design/rules/README.md。 */
+.rm-scrim{position:fixed;inset:0;z-index:4}          /* 點視窗外面＝完成 */
+.rm-edit{
+  position:fixed;top:74px;right:20px;z-index:5;      /* 錨在右欄那顆「設定」底下 */
+  /* 小筆電／分割視窗（760–1000）會吃到座位表右邊一點，但點外面就收掉；
+     寬度保底是為了不讓視窗自己溢出畫面 */
+  width:min(436px,calc(100vw - 40px));max-height:calc(100dvh - 96px);
+  display:flex;flex-direction:column;border-radius:18px;
+  background:linear-gradient(178deg in oklab,
+    color-mix(in oklab,var(--felt) 91%,oklch(1 0 0)),
+    color-mix(in oklab,var(--felt) 97%,oklch(1 0 0)));
+  box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair),
+    0 2px 6px rgba(0,0,0,.30),0 36px 80px rgba(0,0,0,.52);
+  transform-origin:100% 0;animation:rmPop .24s var(--e-out) both}
+@keyframes rmPop{from{opacity:0;transform:scale(.965) translateY(-6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rm-edit{animation:none}}
+/* 視窗開著的時候：桌子退一階但看得見，被視窗頂掉的那一欄整條退場——
+   留個半透明的話，視窗底下會透出半顆銅色的開始鈕 */
+.rm-plan,.rm-sheet{transition:opacity .3s var(--e-out)}
+body.rm-set .rm-plan{opacity:.72}
+body.rm-set .rm-sheet{opacity:0;pointer-events:none}
+
+.rm-ehd{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+  padding:20px 24px 13px;border-bottom:1px solid var(--hair)}
+.rm-ehd h2{font-family:"Bodoni Moda",Georgia,serif;font-size:23px;font-weight:600;letter-spacing:-.005em}
 .rm-done{padding:9px 22px;border-radius:99px;font-size:12.5px;color:var(--ink);
   background:var(--glass);box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair)}
 .rm-done:hover{background:oklch(.98 .012 92/.13)}
-.rm-cols{flex:1;display:grid;grid-template-columns:1fr 1px 1fr;gap:0 clamp(28px,3.6vw,58px);
-  padding-top:6px;overflow:auto}
-.rm-cols .cap{margin:22px 0 4px}
-.rm-rule{width:1px;background:var(--hair);height:100%}
-.rm-f{display:flex;align-items:baseline;gap:20px;padding:20px 0;border-bottom:1px solid var(--hair-2)}
-.rm-f>label{width:88px;flex:none;font-size:12.5px;color:var(--ink-3)}
-.rm-pick{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 4px;flex:1}
+.rm-ebd{overflow:auto;padding:2px 24px 6px}
+.rm-ebd .cap{margin:15px 0 0}
+.rm-f{display:flex;align-items:baseline;gap:14px;padding:10px 0;border-bottom:1px solid var(--hair-2)}
+/* 標籤靠右切齊：選項的左界因此是一條直線，八排一眼掃得完 */
+.rm-f>label{width:72px;flex:none;text-align:right;font-size:12.5px;color:var(--ink-3)}
+.rm-f.last{border-bottom:0}
+.rm-pick{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 3px;flex:1}
+/* 分數例子跟右欄唯讀那份同一種排法（leader dots），只是收小一號 */
+.rm-egs{padding:8px 0 2px}
+.rm-egs .rm-r{padding:4px 0}
+.rm-egs .rm-r .k{font-size:11.5px}
+.rm-egs .rm-r .v{font-family:"IBM Plex Mono",monospace;font-size:12px;font-variant-numeric:tabular-nums}
 /* 選項不做膠囊也不做框：選中的那個下面一條銅線 */
 .rm-ch{font-size:13.5px;color:var(--ink-3);padding:4px 6px;position:relative;transition:color .18s}
 .rm-ch::after{content:"";position:absolute;left:6px;right:6px;bottom:1px;height:1px;
@@ -1134,12 +1160,13 @@ button.rm-slot:hover .ai{opacity:1}
 .rm-ch[aria-pressed="true"]{color:var(--ink)}
 .rm-ch[aria-pressed="true"]::after{background:var(--brass)}
 .rm-sep{color:var(--hair);font-size:11px;user-select:none}
-.rm-eft{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
-  padding-top:16px;border-top:1px solid var(--hair)}
-.rm-nums{display:flex;gap:34px}
+.rm-eft{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding:14px 24px 18px;border-top:1px solid var(--hair)}
+.rm-nums{display:flex;gap:26px}
 .rm-nums .k{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
-.rm-nums .v{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:500;line-height:1;
+.rm-nums .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:500;line-height:1;
   font-variant-numeric:tabular-nums}
+.rm-emeta{font-size:11px;color:var(--ink-3);letter-spacing:.04em}
 
 @media (max-width:760px){
   .rm-top{padding:14px 16px 0}
@@ -1166,18 +1193,17 @@ button.rm-slot:hover .ai{opacity:1}
   .rm-sect{margin-bottom:12px}
   .rm-tot{margin-top:14px}
   .rm-go{position:sticky;bottom:10px;z-index:3}
-  .rm-edit{padding:8px 16px calc(24px + env(safe-area-inset-bottom))}
-  .rm-ehd{flex-direction:column;align-items:flex-start;gap:12px}
-  .rm-ehd h2{font-size:26px}
-  .rm-doneline{width:100%;justify-content:space-between}
-  .rm-cols{grid-template-columns:1fr;padding-top:0}
-  .rm-rule{display:none}
-  .rm-f{flex-direction:column;gap:8px;padding:16px 0}
-  .rm-f>label{width:auto}
-  .rm-eft{flex-direction:column;align-items:flex-start;gap:10px;position:sticky;bottom:0;
-    background:linear-gradient(to top,var(--felt-deep) 76%,transparent);
-    padding-bottom:calc(8px + env(safe-area-inset-bottom))}
-  .rm-nums{gap:26px}
+  /* 右欄在手機上本來就在畫面下方，視窗就從那裡升起來、貼著底邊 */
+  .rm-edit{top:auto;right:0;left:0;bottom:0;width:auto;max-height:88dvh;
+    border-radius:20px 20px 0 0;transform-origin:50% 100%;animation:rmUp .28s var(--e-out) both}
+  @keyframes rmUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+  .rm-edit::before{content:"";position:absolute;left:50%;top:8px;translate:-50% 0;
+    width:36px;height:4px;border-radius:99px;background:var(--hair)}
+  .rm-ehd{padding:20px 18px 12px}
+  .rm-ebd{padding:2px 18px 6px}
+  .rm-f{gap:12px}
+  .rm-f>label{width:66px}
+  .rm-eft{padding:12px 18px calc(14px + env(safe-area-inset-bottom))}
 }
 
 /* ================= 帳號 · 設定 · 規則 =================
@@ -1591,6 +1617,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
     <aside class="rm-sheet" id="rmSheet"></aside>
   </div>
 
+  <div class="rm-scrim" id="rmScrim" data-room="seats" hidden></div>
   <div class="rm-edit" id="rmEdit" hidden></div>
 </div>
 
@@ -4653,7 +4680,7 @@ function openRoom(auto){
   paintRoom();
 }
 function closeRoom(){
-  document.body.classList.remove("in-room");
+  document.body.classList.remove("in-room", "rm-set");
   $("room").hidden = true;
   /* 牌桌剛才是 display:none，畫布量起來是 0×0；一露臉就得補量一次，
      不然立體桌會停在錯的尺寸（或根本沒開始畫）。 */
@@ -4758,8 +4785,10 @@ function paintRoom(){
   paintRoomMe();
   paintRoomSheet();
   paintRoomEdit();
-  $("rmBody").hidden = roomView === "rules";
-  $("rmEdit").hidden = roomView !== "rules";
+  /* 座位表一直在：設定是浮在它上面的一個視窗，不是把整頁換掉 */
+  const set = roomView === "rules";
+  $("rmEdit").hidden = $("rmScrim").hidden = !set;
+  document.body.classList.toggle("rm-set", set);
 }
 function paintRoomMe(){
   setHTML($("rmMe"), '<span class="nm">' + esc(MY.name || MY.gname || "你") + '</span>' +
@@ -4823,38 +4852,39 @@ function paintRoomSheet(){
 function paintRoomEdit(){
   const C = rules(G.cfg), N = roomNumbers(C), hs = G.hs || 5;
   const solo = MODE !== "net";
-  const field = function(k){
+  /* 每一組的最後一排不畫線：底下緊接著就是下一組的小標，兩條線疊在一起太吵 */
+  const field = function(k, last){
     const f = ruleField(k);
     if(!f) return "";
     const cur = String(C[f.k]);
-    return '<div class="rm-f"><label>' + (RM_ROW[k] || f.label) + '</label><div class="rm-pick">' +
+    return '<div class="rm-f' + (last ? " last" : "") + '"><label>' + (RM_ROW[k] || f.label) +
+      '</label><div class="rm-pick">' +
       f.opts.map(function(o){
         return '<button class="rm-ch" data-rule="' + f.k + '" data-v="' + o.v + '" aria-pressed="' +
           (String(o.v) === cur ? "true" : "false") + '">' + o.t + '</button>';
       }).join('<i class="rm-sep">／</i>') + '</div></div>';
   };
   setHTML($("rmEdit"),
-    '<div class="rm-ehd"><div><h2>這一桌的規則</h2>' +
-      '<p class="rm-meta">' + (solo ? '一個人打' : '房號 <b>' + esc(NET.code) + '</b>') + ' · ' +
-      G.seats.length + ' 人就座 · ' + N.size + ' 張牌</p></div>' +
-      '<div class="rm-doneline">' +
-      '<button class="rm-done" data-room="seats">完成</button></div></div>' +
-    '<div class="rm-cols"><section>' +
-      '<span class="cap">叫墩</span>' + field("bidMode") + field("hook") +
-      '<span class="cap">牌</span>' + field("decks") + field("minRank") + field("jokers") +
-    '</section><i class="rm-rule"></i><section>' +
-      '<span class="cap">計分</span>' + field("hit") + field("zero") + field("miss") +
-      '<span class="cap">這樣算</span>' +
-      [[3,3],[0,0],[3,4],[3,0]].map(function(e){
+    '<header class="rm-ehd"><h2>這一桌的規則</h2>' +
+      '<button class="rm-done" data-room="seats">完成</button></header>' +
+    '<div class="rm-ebd">' +
+      /* 右欄整條被視窗頂掉了，改規則沒送成的那句話要印在這裡才看得到 */
+      (roomErr ? '<p class="rm-err">' + esc(roomErr) + '</p>' : "") +
+      '<span class="cap">叫墩</span>' + field("bidMode") + field("hook", 1) +
+      '<span class="cap">牌</span>' + field("decks") + field("minRank") + field("jokers", 1) +
+      '<span class="cap">計分</span>' + field("hit") + field("zero") + field("miss", 1) +
+      '<span class="cap">這樣算</span><div class="rm-egs">' +
+      [[3,3],[0,0],[3,4]].map(function(e){
         const p = roundPoints(e[0], e[1], hs, C);
         return '<div class="rm-r"><span class="k">叫 ' + e[0] + '，拿 ' + e[1] + '</span>' +
           '<i class="d"></i><span class="v">' + (p >= 0 ? "＋" : "−") + Math.abs(p) + '</span></div>';
-      }).join("") +
-    '</section></div>' +
-    '<div class="rm-eft"><div class="rm-nums">' +
+      }).join("") + '</div></div>' +
+    '<footer class="rm-eft"><div class="rm-nums">' +
       '<div><div class="k">牌數</div><div class="v">' + N.size + '</div></div>' +
       '<div><div class="k">最多每人</div><div class="v">' + N.peak + '</div></div>' +
-      '<div><div class="k">總局數</div><div class="v">' + N.rounds + '</div></div></div></div>');
+      '<div><div class="k">總局數</div><div class="v">' + N.rounds + '</div></div></div>' +
+      '<span class="rm-emeta">' + (solo ? "一個人打" : "房號 " + esc(NET.code)) + ' · ' +
+      G.seats.length + ' 人就座</span></footer>');
 }
 /* 房號要能一鍵貼給朋友；沒有 clipboard API（http、舊瀏覽器）就退回 execCommand */
 function copyRoomCode(){
@@ -5033,11 +5063,13 @@ function showFinal(){
     e.pos = 1 + rank.filter(function(x){ return x.sc > e.sc; }).length;
   });
   rank.sort(function(a, b){ return b.sc - a.sc; });
-  const top = rank.slice(0, 3);
+  /* 「前三名」是名次前三，不是前三列：同分的人一起上台，所以三個人打平就是三個第一名，
+     台上會有三列；30／20／10／10 那種則是四列。切成 slice(0,3) 的話會有人被關在門外。 */
+  const top = rank.filter(function(e){ return e.pos <= 3; });
   /* 單人局不進戰績——收桌這一刻是唯一還說得上這句話的地方 */
   $("endSub").textContent = G.log.length + " 局打完" + (MODE === "net" ? "" : " · 對 AI，不記戰績");
-  setHTML($("endTop"), top.map(function(e, k){
-    return '<li class="' + (k === 0 ? "p1" : "") + '">' +
+  setHTML($("endTop"), top.map(function(e){
+    return '<li class="' + (e.pos === 1 ? "p1" : "") + '">' +
       '<span class="pl">' + e.pos + '</span>' +
       '<span class="pn">' + e.name + '</span>' +
       '<span class="pv">' + (e.sc > 0 ? "+" : "") + e.sc + '</span></li>';
