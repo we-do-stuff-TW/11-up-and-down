@@ -55,6 +55,7 @@ docs/index.html                前端（單檔，無建置流程）
 docs/cards/                    J／Q／K 十二張人像（CC0 英式宮廷牌，已裁切重新配色；來源見裡面的 README）
 supabase/functions/game/       牌局伺服器：發牌、驗證出牌、規則、AI
 supabase/migrations/           資料表與 RLS
+scripts/                       測試與一次性的設定指令（見下面〈測試〉）
 updown.html                    Claude artifact 版（單人）── 2026-09-11 的快照，不再跟
 updown-online.html             Claude artifact 版（組織內多人）── 同上
 ```
@@ -71,6 +72,27 @@ updown-online.html             Claude artifact 版（組織內多人）── �
 以前這裡寫著「改一處就三處一起改」。那條規矩取消了——沒有任何東西在檢查三份有沒有一致，
 而在它被寫下之後，`docs/index.html` 改了 19 次，一次都沒有回頭改它們。與其留一條沒人遵守的規矩，
 不如老實說它們是那一天的樣子。要玩最新規則的人請開正式版。
+
+## 測試
+
+```
+deno run --allow-read scripts/engine_test.ts     # 牌局引擎：各種規則組合各打完一整場
+deno run --allow-read scripts/rules_test.ts      # 兩份規則對照：畫面 vs 伺服器
+deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗證
+```
+
+前兩支**不改也不需要任何產品程式配合**：它們照區段標記把「純計算」那一段從
+`docs/index.html` 與 `supabase/functions/game/index.ts` 切出來，在沙箱裡求值
+（`scripts/_engines.ts`）。切不到標記就直接報錯，不會安靜地少測一塊。
+
+- **`engine_test.ts`** 打 321 場完整牌局（288 種規則組合各一場、2–10 人各一場、牌組邊角 24 種），
+  一路檢查發牌、跟牌、the hook、贏墩、計分、收局。檢查用的「誰贏這一墩」「能出哪些牌」「這局幾分」
+  是測試自己算的一份，刻意不呼叫引擎那份——兩邊算出來不一樣就是有一邊錯了。
+  亂數是有種子的：失敗訊息帶著種子，`--seed=N` 照著跑一次就是同一場牌。
+- **`rules_test.ts`** 把同樣的輸入餵給兩份規則引擎比對輸出（約五萬七千組）。
+  不在比對範圍裡的是伺服器刻意獨有的三件事：斷線 30 秒 AI 接手、把房主送上來的規則夾回合理範圍、
+  用真亂數洗牌。
+- 入口是 `window.UD.engine`（`docs/index.html`）。**在那份名單上加東西，`engine_test.ts` 會要求它也被測到。**
 
 ## 頁面與牌桌是兩種東西
 
