@@ -88,6 +88,8 @@ deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗
   伺服器蓋章不重演動畫、過期的那一列、六秒保險絲、送不出去要退回、對手廣播、有人亂喊。
   伺服器換成假的（接縫 `window.__call`），每一列什麼時候到、內容是什麼都由測試決定。
 - 入口是 `window.UD.engine`（`docs/index.html`）。**在那份名單上加東西，`engine_test.ts` 會要求它也被測到。**
+- **測試自己也要驗**：故意把規則或判斷改壞，看它抓不抓得到（這四支都這樣驗過，每一條都當場被抓）。
+  改壞之前先 commit——還原時 `git checkout` 會把還沒存的修改一起帶走。
 
 ## 頁面與牌桌是兩種東西
 
