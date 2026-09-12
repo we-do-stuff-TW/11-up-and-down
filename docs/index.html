@@ -292,7 +292,7 @@ input{font:inherit}
 .seat-top{display:flex;align-items:baseline;gap:7px}
 .seat-name{
   display:flex;align-items:center;gap:6px;
-  font-weight:500;font-size:13.5px;letter-spacing:.005em;color:var(--ink);
+  font-weight:500;font-size:15px;letter-spacing:.005em;color:var(--ink);
 }
 .seat-name .tag{
   font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
@@ -301,33 +301,35 @@ input{font:inherit}
 .seat-name .tag.off{color:var(--bad);border-color:oklch(.735 .135 32 / .34)}
 /* Google 頭像。載不出來（沒設 referrer、帳號沒大頭貼）就自己消失，名字照樣讀得到 */
 .av{
-  width:19px;height:19px;flex:none;border-radius:99px;
+  width:21px;height:21px;flex:none;border-radius:99px;
   object-fit:cover;background:var(--glass);
   box-shadow:0 0 0 1px var(--hair);
 }
 .av[hidden]{display:none!important}
-body.is3d .av{width:16px;height:16px}
-.seat-score{
-  margin-left:auto;
-  font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:500;
-  font-variant-numeric:tabular-nums;color:var(--ink-2);
-}
-.seat.is-active .seat-score{color:var(--brass)}
+body.is3d .av{width:18px;height:18px}
 .seat-row{display:flex;align-items:center;gap:11px}
-/* 叫了幾墩就幾顆點：贏一墩填實一顆。點是「還差幾」的計數器，不是裝飾——
-   空心＝還欠、金色＝已經拿到、整排轉綠＝剛好、後面多出來的紅點＝超了 */
-.tally{display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:108px;flex:none}
-.tally u{
-  display:block;width:9px;height:9px;border-radius:50%;text-decoration:none;
-  box-shadow:inset 0 0 0 1.5px var(--ink-3);opacity:.55;
-  transition:background-color .3s var(--e-out), box-shadow .3s var(--e-out), opacity .3s var(--e-out);
+/* 叫幾墩就排幾格空墩位，贏一墩就填實一格。空的還剩幾格＝還差幾墩——
+   數格子就是答案，所以這裡不再寫一次「還差 n」。整排填滿轉綠＝剛好，
+   後面長出紅格＝超了。為什麼是方格不是圓點：桌上贏到的墩本來就是一疊一疊的牌，
+   方格是那一疊的縮圖，中間那道橫線是牌背的腰線。五格一排，窄螢幕四格一排。 */
+.slots{display:flex;gap:5px;align-items:center;flex-wrap:wrap;max-width:100px;flex:none}
+.slots u{
+  display:block;position:relative;width:15px;height:20px;border-radius:3.5px;
+  text-decoration:none;box-shadow:inset 0 0 0 1.6px oklch(.90 .02 92 / .30);
+  transition:background-color .3s var(--e-out), box-shadow .3s var(--e-out);
 }
-.tally u.got{background:var(--brass);box-shadow:none;opacity:1}
-.tally u.over{background:var(--bad);box-shadow:none;opacity:1}
-.tally.done u.got{background:var(--good)}
-/* 還沒叫的時候那一格寫什麼：叫完之後改由上面那排點說話 */
+.slots u.got{background:linear-gradient(160deg,var(--brass),var(--brass-2));box-shadow:none}
+.slots u.over{background:var(--bad);box-shadow:none}
+.slots u.got::after,.slots u.over::after{
+  content:"";position:absolute;left:3px;right:3px;top:50%;height:1.5px;border-radius:1px;
+  background:oklch(.30 .07 84 / .55);
+}
+.slots u.over::after{background:oklch(.26 .06 32 / .5)}
+.slots.done u.got{background:linear-gradient(160deg,var(--good),oklch(.700 .115 156))}
+.slots.done u.got::after{background:oklch(.28 .07 156 / .5)}
+/* 還剩下要寫字的只有三種：還沒叫、放好了還沒翻、超了幾墩 */
 .aword{
-  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:11.5px;
+  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:12.5px;
   color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums;
 }
 
@@ -345,27 +347,27 @@ body.is3d .av{width:16px;height:16px}
 
 /* ================= 骰子 ================= */
 .die{
-  width:31px;height:31px;flex:none;
+  width:34px;height:34px;flex:none;
   display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);
-  gap:1px;padding:4.5px;
+  gap:1px;padding:5px;
   background:linear-gradient(158deg,var(--die),#E4DDCA);
-  border-radius:7px;
+  border-radius:8px;
   box-shadow:inset 0 -2px 0 rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.75), 0 2px 5px rgba(0,0,0,.35);
 }
-.die .pip{width:5px;height:5px;border-radius:50%;background:var(--die-ink);place-self:center}
+.die .pip{width:5.5px;height:5.5px;border-radius:50%;background:var(--die-ink);place-self:center}
 .die .num{
   grid-area:1/1/4/4;place-self:center;
-  font-family:"Bodoni Moda",Georgia,serif;font-size:17px;font-weight:700;color:var(--die-ink);
+  font-family:"Bodoni Moda",Georgia,serif;font-size:18px;font-weight:700;color:var(--die-ink);
   line-height:1;
 }
 .die.empty{
   background:none;box-shadow:none;
   border:1px dashed var(--hair);
 }
-.die.empty .num{color:var(--ink-3);font-size:12px;font-family:"Archivo",sans-serif;font-weight:400}
+.die.empty .num{color:var(--ink-3);font-size:13px;font-family:"Archivo",sans-serif;font-weight:400}
 /* 叫 0：不是一顆骰子，是一個數字 */
 .die.zero{background:none;box-shadow:none;border:1px solid var(--hair)}
-.die.zero .num{color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:500}
+.die.zero .num{color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:500}
 /* 叫 7 以上是兩顆並排；第二顆晚一點落 */
 .dice{display:flex;gap:3px;flex:none}
 /* 放下骰子：翻滾後定住 */
@@ -590,7 +592,7 @@ body.is3d .av{width:16px;height:16px}
 .bidbtn.no i{color:var(--bad)}
 /* 同時叫墩：放好了但還沒翻開 */
 .die.sealed{background:var(--felt-3);box-shadow:inset 0 0 0 1px var(--hair-2)}
-.die.sealed .num{color:var(--ink-3);font-size:12px}
+.die.sealed .num{color:var(--ink-3);font-size:13px}
 
 /* 規則區塊：等待房間裡所有人都看得到，只有房主按得動 */
 .slot .btn{padding:3px 9px;font-size:11px}
@@ -952,6 +954,12 @@ body.in-lobby .app{display:none}
   .hand{min-height:96px;gap:6px}
   .trick{gap:9px}
   .seat{min-width:0;padding:10px 12px}
+  .seat-name{font-size:13.5px}
+  .die{width:29px;height:29px;padding:4px;border-radius:7px}
+  .die .pip{width:4.5px;height:4.5px}
+  .die .num{font-size:15px}
+  .slots{gap:4px;max-width:64px}
+  .slots u{width:13px;height:17px}
   .roomcode{font-size:44px}
   .sheet{padding:22px 20px 20px;border-radius:18px}
   .sheet h2{font-size:23px}
@@ -1309,9 +1317,9 @@ body.is3d .seats{position:absolute;inset:0;display:block;pointer-events:none;z-i
 body.is3d .seat{
   position:absolute;left:0;top:0;translate:-50% -50%;
   /* 寬度照內容量：裡面是 grid，靠 shrink-to-fit 算出來的寬度會比實際那一列窄，
-     叫的墩數一多，「還差 n」就被切掉半個字 */
+     叫的墩數一多，最後那一格墩位就被切掉半個 */
   min-width:0;width:max-content;max-width:min(44vw, 250px);
-  padding:8px 12px;border-radius:12px;
+  padding:11px 15px;border-radius:14px;
   /* 玻璃的底色跟桌布同色相：換王牌時跟著整個房間一起變 */
   background:color-mix(in oklab, var(--felt-deep) 48%, oklch(.10 0 0 / .62));
   box-shadow:inset 0 0 0 1px var(--hair-2), 0 8px 22px rgba(0,0,0,.34);
@@ -1326,11 +1334,10 @@ body.is3d .seat.is-active{
   box-shadow:inset 0 0 0 1px var(--glass-lip), 0 10px 30px rgba(0,0,0,.42);
 }
 body.is3d .seat .spread{display:none}   /* 剩幾張牌由桌上那疊牌背自己說 */
-/* 桌上那塊牌小一號：點與字跟著收，叫 8、9 墩時整排點才不會撐到畫面邊 */
-body.is3d .seat-row{gap:8px}
-body.is3d .tally{gap:3px;max-width:95px}
-body.is3d .tally u{width:8px;height:8px;box-shadow:inset 0 0 0 1.3px var(--ink-3)}
-body.is3d .aword{font-size:11px}
+/* 墩位在平面與立體是同一個尺寸——這塊牌本來就是要看得清楚的。
+   只有列距收一點，讓骰子跟墩位靠近一些 */
+body.is3d .seat-row{gap:9px}
+body.is3d .aword{font-size:12px}
 
 /* 手牌：3D 負責畫，DOM 只留下按得到、也讀得到的那一層。
    透明但可對焦，位置貼著投影後的牌面，所以焦點框會框在正確的那張牌上。 */
@@ -1418,9 +1425,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
 }
 
 @media (max-width:700px){
-  body.is3d .seat{padding:6px 9px;border-radius:10px}
-  body.is3d .seat-name{font-size:12px}
-  body.is3d .seat-score{font-size:13px}
+  body.is3d .seat{padding:8px 11px;border-radius:11px}
 }
 
 /* ================= 動作偏好 ================= */
@@ -4022,22 +4027,20 @@ function seatHTML(i){
   const act = (G.phase === "bid" || G.phase === "play") && G.turn === i;
   const bid = G.bids[i];
   const online = MODE === "net" && s.kind === "human" && !!liveCids()[s.cid];
-  const prev = SEEN.scores[i] === undefined ? (G.score[i]||0) : SEEN.scores[i];
   return '<div class="seat ' + (act ? "is-active" : "") + (i === mySeat() ? " is-me" : "") +
     '" data-seat="' + i + '">' +
     '<div class="seat-top"><span class="seat-name">' +
       (s.av ? '<img class="av" src="' + esc(s.av) + '" alt="" referrerpolicy="no-referrer" ' +
               'onerror="this.hidden=true">' : "") +
       (MODE === "net" ? '<span class="dot ' + (online ? "on" : "") + '"></span>' : "") +
-      seatLabel(i) + seatTag(i) + '</span>' +
-      '<span class="seat-score" data-score="' + (G.score[i]||0) + '" data-from="' + prev + '">' +
-      (G.score[i]||0) + '</span></div>' +
+      seatLabel(i) + seatTag(i) + '</span></div>' +
     '<div class="seat-row">' + dieHTML(bid, i) + bidPips(i) +
       '<span class="spread">' + Array.from({length:handCount(i)}, () => "<i></i>").join("") +
     '</span></div></div>';
 }
-/* 叫了幾墩就幾顆點，贏一墩填實一顆——骰子說「他答應了幾」，點說「走到哪了」。
-   點填滿＝剛好，再多贏的往後長出紅點。不必讀數字，數點就知道還差幾。 */
+/* 叫幾墩就排幾格墩位，贏一墩就填實一格——骰子說「他答應了幾」，墩位說「走到哪了」。
+   空的還剩幾格就是還差幾墩。本來是 9px 的圓點，要對焦才數得清；
+   換成 15×20 的方格之後餘光掃過去就是答案，那也是這塊牌唯一要做到的事。 */
 function bidPips(i){
   const bid = G.bids[i], got = G.won[i] || 0;
   if(bid === null || bid === undefined)
@@ -4047,11 +4050,13 @@ function bidPips(i){
   let h = "";
   for(let k = 0; k < bid; k++) h += '<u class="' + (k < got ? "got" : "") + '"></u>';
   for(let k = 0; k < over; k++) h += '<u class="over"></u>';
-  /* 「還差幾／剛好／超了」不再寫成字：那正是這排點在說的事（空心＝還欠、
-     金色＝拿到、整排轉綠＝剛好、紅點＝超了）。叫 0 沒有點，骰子上那個 0 就是答案。 */
+  /* 「還差幾／剛好／超了」不寫成字：那正是這排墩位在說的事（空格＝還欠、
+     金色＝拿到、整排轉綠＝剛好、紅格＝超了）。叫 0 沒有墩位，骰子上那個 0 就是答案。
+     但格子只有眼睛數得到——讀螢幕的人數不到，所以那句話完整寫在 aria-label 裡。 */
+  const said = over ? "，超了 " + over + " 墩" : d > 0 ? "，還差 " + d + " 墩" : "，剛好";
   return bid || over
-    ? '<span class="tally' + (d === 0 && !over ? " done" : "") + '" role="img" aria-label="叫 ' +
-        bid + ' 墩，已贏 ' + got + ' 墩">' + h + '</span>'
+    ? '<span class="slots' + (d === 0 && !over ? " done" : "") + '" role="img" aria-label="叫 ' +
+        bid + ' 墩，已贏 ' + got + ' 墩' + said + '">' + h + '</span>'
     : '';
 }
 /* 桌面顏色：王牌花色決定色相，局數階梯決定深度 */
@@ -4176,7 +4181,6 @@ function render(){
   /* 定格中又重畫了：牌是剛換上去的 DOM，身上的 --px/--py 沒了，重新量一次補回去。
      連線模式每 420ms 敲一次伺服器，敲一次就重畫一次，不補的話會看到那張牌跳一下 */
   }else if(G.phase === "trickend" && $("trick").classList.contains("is-won")) pushWinner();
-  SEEN.scores = G.score.slice();
   if(UD.sync3d) UD.sync3d();
   /* 音效層跟 3D 一樣，是加上去的一層：把當下的牌局狀態遞過去，
      它自己跟上一次比對，差在哪就發什麼聲。平面與立體共用這一份——
@@ -4341,18 +4345,8 @@ function scheduleCollect(){
     trick.classList.add("is-collecting");
   }, wait);
 }
+/* 一局結束、分數變了：座位牌上已經沒有分數，剩下計分表那一欄的總分亮一下 */
 function tallyScores(){
-  document.querySelectorAll("[data-score]").forEach(function(el){
-    const to = +el.dataset.score, from = +el.dataset.from;
-    if(from === to || isNaN(from)) return;
-    if(REDUCED){ el.textContent = to; return; }
-    const t0 = performance.now();
-    (function step(t){
-      const k = Math.min(1, (t - t0) / 640);
-      el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1-k, 3)));
-      if(k < 1) requestAnimationFrame(step);
-    })(t0);
-  });
   document.querySelectorAll(".tot").forEach(function(el){ el.classList.add("up"); });
 }
 
@@ -5199,7 +5193,7 @@ function startSolo(){
   G.seats[0] = {name:"你", kind:"human", cid:"me", av:MY.av};
   for(let i=1;i<G.cfg.n;i++) G.seats[i] = {name:String.fromCharCode(65+i), kind:"ai", cid:null};
   G.host = "me";
-  SEEN.round = -1; SEEN.phase = ""; SEEN.flip = -1; SEEN.bids = {}; SEEN.keys = {}; SEEN.scores = []; SEEN.won = 0;
+  SEEN.round = -1; SEEN.phase = ""; SEEN.flip = -1; SEEN.bids = {}; SEEN.keys = {}; SEEN.won = 0;
   startRound(G);
   render();
 }

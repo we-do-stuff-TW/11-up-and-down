@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>座位牌 · 擺回桌上</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="_page.css">
+<link rel="stylesheet" href="_seat.css">
+<style>
+/* 四張假桌並排。牌是真尺寸，座位牌也是真尺寸——這一頁只回答一個問題：
+   坐在 1440 寬的螢幕前，這塊牌夠不夠看得清楚。 */
+body{background:oklch(.115 .012 42)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:4px 26px 30px}
+.pane{position:relative;border-radius:16px;overflow:hidden;height:452px;
+  box-shadow:inset 0 0 0 1px var(--hair-2)}
+/* ?k=a 單獨一案：整個 viewport 就是一張桌子。phone.html 的 iframe 走這條 */
+body.one{background:none}
+body.one header{display:none}
+body.one .grid{display:block;padding:0}
+body.one .pane{height:100dvh;border-radius:0;box-shadow:none}
+body.one .felt{width:90%;height:64%;top:52%}
+body.one .hand{bottom:-34px}
+.pane .tag{position:absolute;left:14px;top:12px;z-index:5;font-size:12px;letter-spacing:.05em;
+  color:oklch(1 0 0/.55)}
+.pane .tag b{color:var(--ink);font-weight:600}
+.room{position:absolute;inset:0;
+  background:
+    radial-gradient(120% 90% at 50% 118%, oklch(.30 .055 46) 0%, oklch(.19 .038 42) 42%, oklch(.115 .022 40) 100%);
+}
+.felt{
+  position:absolute;left:50%;top:56%;translate:-50% -50%;
+  width:82%;height:74%;border-radius:50%;
+  background:
+    radial-gradient(circle at 30% 14%, rgba(255,255,255,.055), transparent 26%),
+    radial-gradient(115% 95% at 50% 8% in oklab, var(--glow) 0%, var(--felt) 55%, var(--felt-deep) 100%);
+  box-shadow:0 0 0 13px oklch(.285 .052 44), 0 0 0 15px oklch(.17 .03 40), 0 26px 60px rgba(0,0,0,.55);
+}
+.pcard{position:absolute;width:46px;height:65px;border-radius:5px;
+  background:linear-gradient(160deg,#F8F5EC,#ECE5D2);
+  box-shadow:0 2px 8px rgba(0,0,0,.45);display:grid;place-items:center;
+  font-family:"Bodoni Moda",Georgia,serif;font-size:15px;font-weight:600;color:#1A1714}
+.pcard.r{color:#A32B25}
+.hand{position:absolute;left:50%;bottom:-26px;translate:-50% 0;display:flex}
+.hand .pcard{position:relative;width:56px;height:79px;margin-left:-14px;
+  box-shadow:0 -2px 10px rgba(0,0,0,.42)}
+.hand .pcard:first-child{margin-left:0}
+.vig{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(118% 92% at 50% 46%, transparent 56%, rgba(0,0,0,.34) 100%)}
+.seat{position:absolute;translate:-50% -50%;z-index:4}
+@media (max-width:700px){
+  .pane .seat{padding:8px 11px;border-radius:11px;gap:7px}
+  .pane .seat-name{font-size:13.5px}
+  .pane .die{width:29px;height:29px;padding:4px;border-radius:7px}
+  .pane .die .pip{width:4.5px;height:4.5px}
+  .pane .die .num{font-size:15px}
+  .pane .a-todo .big{font-size:25px} .pane .a-todo .word{font-size:16px}
+  .pane .b-frac .got{font-size:27px} .pane .b-frac .sl,.pane .b-frac .bid{font-size:19px}
+  /* 窄螢幕改四格一排：五格的話叫 8 墩會長到 175px，蓋掉中間的牌 */
+  .pane .c-slots{gap:4px;max-width:64px} .pane .c-slots u{width:13px;height:17px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>擺回桌上</h1>
+  <p>同一局、同一個時間點：你叫 3 拿到 1、左手叫 8 拿到 5、對面還沒叫、右手叫 0。
+     牌與座位牌都是真尺寸（1440 寬螢幕上看到的大小）。左上是現況，其餘三案的牌都大了一級。</p>
+</header>
+<div class="grid" id="grid"></div>
+<script src="_seat.js"></script>
+<script>
+/* 四個人、同一個時間點。位置照立體桌上的座位：你在下、左、對面、右。 */
+const NARROW = innerWidth < 700;
+const P = [
+  {x:"50%", y:NARROW?"76%":"81%", name:"你",   me:1, on:1, bid:3,    got:1, score:5},
+  {x:NARROW?"27%":"15%", y:NARROW?"43%":"50%", name:"阿海", me:0, on:0, bid:8, got:5, score:12},
+  {x:"50%", y:NARROW?"17%":"20%", name:"小雨", me:0, on:0, bid:null, got:0, score:9},
+  {x:NARROW?"73%":"85%", y:NARROW?"59%":"50%", name:"老莊", me:0, on:0, bid:0, got:0, score:14},
+];
+const TRICK = [{v:"K",s:"♠"},{v:"7",s:"♦",r:1},{v:"A",s:"♣"}];
+const ALL = [["現況","線上這一版",OLD],["A","倒數",A],["B","拿／叫",B],["C","墩位",C]];
+const only = new URLSearchParams(location.search).get("k");
+const KINDS = only ? ALL.filter(function(k){ return k[0].toLowerCase() === only; }) : ALL;
+if(only) document.body.classList.add("one");
+document.getElementById("grid").innerHTML = KINDS.map(function(k, ki){
+  const cls = k[2] === OLD ? "old" : "";
+  const trick = TRICK.map(function(c, i){
+    return '<div class="pcard' + (c.r ? " r" : "") + '" style="left:calc(50% + ' + ((i-1)*54) +
+      'px);top:46%;translate:-50% -50%">' + c.v + c.s + '</div>';
+  }).join("");
+  const hand = '<div class="hand">' + ["Q♥","9♠","4♦","J♣","2♠"].map(function(c){
+    return '<div class="pcard' + (/[♥♦]/.test(c) ? " r" : "") + '">' + c + '</div>';
+  }).join("") + '</div>';
+  const seats = P.map(function(p){
+    return k[2](p).replace('class="seat ', 'style="left:' + p.x + ';top:' + p.y + '" class="seat ');
+  }).join("");
+  return '<div class="pane ' + cls + '"><div class="room"><div class="felt"></div>' +
+    trick + hand + '</div><div class="vig"></div>' +
+    '<span class="tag"><b>' + k[0] + '</b> · ' + k[1] + '</span>' + seats + '</div>';
+}).join("");
+</script>
+</body>
+</html>

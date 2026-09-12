@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>座位牌 · 三案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="_page.css">
+<link rel="stylesheet" href="_seat.css">
+</head>
+<body>
+<header>
+  <h1>座位牌 · 三案</h1>
+  <p>桌上那塊浮在座位上方的牌。三案的<b>共同前提</b>：分數拿掉（總分在計分表裡）、整塊放大一級
+     （名字 13.5→15px、內距 8/12→11/15、骰子 31→34）。差別在第二行怎麼講「還要拿幾墩」。
+     每一欄由上往下是同一個人打完一局會經過的六個狀態，最後一格是叫 8 墩的寬度壓力測試。
+     <code>?w=1</code> 只看第一欄。</p>
+</header>
+<div class="cols" id="cols"></div>
+
+<script src="_seat.js"></script>
+<script>
+/* 六個狀態：叫之前 → 叫了 3 → 贏第一墩 → 剛好 → 超了 → 叫 0；外加叫 8 看寬度 */
+const S = [
+  {t:"還沒叫",        name:"你", me:1, on:1, bid:null, got:0},
+  {t:"叫 3 · 還沒贏", name:"你", me:1, on:0, bid:3,    got:0},
+  {t:"叫 3 · 贏 1",   name:"你", me:1, on:1, bid:3,    got:1},
+  {t:"叫 3 · 贏 3（剛好，手上還有牌）", name:"你", me:1, on:0, bid:3, got:3},
+  {t:"叫 3 · 贏 4（超了）", name:"阿海", me:0, on:0, bid:3, got:4},
+  {t:"叫 0 · 還沒破功", name:"阿海", me:0, on:0, bid:0, got:0},
+  {t:"叫 8 · 贏 5（寬度壓力）", name:"阿海", me:0, on:1, bid:8, got:5},
+];
+const COLS = [
+  {k:"old", h:"現況 <em>· 線上這一版</em>",
+   why:"分數釘在右上、第二行是<b>骰子＋小圓點＋「還差 n」</b>。三樣東西講同一件事，" +
+       "而且沒有一樣是大的——最關鍵的「我還要拿幾墩」用 11px 的字擠在最右邊。",
+   fn:OLD},
+  {k:"a", h:"A <em>· 倒數</em>",
+   why:"第二行只講<b>你現在該做什麼</b>：「還要贏」小、數字 30px 大。剛好了就換成「別再贏了」轉綠、" +
+       "超了轉紅。已贏／叫的比例縮成卡片底緣一條 3px 的線。<br>" +
+       "<b>強</b>：一眼就是答案，不用數點也不用減。<br><b>弱</b>：看不到已經贏了幾墩（要從骰子減）。",
+   fn:A},
+  {k:"b", h:"B <em>· 拿／叫</em>",
+   why:"骰子退場——<b>分母就是叫的墩數</b>，不必再放一顆骰子講同一件事。" +
+       "「1／3」大分數，左邊金色的數字每贏一墩就跳一次；差幾用有底色的膠囊講。<br>" +
+       "<b>強</b>：兩個數字都在、最省寬度，叫 11 墩也一樣寬。<br><b>弱</b>：要自己減一下。",
+   fn:B},
+  {k:"c", h:"C <em>· 墩位</em>",
+   why:"完全不寫數字。<b>叫幾墩就排幾格空墩位</b>，贏一墩就填實一格（中間那道是牌背的腰線）。" +
+       "空的還剩幾格＝還差幾墩，數就好。剛好整排轉綠、超了後面長紅格。<br>" +
+       "<b>強</b>：最像桌上真的東西，跟立體房間同一套語言。<br><b>弱</b>：叫 8 墩以上會很寬。",
+   fn:C},
+];
+const only = new URLSearchParams(location.search).get("w");
+const cols = only ? COLS.slice(0, +only) : COLS;
+document.getElementById("cols").style.gridTemplateColumns = "repeat(" + cols.length + ",1fr)";
+document.getElementById("cols").innerHTML = cols.map(c =>
+  '<div class="col ' + c.k + '"><h2>' + c.h + '</h2><p class="why">' + c.why + '</p>' +
+  '<div class="states">' + S.map(s =>
+    '<div class="st"><i>' + s.t + '</i>' + c.fn(s) + '</div>').join("") +
+  '</div></div>').join("");
+</script>
+</body>
+</html>

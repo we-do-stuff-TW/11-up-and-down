@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>座位牌 · 手機寬</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:opsz,wght@6..96,600&display=swap">
+<style>
+html,body{margin:0;background:oklch(.105 .012 42);color:oklch(.965 .014 92);
+  font:13px/1.6 "Archivo",-apple-system,"PingFang TC","Noto Sans TC",sans-serif}
+header{padding:26px 30px 14px}
+h1{margin:0;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:26px}
+header p{margin:8px 0 0;color:oklch(.700 .016 92);max-width:80ch;font-size:12.5px}
+.row{display:flex;gap:20px;padding:14px 30px 34px;align-items:flex-start}
+figure{margin:0;flex:none;width:390px}
+figcaption{padding:0 0 9px;font-size:12.5px}
+figcaption b{font-size:14px}
+figcaption span{color:oklch(.700 .016 92)}
+/* headless 截不到 390 寬（Chrome 夾到最小 500px、媒體查詢不觸發），
+   所以手機一律用 iframe 看——iframe 有自己的 viewport。 */
+iframe{width:390px;height:700px;border:1px solid oklch(.90 .02 92 / .12);border-radius:16px;
+  background:#0d1a16;display:block}
+</style>
+</head>
+<body>
+<header>
+  <h1>手機寬 · 390</h1>
+  <p>同一局同一個時間點，390 寬。座位牌在窄螢幕會收一級（照 <code>docs/index.html</code> 的
+     <code>@media (max-width:700px)</code>），左右兩個人的位置也往中間收。
+     這一頁要看的是：四塊牌會不會疊在一起、會不會被切掉。</p>
+</header>
+<div class="row">
+  <figure><figcaption><b>現況</b> <span>· 線上這一版</span></figcaption><iframe src="table.html?k=現況"></iframe></figure>
+  <figure><figcaption><b>A</b> <span>· 倒數</span></figcaption><iframe src="table.html?k=a"></iframe></figure>
+  <figure><figcaption><b>B</b> <span>· 拿／叫</span></figcaption><iframe src="table.html?k=b"></iframe></figure>
+  <figure><figcaption><b>C</b> <span>· 墩位</span></figcaption><iframe src="table.html?k=c"></iframe></figure>
+</div>
+</body>
+</html>

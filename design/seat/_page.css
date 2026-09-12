@@ -1,0 +1,43 @@
+/* 色票抄 docs/index.html 的 :root；--felt 走 paintTable() 的 ♠ ＋深局
+   （L .229 C .0513 h168），跟真的打到一半時看到的桌色一樣。 */
+:root{
+  color-scheme:dark;
+  --felt: oklch(.229 .0513 168); --felt-deep: oklch(.141 .0410 168); --glow: oklch(.344 .0718 168);
+  --ink: oklch(.965 .014 92); --ink-2: oklch(.805 .017 92); --ink-3: oklch(.700 .016 92);
+  --hair: oklch(.90 .02 92 / .155); --hair-2: oklch(.90 .02 92 / .075);
+  --brass: oklch(.845 .128 84); --brass-2: oklch(.760 .112 84);
+  --good: oklch(.800 .125 156); --bad: oklch(.735 .135 32);
+  --glass: oklch(.98 .012 92 / .085); --glass-edge: oklch(1 0 0 / .20); --glass-lip: oklch(1 0 0 / .34);
+  --die:#F4EFE0; --die-ink:#26211B;
+  --e-out: cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  min-height:100dvh;color:var(--ink);
+  font-family:"Archivo",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(circle at 20% 8%,  rgba(255,255,255,.05), transparent 9%),
+    radial-gradient(circle at 62% 34%, rgba(255,255,255,.042), transparent 15%),
+    radial-gradient(circle at 55% 90%, rgba(255,255,255,.06), transparent 18%),
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+  background-attachment:fixed;
+}
+header{padding:30px 32px 14px}
+h1{margin:0;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:29px}
+header p{margin:9px 0 0;color:var(--ink-3);max-width:76ch;font-size:13px}
+header code{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--brass-2)}
+
+.cols{display:grid;grid-template-columns:repeat(4,1fr);gap:0;padding:6px 32px 40px;align-items:start}
+.col{padding:0 20px;border-left:1px solid var(--hair-2)}
+.col:first-child{border-left:none;padding-left:0}
+.col h2{font-size:15px;font-weight:600;margin:0 0 5px}
+.col h2 em{font-style:normal;color:var(--ink-3);font-weight:400}
+.col .why{color:var(--ink-3);font-size:12px;line-height:1.65;margin:0 0 4px;min-height:88px}
+.col .why b{color:var(--ink-2);font-weight:500}
+.states{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.st{width:100%}
+.st > i{display:block;font-style:normal;font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:oklch(1 0 0/.30);margin-bottom:6px}
+

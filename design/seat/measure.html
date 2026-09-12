@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="_page.css"><link rel="stylesheet" href="_seat.css">
+<style>
+/* 只量尺寸，不看美感。桌機尺寸量一次、手機那一級（@media 700 的縮法）量一次。 */
+body{background:#0b1512;padding:18px 22px;font-size:13px}
+table{border-collapse:collapse;font-family:"IBM Plex Mono",monospace;font-size:14px}
+th,td{padding:5px 14px;text-align:right;border-bottom:1px solid var(--hair-2)}
+th{color:var(--ink-3);font-weight:400;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase}
+td:first-child,th:first-child{text-align:left;font-family:"Archivo",sans-serif}
+.warn{color:var(--bad)} .ok{color:var(--good)}
+h1{font-family:"Bodoni Moda",serif;font-size:20px;font-weight:600;margin:0 0 4px}
+p{margin:0 0 14px;color:var(--ink-3);font-size:12px}
+#pit{position:absolute;left:-4000px;top:0}
+#pit.sm .seat{padding:8px 11px;border-radius:11px;gap:7px}
+#pit.sm .seat-name{font-size:13.5px}
+#pit.sm .die{width:29px;height:29px;padding:4px;border-radius:7px}
+#pit.sm .die .pip{width:4.5px;height:4.5px} #pit.sm .die .num{font-size:15px}
+#pit.sm .a-todo .big{font-size:25px} #pit.sm .a-todo .word{font-size:16px}
+#pit.sm .b-frac .got{font-size:27px} #pit.sm .b-frac .sl,#pit.sm .b-frac .bid{font-size:19px}
+#pit.sm .c-slots{gap:4px;max-width:64px} #pit.sm .c-slots u{width:13px;height:17px}
+</style></head><body>
+<h1>座位牌的實際寬高</h1>
+<p>單位 px。「叫 8」是最寬的狀態（八格墩位／八顆點／兩顆骰子）。手機那一欄套 <code>@media (max-width:700px)</code> 的縮法。
+   一支 390 寬的手機，四個座位牌要塞在同一張桌子上——超過 <b>170</b> 就會蓋到中間的牌。</p>
+<div id="pit"></div><div id="out"></div>
+<script src="_seat.js"></script>
+<script>
+const CASE = [["現況",OLD],["A · 倒數",A],["B · 拿／叫",B],["C · 墩位",C]];
+const ST = [["叫 3 · 贏 1",{name:"你",me:1,on:1,bid:3,got:1}],
+            ["叫 8 · 贏 5",{name:"阿海",me:0,on:1,bid:8,got:5}],
+            ["叫 3 · 剛好",{name:"你",me:1,on:0,bid:3,got:3}]];
+const pit = document.getElementById("pit");
+function mm(fn, s){
+  pit.innerHTML = fn(s);
+  const el = pit.firstElementChild, r = el.getBoundingClientRect();
+  return [Math.round(r.width), Math.round(r.height)];
+}
+let h = "";
+[["桌機（1440）",""],["手機（390）","sm"]].forEach(function(mode){
+  pit.className = mode[1];
+  h += '<table><tr><th>' + mode[0] + '</th>' +
+       ST.map(function(t){ return '<th>' + t[0] + '</th>'; }).join("") + '</tr>';
+  CASE.forEach(function(c){
+    h += '<tr><td>' + c[0] + '</td>' + ST.map(function(t){
+      const wh = mm(c[1], t[1]);
+      const bad = mode[1] === "sm" && wh[0] > 170;
+      return '<td class="' + (bad ? "warn" : "") + '">' + wh[0] + ' × ' + wh[1] + '</td>';
+    }).join("") + '</tr>';
+  });
+  h += '</table><div style="height:16px"></div>';
+});
+document.getElementById("out").innerHTML = h;
+</script></body></html>
