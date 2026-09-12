@@ -1,0 +1,134 @@
+/* TITLE: B 靠著規則單展開 · 側窗 */
+/* ── B 案：視窗從「設定」那兩個字底下長出來 ────────────────────────
+   位置就是答案：面板貼在右欄原來的位置，寬一點、浮起來，左邊的座位表一格也沒被蓋到。
+   改規則的時候還看得到誰在座、幾個人——牌數跟局數本來就是「幾個人」算出來的。
+   高度只取內容所需，不撐滿螢幕；撐滿就又變成一頁了。 */
+body.set .plan{opacity:.72;transition:opacity .3s var(--e-out)}
+.plan{transition:opacity .3s var(--e-out)}
+body.set .sheet{opacity:0;transition:opacity .26s}         /* 被面板頂掉的那一欄整條退場，不要在視窗底下透出半顆開始鈕 */
+.sheet{transition:opacity .26s}
+
+.pop{position:fixed;top:74px;right:20px;z-index:40;display:none;
+  width:436px;max-height:calc(100dvh - 96px);flex-direction:column;border-radius:18px;
+  background:linear-gradient(178deg in oklab,
+    color-mix(in oklab,var(--felt) 91%,oklch(1 0 0)),
+    color-mix(in oklab,var(--felt) 97%,oklch(1 0 0)));
+  box-shadow:inset 0 1px 0 var(--glass-lip), 0 0 0 1px var(--hair),
+    0 2px 6px rgba(0,0,0,.30), 0 36px 80px rgba(0,0,0,.52);
+  transform-origin:100% 0;animation:popIn .24s var(--e-out) both}
+body.set .pop{display:flex}
+@keyframes popIn{from{opacity:0;transform:scale(.965) translateY(-6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.pop{animation:none}}
+
+.pophd{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+  padding:20px 24px 13px;border-bottom:1px solid var(--hair)}
+.pophd h2{font-family:"Bodoni Moda",Georgia,serif;font-size:23px;font-weight:600;letter-spacing:-.005em}
+.pophd .meta{font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+.pophd .meta b{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--ink-2)}
+
+.popbd{overflow:auto;padding:2px 24px 6px}
+.popbd .cap{display:block;margin:15px 0 0}
+.f{display:flex;align-items:baseline;gap:14px;padding:10px 0;border-bottom:1px solid var(--hair-2)}
+.f>label{width:72px;flex:none;text-align:right;font-size:12.5px;color:var(--ink-3)}
+.f .pick{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 3px;flex:1}
+.f.last{border-bottom:0}
+/* 例子接在計分那組後面，跟右欄唯讀那份同一種排法（leader dots） */
+.egrid{padding:8px 0 2px}
+.egrid .r{padding:4px 0}
+.egrid .r .k{font-size:11.5px}
+.egrid .r .v{font-size:12px;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+
+.popft{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding:14px 24px 18px;border-top:1px solid var(--hair)}
+.popft .nums{gap:26px}
+.popft .nums .v{font-size:20px}
+
+/* 手機：右欄在畫面下方，從那裡升起一張貼底的紙 */
+@media (max-width:760px){
+  body.set .plan{opacity:1}
+  body.set .sheet{opacity:1}
+  .pop{top:auto;right:0;left:0;bottom:0;width:auto;max-height:88dvh;border-radius:20px 20px 0 0;
+    transform-origin:50% 100%;animation:popUp .28s var(--e-out) both}
+  @keyframes popUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+  .pop::before{content:"";position:absolute;left:50%;top:8px;translate:-50% 0;
+    width:36px;height:4px;border-radius:99px;background:var(--hair)}
+  .pophd{padding:20px 18px 12px}
+  .popbd{padding:2px 18px 6px}
+  .f{gap:12px}
+  .f>label{width:66px}
+  .popft{padding:12px 18px calc(14px + env(safe-area-inset-bottom))}
+}
+/*==HTML==*/
+<div class="popscrim" data-close style="position:fixed;inset:0;z-index:39;display:none"></div>
+<aside class="pop" role="dialog" aria-label="這一桌的規則">
+  <header class="pophd">
+    <h2>這一桌的規則</h2>
+    <button class="done" data-close>完成</button>
+  </header>
+
+  <div class="popbd">
+    <span class="cap">叫墩</span>
+    <div class="f"><label>方式</label>
+      <div class="pick"><button class="ch" aria-pressed="true">依序公開叫</button><i class="sep">／</i><button class="ch">同時叫墩</button></div></div>
+    <div class="f last"><label>末位限制</label>
+      <div class="pick"><button class="ch" aria-pressed="true">the hook</button><i class="sep">／</i><button class="ch">不限制</button></div></div>
+
+    <span class="cap">牌</span>
+    <div class="f"><label>牌組</label>
+      <div class="pick"><button class="ch">單副</button><i class="sep">／</i><button class="ch" aria-pressed="true">雙副</button></div></div>
+    <div class="f"><label>最小點數</label>
+      <div class="pick"><button class="ch">9</button><i class="sep">／</i><button class="ch" aria-pressed="true">7</button><i class="sep">／</i><button class="ch">6</button><i class="sep">／</i><button class="ch">5</button><i class="sep">／</i><button class="ch">4</button><i class="sep">／</i><button class="ch">3</button><i class="sep">／</i><button class="ch">2</button></div></div>
+    <div class="f last"><label>鬼牌</label>
+      <div class="pick"><button class="ch" aria-pressed="true">不放</button><i class="sep">／</i><button class="ch">放兩張</button></div></div>
+
+    <span class="cap">計分</span>
+    <div class="f"><label>叫中得分</label>
+      <div class="pick"><button class="ch" aria-pressed="true">10＋叫</button><i class="sep">／</i><button class="ch">10×叫</button><i class="sep">／</i><button class="ch">10＋叫²</button></div></div>
+    <div class="f"><label>叫 0 中了</label>
+      <div class="pick"><button class="ch" aria-pressed="true">5 分</button><i class="sep">／</i><button class="ch">5＋該局張數</button></div></div>
+    <div class="f last"><label>沒叫中</label>
+      <div class="pick"><button class="ch" aria-pressed="true">扣差額</button><i class="sep">／</i><button class="ch">扣 10×差</button><i class="sep">／</i><button class="ch">扣差額²</button></div></div>
+
+    <span class="cap">這樣算</span>
+    <div class="egrid">
+      <div class="r"><span class="k">叫 3，拿 3</span><i class="d"></i><span class="v">＋13</span></div>
+      <div class="r"><span class="k">叫 0，拿 0</span><i class="d"></i><span class="v">＋5</span></div>
+      <div class="r"><span class="k">叫 3，拿 4</span><i class="d"></i><span class="v">−1</span></div>
+    </div>
+  </div>
+
+  <footer class="popft">
+    <div class="nums">
+      <div><div class="k">牌數</div><div class="v">64</div></div>
+      <div><div class="k">最多每人</div><div class="v">11</div></div>
+      <div><div class="k">總局數</div><div class="v">21</div></div>
+    </div>
+    <span class="meta" style="font-size:11px;color:var(--ink-3)">房號 7K2M · 4 人就座</span>
+  </footer>
+</aside>
+
+<div class="dev">
+  <button data-v="room">開房</button>
+  <button data-v="set" aria-pressed="true">設定</button>
+</div>
+<script>
+const scrim = document.querySelector(".popscrim");
+const setv = v => {
+  const on = v === "set";
+  document.body.classList.toggle("set", on);
+  scrim.style.display = on ? "block" : "none";
+  document.querySelectorAll(".dev button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v));
+};
+document.querySelector(".dev").onclick = e => { const b = e.target.closest("button"); if(b) setv(b.dataset.v); };
+document.getElementById("toSet").onclick = () => setv("set");
+document.addEventListener("click", e => {
+  if(e.target.closest("[data-close]")) return setv("room");
+  const o = e.target.closest(".ch");
+  if(!o) return;
+  o.parentElement.querySelectorAll(".ch").forEach(b => b.setAttribute("aria-pressed", "false"));
+  o.setAttribute("aria-pressed", "true");
+});
+addEventListener("keydown", e => { if(e.key === "Escape") setv("room"); });
+if(location.search.includes("nodev")) document.querySelector(".dev").hidden = true;
+setv(location.search.includes("room") ? "room" : "set");
+</script>

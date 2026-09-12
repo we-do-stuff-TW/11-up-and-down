@@ -1,0 +1,130 @@
+/* TITLE: A 一張規則卡 · 置中 */
+/* ── A 案：整份規則收成一張置中的卡 ───────────────────────────────
+   全螢幕那版的毛病是把八件事攤在 1440px 上，眼睛要橫著跑。這裡把它壓回
+   一張 560 的紙：標籤靠右切齊，選項全部從同一條左界開始，由上往下一條直線掃完。
+   背後的座位表壓暗但不糊掉——改規則的時候還是知道自己站在哪一桌。 */
+.ov{position:fixed;inset:0;z-index:40;display:none;place-items:center;padding:24px}
+body.set .ov{display:grid}
+.scrim{position:absolute;inset:0;background:oklch(.12 .008 250/.52);
+  animation:fade .22s var(--e-out) both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+.card{position:relative;width:min(560px,100%);max-height:min(86vh,780px);
+  display:flex;flex-direction:column;border-radius:20px;
+  background:linear-gradient(178deg in oklab,
+    color-mix(in oklab,var(--felt) 91%,oklch(1 0 0)),
+    color-mix(in oklab,var(--felt) 97%,oklch(1 0 0)));
+  box-shadow:inset 0 1px 0 var(--glass-lip), 0 0 0 1px var(--hair),
+    0 2px 6px rgba(0,0,0,.30), 0 44px 90px rgba(0,0,0,.55);
+  animation:cardIn .26s var(--e-out) both}
+@keyframes cardIn{from{opacity:0;transform:translateY(10px) scale(.975)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.card,.scrim{animation:none}}
+
+.cardhd{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  padding:22px 30px 14px;border-bottom:1px solid var(--hair)}
+.cardhd h2{font-family:"Bodoni Moda",Georgia,serif;font-size:26px;font-weight:600;letter-spacing:-.008em}
+
+.rows{overflow:auto;padding:4px 30px 8px}
+.rows .cap{display:block;margin:20px 0 2px}
+.rows .cap:first-child{margin-top:14px}
+/* 標籤靠右切齊：選項的左界因此是一條直線，八排一眼掃得完 */
+.f{display:flex;align-items:baseline;gap:18px;padding:11px 0;border-bottom:1px solid var(--hair-2)}
+.f>label{width:76px;flex:none;text-align:right;font-size:12.5px;color:var(--ink-3)}
+.f .pick{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 3px;flex:1}
+.f.last{border-bottom:0}
+/* 改了會怎樣：三個例子橫成一行，貼在計分那組底下 */
+.egs{display:flex;flex-wrap:wrap;gap:0 16px;padding:4px 0 2px;margin-left:94px;
+  font-size:11.5px;color:var(--ink-3)}
+.egs+.egs{padding-top:0}
+.egs b{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--ink-2);margin-left:5px;
+  font-variant-numeric:tabular-nums}
+
+.cardft{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  padding:16px 30px 20px;border-top:1px solid var(--hair)}
+.cardft .meta{font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+
+@media (max-width:760px){
+  .ov{padding:0;place-items:end stretch}
+  .card{width:100%;max-height:92dvh;border-radius:22px 22px 0 0;
+    animation:sheetIn .3s var(--e-out) both}
+  @keyframes sheetIn{from{transform:translateY(22px);opacity:0}to{transform:none;opacity:1}}
+  .cardhd{padding:18px 20px 12px}
+  .cardhd h2{font-size:22px}
+  .rows{padding:2px 20px 6px}
+  .f{gap:14px;padding:10px 0}
+  .f>label{width:66px}
+  .egs{margin-left:80px}
+  .cardft{padding:14px 20px calc(16px + env(safe-area-inset-bottom))}
+  .nums .v{font-size:19px}
+}
+/*==HTML==*/
+<div class="ov" id="ov">
+  <div class="scrim" data-close></div>
+  <div class="card" role="dialog" aria-modal="true" aria-label="這一桌的規則">
+    <header class="cardhd">
+      <h2>這一桌的規則</h2>
+      <button class="done" data-close>完成</button>
+    </header>
+
+    <div class="rows">
+      <span class="cap">叫墩</span>
+      <div class="f"><label>方式</label>
+        <div class="pick"><button class="ch" aria-pressed="true">依序公開叫</button><i class="sep">／</i><button class="ch">同時叫墩</button></div></div>
+      <div class="f"><label>末位限制</label>
+        <div class="pick"><button class="ch" aria-pressed="true">the hook</button><i class="sep">／</i><button class="ch">不限制</button></div></div>
+
+      <span class="cap">牌</span>
+      <div class="f"><label>牌組</label>
+        <div class="pick"><button class="ch">單副</button><i class="sep">／</i><button class="ch" aria-pressed="true">雙副</button></div></div>
+      <div class="f"><label>最小點數</label>
+        <div class="pick"><button class="ch">9</button><i class="sep">／</i><button class="ch" aria-pressed="true">7</button><i class="sep">／</i><button class="ch">6</button><i class="sep">／</i><button class="ch">5</button><i class="sep">／</i><button class="ch">4</button><i class="sep">／</i><button class="ch">3</button><i class="sep">／</i><button class="ch">2</button></div></div>
+      <div class="f"><label>鬼牌</label>
+        <div class="pick"><button class="ch" aria-pressed="true">不放</button><i class="sep">／</i><button class="ch">放兩張</button></div></div>
+
+      <span class="cap">計分</span>
+      <div class="f"><label>叫中得分</label>
+        <div class="pick"><button class="ch" aria-pressed="true">10＋叫</button><i class="sep">／</i><button class="ch">10×叫</button><i class="sep">／</i><button class="ch">10＋叫²</button></div></div>
+      <div class="f"><label>叫 0 中了</label>
+        <div class="pick"><button class="ch" aria-pressed="true">5 分</button><i class="sep">／</i><button class="ch">5＋該局張數</button></div></div>
+      <div class="f last"><label>沒叫中</label>
+        <div class="pick"><button class="ch" aria-pressed="true">扣差額</button><i class="sep">／</i><button class="ch">扣 10×差</button><i class="sep">／</i><button class="ch">扣差額²</button></div></div>
+      <span class="cap" style="margin-top:18px">這樣算</span>
+      <div class="egs">
+        <span>叫 3，拿 3<b>＋13</b></span><span>叫 0，拿 0<b>＋5</b></span>
+        <span>叫 3，拿 4<b>−1</b></span><span>叫 3，拿 0<b>−3</b></span>
+      </div>
+    </div>
+
+    <footer class="cardft">
+      <div class="nums">
+        <div><div class="k">牌數</div><div class="v">64</div></div>
+        <div><div class="k">最多每人</div><div class="v">11</div></div>
+        <div><div class="k">總局數</div><div class="v">21</div></div>
+      </div>
+      <span class="meta">房號 7K2M · 4 人就座</span>
+    </footer>
+  </div>
+</div>
+
+<div class="dev">
+  <button data-v="room">開房</button>
+  <button data-v="set" aria-pressed="true">設定</button>
+</div>
+<script>
+const setv = v => {
+  document.body.classList.toggle("set", v === "set");
+  document.querySelectorAll(".dev button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === v));
+};
+document.querySelector(".dev").onclick = e => { const b = e.target.closest("button"); if(b) setv(b.dataset.v); };
+document.getElementById("toSet").onclick = () => setv("set");
+document.addEventListener("click", e => {
+  if(e.target.closest("[data-close]")) return setv("room");
+  const o = e.target.closest(".ch");
+  if(!o) return;
+  o.parentElement.querySelectorAll(".ch").forEach(b => b.setAttribute("aria-pressed", "false"));
+  o.setAttribute("aria-pressed", "true");
+});
+addEventListener("keydown", e => { if(e.key === "Escape") setv("room"); });
+if(location.search.includes("nodev")) document.querySelector(".dev").hidden = true;
+setv(location.search.includes("room") ? "room" : "set");
+</script>

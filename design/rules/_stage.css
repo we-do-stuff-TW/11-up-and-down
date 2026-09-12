@@ -1,0 +1,149 @@
+/* ── 背景：定案的開房頁（design/room/c.def 那一份，原封搬過來）───────────
+   這一輪要動的只有「設定」長什麼樣。座位表、右欄規則單都不是題目，
+   放在這裡是為了看清楚視窗浮在什麼東西上面、蓋掉了什麼。 */
+.pg{flex:1;display:flex;flex-direction:column;min-height:100dvh}
+.top{display:flex;align-items:center;justify-content:space-between;gap:20px;
+  padding:22px clamp(22px,2.6vw,36px) 0}
+.top .you{display:flex;align-items:center;gap:10px}
+.top .you .nm{font-size:13px;color:var(--ink-2)}
+.top .you .av,.top .you .mono-av{width:26px;height:26px;font-size:11px}
+
+.body{flex:1;display:flex;min-height:0}
+
+.plan{flex:1;position:relative;display:grid;place-items:center;min-width:0;padding:20px 40px 40px}
+.diagram{position:relative;width:680px;height:434px}
+.ring{position:absolute;inset:0;border-radius:50%;border:1px solid oklch(.845 .128 84/.30);
+  background:radial-gradient(78% 84% at 50% 46% in oklab,oklch(1 0 0/.028),transparent 72%)}
+.ring::after{content:"";position:absolute;inset:9px;border-radius:50%;border:1px solid oklch(.845 .128 84/.10)}
+.mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.mid .code{font-family:"Bodoni Moda",Georgia,serif;font-size:84px;font-weight:600;line-height:1;
+  letter-spacing:.1em;text-indent:.1em;color:var(--ink)}
+.mid .copy{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-3);
+  padding:7px 13px;border-radius:99px;transition:.18s}
+.mid .copy:hover{background:oklch(1 0 0/.05);color:var(--ink-2)}
+.mid .copy i{width:3px;height:3px;border-radius:99px;background:var(--foil-2);display:block}
+
+.tick{position:absolute;left:50%;top:50%;width:19px;height:1px;background:var(--foil-2);opacity:.45;
+  translate:calc(-50% + var(--x)) calc(-50% + var(--y));rotate:var(--r)}
+.tick.open{background:var(--ink-3);opacity:.3}
+
+.p{position:absolute;left:50%;top:50%;translate:calc(-50% + var(--x)) calc(-50% + var(--y));
+  display:flex;align-items:center;gap:10px;white-space:nowrap}
+.p.l{flex-direction:row-reverse}
+.p.l .t{text-align:right}
+.p .t{display:flex;flex-direction:column;gap:4px;line-height:1}
+.p .t b{font-size:15px;font-weight:600;letter-spacing:.01em}
+.p .t span{font-size:10px;letter-spacing:.14em;color:var(--ink-3)}
+.p .mono-av,.p .av{width:36px;height:36px}
+.p.open .t b{font-size:13px;font-weight:400;color:var(--ink-3);letter-spacing:.14em}
+.p.open .ph{width:36px;height:36px;border-radius:99px;border:1px dashed oklch(.90 .02 92/.20);flex:none}
+.p.open{opacity:.9;transition:opacity .2s}
+.p.open:hover{opacity:1}
+.p.open:hover .t b{color:var(--ink-2)}
+.p.open .t .ai{position:absolute;opacity:0;color:var(--foil-2);transition:opacity .18s}
+.p.open .t .wait{transition:opacity .18s}
+.p.open:hover .t .wait{opacity:0}
+.p.open:hover .t .ai{opacity:1}
+.p.s1 .t b{color:var(--brass)}
+
+.plan .foot{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:11.5px;
+  color:var(--ink-3);letter-spacing:.04em}
+
+/* 右欄：印出來的規則單 */
+.sheet{width:376px;flex:none;border-left:1px solid var(--hair);
+  padding:26px 34px 26px;display:flex;flex-direction:column;background:transparent}
+.sheethd{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:2px}
+.sheethd h2{font-family:"Bodoni Moda",Georgia,serif;font-size:23px;font-weight:600;letter-spacing:-.005em}
+.lnk{font-size:12px;color:var(--ink-3);padding:6px 2px;position:relative;transition:color .18s}
+.lnk::after{content:"";position:absolute;left:0;right:0;bottom:4px;height:1px;background:var(--hair);
+  transition:background .18s}
+.lnk:hover{color:var(--ink)}
+.lnk:hover::after{background:var(--brass)}
+.sheetsub{margin:0 0 20px;font-size:11.5px;color:var(--ink-3)}
+
+.sect{margin-bottom:16px}
+.sect>.cap{display:block;margin-bottom:6px}
+.r{display:flex;align-items:baseline;gap:0;padding:7px 0}
+.r .k{font-size:12.5px;color:var(--ink-3);flex:none}
+.r .d{flex:1;margin:0 9px;border-bottom:1px dotted oklch(.90 .02 92/.26);translate:0 -4px}
+.r .v{font-size:13px;color:var(--ink);flex:none}
+.r .v small{color:var(--ink-3);font-size:11px}
+
+.tot{margin:auto 0 0;padding-top:18px;border-top:1px solid var(--hair);
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  font-size:12px;color:var(--ink-3)}
+.tot b{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:500;color:var(--ink-2);
+  font-variant-numeric:tabular-nums}
+.go{margin-top:16px}
+.sheetft{margin:11px 0 0;font-size:11px;color:var(--ink-3);text-align:center;letter-spacing:.03em}
+
+/* 座位與刻度的座標 */
+.tick.t1{--x:0px;--y:217px;--r:90deg}
+.tick.t2{--x:-277px;--y:124px;--r:122.5deg}
+.tick.t3{--x:-277px;--y:-124px;--r:237.5deg}
+.tick.t4{--x:0px;--y:-217px;--r:270deg}
+.tick.t5{--x:277px;--y:-124px;--r:312.3deg}
+.tick.t6{--x:277px;--y:124px;--r:47.7deg}
+.p.s1{--x:0px;--y:272px}
+.p.s2{--x:-330px;--y:158px}
+.p.s3{--x:-330px;--y:-158px}
+.p.s4{--x:0px;--y:-272px}
+.p.s5{--x:330px;--y:-158px}
+.p.s6{--x:330px;--y:158px}
+
+/* ── 三案共用的選項列 ───────────────────────────────────────
+   選項不做膠囊也不做框：選中的那個底下一條銅線。跟開房頁 .rm-ch 同一套。 */
+.ch{font-size:13.5px;color:var(--ink-3);padding:4px 6px;position:relative;transition:color .18s}
+.ch::after{content:"";position:absolute;left:6px;right:6px;bottom:1px;height:1px;background:transparent;
+  transition:background .18s}
+.ch:hover{color:var(--ink-2)}
+.ch[aria-pressed=true]{color:var(--ink)}
+.ch[aria-pressed=true]::after{background:var(--brass)}
+.sep{color:var(--hair);font-size:11px;user-select:none}
+.note{margin:7px 0 0;font-size:11.5px;line-height:1.6;color:var(--ink-3)}
+.nums{display:flex;gap:clamp(20px,3vw,34px)}
+.nums .k{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.nums .v{font-family:"IBM Plex Mono",monospace;font-size:22px;font-weight:500;line-height:1;
+  font-variant-numeric:tabular-nums}
+.done{padding:9px 22px;border-radius:99px;font-size:12.5px;color:var(--ink);
+  background:var(--glass);box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair)}
+.done:hover{background:oklch(.98 .012 92/.13)}
+
+@media (max-width:760px){
+  .top{padding:14px 16px 0}
+  .top .you .nm{display:none}
+  .body{flex-direction:column;overflow:auto}
+  .plan{flex:none;padding:10px 16px 0;place-items:start center}
+  .diagram{width:300px;height:260px}
+  .ring::after{inset:7px}
+  .mid{gap:7px}
+  .mid .code{font-size:46px}
+  .mid .copy{font-size:11px;padding:5px 10px}
+  .tick{width:14px}
+  .tick.t1{--x:0px;--y:130px}
+  .tick.t2{--x:-123px;--y:75px}
+  .tick.t3{--x:-123px;--y:-75px}
+  .tick.t4{--x:0px;--y:-130px}
+  .tick.t5{--x:123px;--y:-75px}
+  .tick.t6{--x:123px;--y:75px}
+  .p,.p.l{flex-direction:column;gap:6px;text-align:center}
+  .p.l .t{text-align:center}
+  .p .t{gap:3px}
+  .p .t b{font-size:12.5px}
+  .p .t span{font-size:9px;letter-spacing:.1em}
+  .p .mono-av,.p .av,.p.open .ph{width:30px;height:30px}
+  .p.open .t b{font-size:11px}
+  .p.s1{--x:0px;--y:174px}
+  .p.s2{--x:-142px;--y:100px}
+  .p.s3{--x:-142px;--y:-100px}
+  .p.s4{--x:0px;--y:-174px}
+  .p.s5{--x:142px;--y:-100px}
+  .p.s6{--x:142px;--y:100px}
+  .plan .foot{position:static;margin:96px 0 0;font-size:11px}
+  .sheet{width:auto;border-left:0;border-top:1px solid var(--hair);
+    margin-top:16px;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+  .sheethd h2{font-size:20px}
+  .sect{margin-bottom:12px}
+  .tot{margin-top:14px}
+  .sheet .go{position:sticky;bottom:10px;z-index:3}
+}
