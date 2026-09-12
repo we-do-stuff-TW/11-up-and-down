@@ -63,6 +63,7 @@ scripts/                       測試與一次性的設定指令（見下面〈�
 ```
 deno run --allow-read scripts/engine_test.ts     # 牌局引擎：各種規則組合各打完一整場
 deno run --allow-read scripts/rules_test.ts      # 兩份規則對照：畫面 vs 伺服器
+deno run -A          scripts/ui_test.ts         # 出牌的入口：無頭 Chrome 開真的牌桌
 deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗證
 ```
 
@@ -77,6 +78,11 @@ deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗
 - **`rules_test.ts`** 把同樣的輸入餵給兩份規則引擎比對輸出（約五萬七千組）。
   不在比對範圍裡的是伺服器刻意獨有的三件事：斷線 30 秒 AI 接手、把房主送上來的規則夾回合理範圍、
   用真亂數洗牌。
+- **`ui_test.ts`** 開無頭 Chrome 打真的牌桌，測「點下去會怎樣」：暗的牌點不動、按太久不算、
+  手指滑開不算、按下與放開之間手牌被重畫還是要出得掉、平面與立體走同一個判斷、鍵盤那條路還在、
+  點一下只出一張。立體那段用軟體 WebGL 開真的場景驗射線；three.js 從 CDN 載不到就跳過，
+  不讓測試綁在別人的網路上。頁面只插兩個接縫（`<head>` 的門禁、`gotoLogin` 不跳走），
+  接縫找不到就直接報錯（`scripts/_browser.ts`）。
 - 入口是 `window.UD.engine`（`docs/index.html`）。**在那份名單上加東西，`engine_test.ts` 會要求它也被測到。**
 
 ## 頁面與牌桌是兩種東西

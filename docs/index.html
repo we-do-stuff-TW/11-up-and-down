@@ -4879,32 +4879,59 @@ document.addEventListener("input", function(e){
     pushName();
   }
 });
-/* 保險絲：按下去的那一刻就記住按在哪一張牌上。
-   為什麼需要它：按下與放開之間只要那顆按鈕被換掉，瀏覽器就**完全不發 click**
-   ——實測放開時只剩 mouseup 打在 #hand 上，click 一個都沒有。所以這條退路不能掛在
-   click 上，要掛在 pointerup。按鈕還在的話就什麼都不做，讓 click 照原本的路走。 */
-let downCard = null;
-document.addEventListener("pointerdown", function(e){
-  const c = e.target.closest && e.target.closest("[data-card]");
-  downCard = (c && !c.disabled)
-    ? {id:c.dataset.card, x:e.clientX, y:e.clientY, t:Date.now()} : null;
-}, true);
-document.addEventListener("pointerup", function(e){
-  const d = downCard;
-  if(!d) return;
-  if(e.target.closest && e.target.closest("[data-card]")) return;   /* 按鈕還在＝click 會照常來 */
-  downCard = null;
-  if(Date.now() - d.t > 1200) return;                               /* 按太久：當成猶豫，不算 */
-  if(Math.abs(e.clientX - d.x) > 14 || Math.abs(e.clientY - d.y) > 14) return;  /* 手指移開了 */
-  doPlay(d.id, document.querySelector('#hand .card[data-card="' + d.id + '"]'));
-}, true);
+/* ---- 這一指點到哪張牌 ----
+   平面與立體各自只回答一件事：手指落在哪張牌上。其餘全部在這裡決定——
+   按多久算數、移多遠就不算、那張牌現在能不能出、以及真的出牌。
+   兩種呈現因此不會各長一套容差；「牌是亮的卻點不動」只會有一個地方要查。
+
+   為什麼在 pointerup 決定而不是 click：按下與放開之間只要那顆按鈕被重畫過，
+   瀏覽器就**完全不發 click**（實測放開時只剩 mouseup 打在 #hand 上）。
+   click 留給鍵盤與螢幕閱讀器——它們送出來的 click 沒有滑鼠座標（detail 是 0）。 */
+const TAP = {
+  R:14,        /* 手指有寬度：立體那層射不中時，在這個半徑內再找一圈 */
+  MOVE:14,     /* 按下與放開之間移超過這麼多像素：手指改變主意了 */
+  HOLD:1200,   /* 按超過這麼久：當成猶豫，不算一次點擊 */
+  hit:null,    /* 立體那層裝上來：畫布上的射線命中。沒裝就只有 DOM 這條 */
+  saw:false,   /* 收過 pointer 事件沒有；沒有的話 click 還是要能出牌 */
+  down:null,
+  btn:function(id){ return document.querySelector('#hand .card[data-card="' + id + '"]'); },
+  playable:function(id){ const b = this.btn(id); return !!b && !b.disabled; },
+  /* 手指落在哪張牌上：先問 DOM 那顆按鈕（平面，也是鍵盤的入口），再問立體那層 */
+  at:function(ev){
+    const c = ev.target && ev.target.closest && ev.target.closest("[data-card]");
+    if(c) return c.disabled ? null : c.dataset.card;
+    return this.hit ? this.hit(ev) : null;
+  },
+  begin:function(ev){
+    this.saw = true;
+    const id = this.at(ev);
+    this.down = id ? {id:id, x:ev.clientX, y:ev.clientY, t:Date.now()} : null;
+  },
+  end:function(ev){
+    const d = this.down; this.down = null;
+    if(!d) return;
+    if(Date.now() - d.t > this.HOLD) return;
+    if(Math.abs(ev.clientX - d.x) > this.MOVE || Math.abs(ev.clientY - d.y) > this.MOVE) return;
+    this.play(d.id);        /* 以按下去那一張為準——那是人的本意，畫面後來變了不算 */
+  },
+  play:function(id){
+    const b = this.btn(id);
+    if(b && !b.disabled) doPlay(id, b);
+  }
+};
+document.addEventListener("pointerdown", function(e){ TAP.begin(e); }, true);
+document.addEventListener("pointerup", function(e){ TAP.end(e); }, true);
 
 document.addEventListener("click", function(e){
-  downCard = null;
   const bid = e.target.closest("[data-bid]");
   if(bid){ doBid(+bid.dataset.bid); return; }
+  /* 牌在 pointerup 就決定完了（見上面的 TAP）。這裡只接鍵盤與螢幕閱讀器送出來的 click
+     （沒有座標，detail 是 0），以及連 pointer 事件都沒有的舊瀏覽器。 */
   const card = e.target.closest("[data-card]");
-  if(card && !card.disabled){ doPlay(card.dataset.card, card); return; }
+  if(card){
+    if(!card.disabled && (e.detail === 0 || !TAP.saw)) TAP.play(card.dataset.card);
+    return;
+  }
   const rule = e.target.closest("[data-rule]");
   if(rule){ onRulePick(rule, rule.dataset.rule, rule.dataset.v); return; }
   const un = e.target.closest("[data-unseat]");
@@ -5256,6 +5283,7 @@ const UD = window.UD = {
   mySeat:mySeat, seatLabel:seatLabel, handCount:handCount, trickBest:trickBest,
   trickGap:trickGap, trickBeats:trickBeats,
   doPlay:doPlay,
+  tap:TAP,        /* 這一指點到哪張牌：立體那層把它的射線裝在 tap.hit 上 */
   felt:null,      /* paintTable 算好的桌色，3D 層拿去染桌布 */
   sync3d:null,    /* 3D 層裝好之後掛上來；沒掛就等於這段不存在 */
   /* 規則引擎的入口。3D 那層用不到，但這是引擎唯一露出來的門——
@@ -7165,10 +7193,9 @@ function sync(){
   const myTurn = G.phase === "play" && G.turn === seat;
   const dealEnd = fresh ? base + dealAt(seat, Math.max(0, hand.length - 1)) : 0;
   hand.forEach(function(card, k){
-    /* 這張能不能出，問的是既有那顆 DOM 按鈕——規則只寫一次，
+    /* 這張能不能出，問的是 UD.tap——規則只寫一次，
        點擊、鍵盤、螢幕閱讀器與這裡的明暗都以它為準 */
-    const b = btnFor(card.id);
-    const ok = !!(b && !b.disabled);
+    const ok = UD.tap.playable(card.id);
     const spec = handSlot(k, hand.length, ok);       /* 能出的推出來一截 */
     const dl = fresh ? base + dealAt(seat, k) : 0;
     lastDeal = Math.max(lastDeal, dl);
@@ -7700,13 +7727,11 @@ function hitTest(ev){
   const hit = S.ray.intersectObjects(list, false)[0];
   return hit ? hit.object : null;
 }
-/* 能不能出，交給既有那顆 DOM 按鈕判斷——規則只寫一次 */
-function btnFor(id){ return document.querySelector('#hand .card[data-card="' + id + '"]'); }
-
 /* 手指不是游標，它有寬度。射不中就在落點周圍再射一圈（±14px 八個方向），
    而且出得掉的那張優先——在扇形裡每張只露出很窄一條，六個人的桌子鏡頭又拉得遠，
-   牌在畫面上更小，正中紅心的機率本來就低。 */
-const TAP_R = 14;
+   牌在畫面上更小，正中紅心的機率本來就低。
+   半徑跟平面那邊共用同一個數字（UD.tap.R）：手指的寬度不會因為切換呈現就變了。 */
+const TAP_R = UD.tap.R;
 const TAP_PTS = [[0,0],[0,-TAP_R],[0,TAP_R],[-TAP_R,0],[TAP_R,0],
                  [-TAP_R,-TAP_R],[TAP_R,-TAP_R],[-TAP_R,TAP_R],[TAP_R,TAP_R]];
 function hitCard(ev){
@@ -7716,8 +7741,7 @@ function hitCard(ev){
     if(!m) continue;
     const id = m.userData.cardId;
     if(first === null) first = id;
-    const b = btnFor(id);
-    if(b && !b.disabled) return id;
+    if(UD.tap.playable(id)) return id;
   }
   return first;
 }
@@ -7730,28 +7754,21 @@ function hitCard(ev){
 CANVAS.addEventListener("pointermove", function(ev){
   if(!S || ev.pointerType !== "mouse") return;
   const m = hitTest(ev);
-  const b = m && btnFor(m.userData.cardId);
-  const key = (b && !b.disabled) ? cardKey(m.userData.cardId) : null;
+  const key = (m && UD.tap.playable(m.userData.cardId)) ? cardKey(m.userData.cardId) : null;
   if(key !== S.hover){ S.hover = key; S.dirty = 3; }
   CANVAS.style.cursor = key ? "pointer" : "";
 });
 CANVAS.addEventListener("pointerleave", function(){
   if(S && S.hover){ S.hover = null; S.dirty = 3; }
 });
-/* 按下去的那一刻牌還在原地，先記下射中的是哪一張。click 是手指放開之後才補出來的，
-   那時候畫面可能已經不一樣了——以按下去那一下為準才是人的本意。 */
-let tapCard = null;
-CANVAS.addEventListener("pointerdown", function(ev){
-  tapCard = S ? hitCard(ev) : null;
-});
-CANVAS.addEventListener("click", function(ev){
-  if(!S) return;
-  const id = tapCard || hitCard(ev);
-  tapCard = null;
-  if(!id) return;
-  const b = btnFor(id);
-  if(b && !b.disabled){ S.hover = null; b.click(); }
-});
+/* 這一層只回答「手指落在哪張牌上」，其餘交給主程式那個 TAP：容差、按多久算數、
+   能不能出、真的出牌，兩種呈現共用同一份。按下去那一刻牌還在原地，所以問的就是那一刻。 */
+UD.tap.hit = function(ev){
+  if(!S || CANVAS.hidden) return null;    /* 切回平面時這條線要斷乾淨，別再回答 */
+  const id = hitCard(ev);
+  if(id) S.hover = null;
+  return id;
+};
 
 /* ================= 啟動與切換 ================= */
 async function fontsReady(){
