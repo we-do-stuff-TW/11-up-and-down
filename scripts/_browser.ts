@@ -12,7 +12,7 @@ const CHROME = Deno.env.get("CHROME") ??
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 /** 把 docs/ 端起來，index.html 換成插了接縫的那一份 */
-async function serve(): Promise<{ port: number; stop: () => Promise<void> }> {
+async function serve(hooks: boolean): Promise<{ port: number; stop: () => Promise<void> }> {
   const docs = new URL("docs/", ROOT);
   let html = await Deno.readTextFile(new URL("index.html", docs));
   // 接縫一：<head> 那道門禁不要把我們轉去 login.html
@@ -27,6 +27,20 @@ async function serve(): Promise<{ port: number; stop: () => Promise<void> }> {
   }
   html = html.replace(gate, "  if(1) return;   /* 測試接縫：門禁關掉 */")
     .replace(bounce, "function gotoLogin(stale){\n  return;   /* 測試接縫：不跳走 */\n  if(bouncing) return;");
+
+  // 連線那一段的測試還要兩個接縫：換掉伺服器、以及看得到 IIFE 裡面。
+  // 只有 net_test 會開（hooks），ui_test 跑的頁面跟正式版一模一樣。
+  if (hooks) {
+    const swap = "  const run = function(){ return call(action, args); };";
+    const expose = "  engine:{";
+    for (const [what, seam] of [["api 的呼叫", swap], ["UD.engine", expose]] as [string, string][]) {
+      if (!html.includes(seam)) throw new Error(`接縫插不進去：找不到${what}那一段`);
+    }
+    html = html
+      .replace(swap, "  const run = function(){ return (window.__call || call)(action, args); };")
+      .replace(expose, "  __t:{applyRow:applyRow, peerMove:peerMove, INBOX:INBOX, " +
+        "snapshot:snapshot, MY:MY, NET:NET},\n  engine:{");
+  }
 
   const types: Record<string, string> = {
     html: "text/html; charset=utf-8", js: "text/javascript", css: "text/css",
@@ -59,9 +73,9 @@ export class Browser {
   #stopServer!: () => Promise<void>;
   port = 0;
 
-  static async start(opts: { gl?: boolean } = {}): Promise<Browser> {
+  static async start(opts: { gl?: boolean; hooks?: boolean } = {}): Promise<Browser> {
     const b = new Browser();
-    const { port, stop } = await serve();
+    const { port, stop } = await serve(!!opts.hooks);
     b.port = port; b.#stopServer = stop;
     b.#profile = await Deno.makeTempDir({ prefix: "ud-test-" });
     const flags = [
