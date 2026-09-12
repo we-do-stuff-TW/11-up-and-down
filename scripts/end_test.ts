@@ -84,15 +84,28 @@ try {
                  .filter(x=>!x.hidden).map(x=>x.textContent),
       mine: document.getElementById("endMine").hidden ? "" : document.getElementById("endMine").textContent,
       sub: document.getElementById("endSub").textContent };`);
-  ok(end.rows === 3, "台上三個人，實際 " + end.rows);
+  /* 台上是三階，不是三個人：同分站同一階，所以列數＝前三種分數的種數 */
+  const want = await b.eval<number>(`return Math.min(3, new Set(UD.G.score).size);`);
+  ok(end.rows === want, "台上要 " + want + " 階，實際 " + end.rows);
   ok(end.first.startsWith("p1|1"), "第一名那一列是 p1／名次 1，實際 " + end.first);
+  /* 同分的人要一起站上那一階，一個都不能漏 */
+  const names = await b.eval<{ got: number; want: number }>(`
+    const sc = UD.G.score;
+    const tiers = [...new Set(sc)].sort((a,b)=>b-a).slice(0,3);
+    return {
+      got: [...document.querySelectorAll("#endTop .pn")]
+             .reduce((n, e) => n + e.textContent.split("、").length, 0),
+      want: sc.filter(v => tiers.indexOf(v) >= 0).length };`);
+  ok(names.got === names.want,
+     "前三階要站 " + names.want + " 個人，台上只有 " + names.got);
   ok(end.buttons.join("／") === "看計分表／返回房間／再來一局", "三顆按鈕：" + end.buttons.join("／"));
   ok(/不記戰績/.test(end.sub), "單人局要說不記戰績：" + end.sub);
-  /* 十個人，自己幾乎一定不在前三 */
-  const meTop = await b.eval<boolean>(`
+  /* 自己站在台上就不要再補一行，沒站上去就一定要補 */
+  const onBoard = await b.eval<boolean>(`
     const sc = UD.G.score, me = UD.mySeat();
-    return sc.filter(v => v > sc[me]).length < 3;`);
-  ok(meTop || /你第/.test(end.mine), "沒進前三要補一行自己的：" + JSON.stringify(end.mine));
+    return [...new Set(sc)].sort((a,b)=>b-a).slice(0,3).indexOf(sc[me]) >= 0;`);
+  ok(onBoard ? end.mine === "" : /你第/.test(end.mine),
+     (onBoard ? "站上台了就不該再補一行：" : "沒上台要補一行自己的：") + JSON.stringify(end.mine));
   await shot("end_podium.png");
 
   /* ── 再來一局：直接發牌，不經過房間 ── */

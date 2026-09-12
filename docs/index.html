@@ -918,7 +918,8 @@ body.in-lobby .app{display:none}
 .podium li:first-child{border-top:1px solid var(--hair-2)}
 .podium .pl{flex:none;width:32px;font-family:"Bodoni Moda",Georgia,serif;font-size:23px;
   font-weight:600;line-height:1;color:var(--ink-3);font-variant-numeric:tabular-nums}
-.podium .pn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+/* 一階可能站著好幾個同分的人，名字要排得下，所以讓它換行不要用刪節號吃掉 */
+.podium .pn{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.45;
   font-size:15px;color:var(--ink)}
 .podium .pv{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
   font-size:17px;font-weight:500;color:var(--ink-2)}
@@ -5063,19 +5064,25 @@ function showFinal(){
     e.pos = 1 + rank.filter(function(x){ return x.sc > e.sc; }).length;
   });
   rank.sort(function(a, b){ return b.sc - a.sc; });
-  /* 「前三名」是名次前三，不是前三列：同分的人一起上台，所以三個人打平就是三個第一名，
-     台上會有三列；30／20／10／10 那種則是四列。切成 slice(0,3) 的話會有人被關在門外。 */
-  const top = rank.filter(function(e){ return e.pos <= 3; });
+  /* 台上就是三階：金、銀、銅。同分的人站同一階（一列寫得下好幾個名字），不是各佔一列——
+     三局的短牌局很容易五個人同分，一人一列的話整張浮層會變成一份名單，就看不出誰贏了。
+     階數只算三階，所以三個人並列第一時，下一個人站的是第二階（名次仍然照實寫 4）。 */
+  const board = [];
+  rank.forEach(function(e){
+    const step = board.filter(function(r){ return r.pos === e.pos; })[0];
+    if(step) step.who.push(e.name);
+    else if(board.length < 3) board.push({pos:e.pos, sc:e.sc, who:[e.name]});
+  });
   /* 單人局不進戰績——收桌這一刻是唯一還說得上這句話的地方 */
   $("endSub").textContent = G.log.length + " 局打完" + (MODE === "net" ? "" : " · 對 AI，不記戰績");
-  setHTML($("endTop"), top.map(function(e){
-    return '<li class="' + (e.pos === 1 ? "p1" : "") + '">' +
-      '<span class="pl">' + e.pos + '</span>' +
-      '<span class="pn">' + e.name + '</span>' +
-      '<span class="pv">' + (e.sc > 0 ? "+" : "") + e.sc + '</span></li>';
+  setHTML($("endTop"), board.map(function(r){
+    return '<li class="' + (r.pos === 1 ? "p1" : "") + '">' +
+      '<span class="pl">' + r.pos + '</span>' +
+      '<span class="pn">' + r.who.join("、") + '</span>' +
+      '<span class="pv">' + (r.sc > 0 ? "+" : "") + r.sc + '</span></li>';
   }).join(""));
   const mine = me >= 0 ? rank.filter(function(e){ return e.i === me; })[0] : null;
-  const outside = !!mine && top.indexOf(mine) < 0;
+  const outside = !!mine && !board.some(function(r){ return r.pos === mine.pos; });
   $("endMine").hidden = !outside;
   if(outside) setHTML($("endMine"), '你第 <b>' + mine.pos + '</b> / ' + G.seats.length +
     ' · <b>' + (mine.sc > 0 ? "+" : "") + mine.sc + '</b> 分');
