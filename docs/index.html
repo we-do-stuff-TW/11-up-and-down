@@ -763,16 +763,6 @@ table.score.tighter col.c-gut{width:5.4em}
   .ledger-scroll{padding:0 1.2em 2em}
 }
 
-/* ================= 浮層 ================= */
-.overlay{
-  position:fixed;inset:0;z-index:60;
-  display:flex;align-items:center;justify-content:center;padding:24px;
-  background:oklch(.12 .02 168 / .62);
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  animation:ov .22s var(--e-out) both;
-}
-@keyframes ov{from{opacity:0}to{opacity:1}}
-
 /* ================= 大廳 =================
    身分不做成一個「面」，只是右上角幾行字加一條線——整頁只有中間那排牌位是亮的。 */
 body.in-lobby .app{display:none}
@@ -876,17 +866,8 @@ body.in-lobby .app{display:none}
   .lb-alt{gap:26px;justify-content:center}
   .lb-al{font-size:var(--lb-alt-m,26px)}
 }
-.sheet{
-  width:min(608px,100%);max-height:88vh;overflow:auto;   /* 人數那一排 2～10 共十顆要排得下 */
-  padding:26px 28px 24px;border-radius:22px;
-  background:linear-gradient(170deg, oklch(.26 .028 168) 0%, oklch(.205 .026 168) 100%);
-  border:1px solid var(--glass-edge);
-  box-shadow:var(--sh-2), inset 0 1px 0 var(--glass-lip);
-  animation:sheet .34s var(--e-out) both;
-}
+/* 手機的計分表浮層從底下升上來用的 */
 @keyframes sheet{from{transform:translateY(14px) scale(.985);opacity:0}to{transform:none;opacity:1}}
-.sheet h2{font-family:"Bodoni Moda",Georgia,serif;font-size:27px;font-weight:700;margin-bottom:5px;letter-spacing:-.01em}
-.sheet .sub{color:var(--ink-3);font-size:13px;margin-bottom:20px;max-width:62ch}
 .opts{display:flex;gap:5px;flex-wrap:wrap}
 .opt{
   padding:7px 14px;border-radius:99px;border:1px solid var(--hair);
@@ -895,7 +876,6 @@ body.in-lobby .app{display:none}
 }
 .opt:hover{color:var(--ink-2);border-color:var(--glass-edge)}
 .opt[aria-pressed="true"]{border-color:var(--brass);color:var(--brass);background:var(--brass-soft)}
-.sheet-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
 /* 設定裡的牌面預覽：同一套 cardHTML／.back，只是縮成手牌尺寸 */
 .preview{display:flex;gap:10px;align-items:flex-end;--cw:62px;--ch:88px;margin:2px 0 0;padding:14px 16px;border-radius:14px;background:oklch(.16 .03 168 / .55)}
 .preview .pvback{position:relative;width:var(--cw);height:var(--ch);flex:none}
@@ -5295,7 +5275,11 @@ $("btnSignOut").onclick = async function(){
   gotoLogin(true);
 };
 $("btnPref").onclick = function(){ openPg("pref"); };
-$("endClose").onclick = $("endClose2").onclick = function(){ $("endOv").hidden = true; };
+$("endClose").onclick = $("endClose2").onclick = function(){
+  $("endOv").hidden = true;
+  /* 窄螢幕的計分表收在頂列那顆「計分」後面，只關掉這一頁看到的是牌桌——要真的把表打開 */
+  if(getComputedStyle($("btnScore")).display !== "none") setScore(true);
+};
 /* 再來一局＝同一桌、同一批人、同一份規則，直接發牌，不經過房間那一站。
    連線局是兩趟：again 把房間退回等待狀態，start 才發牌——伺服器沒有「重開一場」
    這個動作，硬要加一個就得把兩邊的狀態機都改，這裡走現成的那兩顆。

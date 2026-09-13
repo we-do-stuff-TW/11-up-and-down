@@ -116,9 +116,20 @@ try {
   await shot("end_podium.png");
 
   /* ── 再來一局：直接發牌，不經過房間 ── */
-  /* 右上角跟頁腳的「看計分表」走同一條路 */
+  /* 右上角跟頁腳的「看計分表」走同一條路。桌面寬：計分表本來就在右欄，關掉那一頁就看得到 */
   await b.eval(`document.getElementById("endClose2").click(); return 1`);
   ok(await b.eval(`return document.getElementById("endOv").hidden`), "頁腳的看計分表要關掉那一頁");
+  ok(await b.eval(`return !document.body.classList.contains("score-open")`), "桌面寬不該把計分表浮層彈出來");
+  /* 手機寬：計分表收在頂列那顆「計分」後面，「看計分表」要真的把它打開 */
+  await b.cdp("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await new Promise((r) => setTimeout(r, 300));
+  await b.eval(`document.getElementById("btnFinal").click(); return 1`);
+  await b.until(`!document.getElementById("endOv").hidden`, "手機寬再打開收桌");
+  await b.eval(`document.getElementById("endClose").click(); return 1`);
+  ok(await b.eval(`return document.body.classList.contains("score-open")`), "手機寬按看計分表要真的打開計分表");
+  await b.eval(`document.getElementById("scoreClose").click(); return 1`);
+  await b.cdp("Emulation.clearDeviceMetricsOverride");
+  await new Promise((r) => setTimeout(r, 300));
   await b.eval(`document.getElementById("btnFinal").click(); return 1`);
   await b.until(`!document.getElementById("endOv").hidden`, "最終結果再打開");
   await b.eval(`document.getElementById("endAgain").click(); return 1`);
