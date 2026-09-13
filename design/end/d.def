@@ -1,0 +1,55 @@
+/* TITLE: D 木階 · 實木的三階 */
+/* ── D 案：木頭做的講台。三塊實木從地板升起，頂面被頂燈打亮，名次刻在正面 ──────
+   跟立體牌桌那間書房同一種胡桃木（_base.css 的 --wood）。石板灰的紙上放三塊真的東西，
+   不是線稿——這一案是「物件」，A 案是「圖」。第一階的頂面鑲一條銅線，數字是銅的。 */
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:14px;height:300px;padding-top:110px}
+.step{position:relative;flex:1;max-width:176px;display:flex;flex-direction:column;align-items:center}
+.step .who{margin-bottom:10px}
+.step .well{width:100%;height:var(--h);overflow:hidden;display:flex;align-items:flex-end}
+.block{position:relative;width:100%;height:100%;
+  transform:translateY(100%);animation:rise .56s var(--e-out) forwards;animation-delay:var(--d);
+  /* 正面：直紋的胡桃木；頂面：亮一階的一條，像被頂燈照到 */
+  background:
+    linear-gradient(180deg,oklch(.40 .032 62) 0,oklch(.345 .028 62) 16px,transparent 16px),
+    repeating-linear-gradient(90deg,oklch(1 0 0/.028) 0 1px,transparent 1px 7px,oklch(1 0 0/.014) 7px 8px,transparent 8px 13px),
+    linear-gradient(180deg,var(--wood) 16px,oklch(.225 .021 62) 60%,var(--wood-2));
+  box-shadow:inset 0 1px 0 oklch(1 0 0/.18),inset 0 17px 0 -16px oklch(0 0 0/.45),
+    inset 1px 0 0 oklch(1 0 0/.05),inset -1px 0 0 oklch(0 0 0/.35);
+  border-radius:3px 3px 0 0}
+@keyframes rise{to{transform:none}}
+.block .num{position:absolute;left:0;right:0;top:34px;text-align:center;
+  font-family:"Bodoni Moda",Georgia,serif;font-weight:700;font-size:36px;line-height:1;
+  font-variation-settings:"opsz" 6;color:oklch(.58 .03 62);
+  text-shadow:0 1px 0 oklch(1 0 0/.10),0 -1px 0 oklch(0 0 0/.55)}   /* 刻進木頭裡 */
+.step.p1{--h:156px}.step.p2{--h:112px}.step.p3{--h:84px}
+.step.p1 .block{box-shadow:inset 0 1px 0 var(--brass),inset 0 2px 0 oklch(.760 .112 84/.6),inset 0 17px 0 -16px oklch(0 0 0/.45),
+  inset 1px 0 0 oklch(1 0 0/.05),inset -1px 0 0 oklch(0 0 0/.35),0 -20px 50px oklch(.845 .128 84/.10)}
+.step.p1 .num{color:var(--brass);font-size:46px;text-shadow:0 1px 0 oklch(1 0 0/.14),0 -1px 0 oklch(0 0 0/.6)}
+/* 地板：木階底下一道淡影，讓它真的「放在」紙上 */
+.floor{width:min(560px,100%);height:1px;background:var(--hair);margin:0 auto;position:relative}
+.floor::before{content:"";position:absolute;left:8%;right:8%;top:1px;height:26px;
+  background:radial-gradient(60% 100% at 50% 0,oklch(0 0 0/.35),transparent 70%)}
+@media (prefers-reduced-motion:reduce){.block{transform:none;animation:fadeIn .2s ease both}}
+@media (max-width:760px){
+  .podium{height:236px;padding-top:96px;gap:8px}
+  .step.p1{--h:122px}.step.p2{--h:88px}.step.p3{--h:66px}
+  .block .num{font-size:28px;top:28px}.step.p1 .num{font-size:36px}
+}
+/*==HTML==*/
+    <div class="stage">
+      <div class="podium" id="podium"></div>
+      <div class="floor"></div>
+    </div>
+<script>
+(function(){
+  const who = function(t){ return '<div class="who" style="--dw:' + t.dw + '"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div><span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span><span class="sc">' + sc(t.sc) + '</span></div>'; };
+  const T = END.tiers, order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  /* 三、二、一升起；人等台階到位再亮 */
+  const D = {1:".26s", 2:".12s", 3:"0s"};
+  document.getElementById("podium").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1; t.dw = "calc(" + D[k] + " + .32s)";
+    return '<div class="step p' + k + '" style="--d:' + D[k] + '">' + who(t) +
+      '<div class="well"><div class="block"><span class="num">' + t.pos + '</span></div></div></div>';
+  }).join("");
+})();
+</script>

@@ -1,0 +1,51 @@
+/* TITLE: F 聚光燈 · 三道光落在地上 */
+/* ── F 案：沒有台子。三盞頂燈打下來，人站在光裡，名次寫在地上那灘光裡 ─────────────
+   石板灰的紙上什麼都不放，只有光——跟書房那盞頂燈、那個壁爐是同一種東西。
+   冠軍那盞最寬最亮、最後亮；二三名的燈窄一點、暗一階。名次靠亮度跟位置讀，不靠高度。 */
+.lights{display:flex;align-items:flex-end;justify-content:center;height:330px}
+.spot{position:relative;width:196px;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.spot .cone{position:absolute;left:50%;top:0;bottom:0;translate:-50% 0;width:var(--w);
+  background:linear-gradient(180deg,oklch(.845 .128 84/0) 0%,oklch(.845 .128 84/calc(var(--a) * .35)) 45%,oklch(.845 .128 84/var(--a)) 100%);
+  clip-path:polygon(46% 0,54% 0,100% 100%,0 100%);
+  opacity:0;animation:lampOn .5s var(--e-out) forwards;animation-delay:var(--d)}
+/* 燈打開：亮、略暗一下、再穩住——真的燈泡是這樣的 */
+@keyframes lampOn{0%{opacity:0}55%{opacity:1}72%{opacity:.78}100%{opacity:1}}
+.spot .pool{position:absolute;left:50%;bottom:-16px;translate:-50% 0;width:calc(var(--w) * 1.2);height:44px;border-radius:50%;
+  background:radial-gradient(closest-side,oklch(.845 .128 84/calc(var(--a) * 1.8)),oklch(.845 .128 84/calc(var(--a) * .5)) 55%,transparent);
+  opacity:0;animation:lampOn .5s var(--e-out) forwards;animation-delay:var(--d)}
+.spot .who{position:relative;padding-bottom:34px}
+.spot .who .nm{color:var(--ink)}
+.spot .num{position:absolute;left:50%;bottom:-6px;translate:-50% 0;
+  font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:26px;line-height:1;font-variation-settings:"opsz" 6;
+  color:oklch(.845 .128 84/.55);opacity:0;animation:fadeIn .4s var(--e-out) forwards;animation-delay:calc(var(--d) + .3s)}
+@keyframes fadeIn{to{opacity:1}}
+.spot.p1{--w:250px;--a:.30}.spot.p2{--w:170px;--a:.15}.spot.p3{--w:150px;--a:.11}
+.spot.p1{width:250px}
+.spot.p1 .num{color:var(--brass);font-size:34px}
+.spot.p2 .who,.spot.p3 .who{padding-bottom:30px}
+.floor{width:min(560px,100%);height:1px;background:var(--hair);margin:0 auto}
+@media (prefers-reduced-motion:reduce){.spot .cone,.spot .pool{animation:fadeIn .2s ease forwards}}
+@media (max-width:760px){
+  .lights{height:270px}
+  .spot{width:112px}.spot.p1{width:136px}
+  .spot.p1{--w:150px}.spot.p2{--w:106px}.spot.p3{--w:96px}
+  .spot .num{font-size:22px}.spot.p1 .num{font-size:28px}
+}
+/*==HTML==*/
+    <div class="stage">
+      <div class="lights" id="lights"></div>
+      <div class="floor"></div>
+    </div>
+<script>
+(function(){
+  const who = function(t){ return '<div class="who" style="--dw:' + t.dw + '"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div><span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span><span class="sc">' + sc(t.sc) + '</span></div>'; };
+  const T = END.tiers, order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  /* 三、二、一開燈；人在燈亮了之後才出現在光裡 */
+  const D = {1:".46s", 2:".2s", 3:"0s"};
+  document.getElementById("lights").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1; t.dw = "calc(" + D[k] + " + .28s)";
+    return '<div class="spot p' + k + '" style="--d:' + D[k] + '"><div class="cone"></div><div class="pool"></div>' +
+      who(t) + '<span class="num">' + t.pos + '</span></div>';
+  }).join("");
+})();
+</script>

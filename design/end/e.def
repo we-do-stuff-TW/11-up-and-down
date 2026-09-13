@@ -1,0 +1,75 @@
+/* TITLE: E 牌疊 · 一張一張發上去 */
+/* ── E 案：講台是疊起來的牌。發牌一輪一輪繞，第一名那疊一直收到最後，越疊越高 ──────
+   高度還是名次，但台階是這個遊戲自己的東西：牌。底下都是牌背（線上那副的深紅格紋），
+   最上面一張翻開，寫的是名次。人站在牌疊上。 */
+.stacks{display:flex;align-items:flex-end;justify-content:center;gap:26px;height:310px;padding-top:100px}
+.stack{position:relative;width:110px;flex:none;display:flex;flex-direction:column;align-items:center}
+.stack .who{margin-bottom:12px}
+.pile{position:relative;width:110px;height:calc(154px + var(--n) * 7px)}
+.cd{position:absolute;left:0;bottom:calc(var(--i) * 7px);width:110px;height:154px;border-radius:9px;
+  rotate:var(--rz);opacity:0;transform:translate(70px,-110px) rotate(9deg);
+  animation:deal .46s var(--e-out) forwards;animation-delay:var(--d);
+  background:
+    repeating-linear-gradient(45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
+    repeating-linear-gradient(-45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
+    linear-gradient(160deg in oklab,#8E2228,#5E1418);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.35),inset 0 0 0 5px #F1E9D6,inset 0 0 0 6px rgba(0,0,0,.18),
+    0 1px 0 rgba(0,0,0,.55),0 3px 6px rgba(0,0,0,.35)}
+@keyframes deal{to{opacity:1;transform:none}}
+/* 最上面那張：翻開的，米色的紙，中間是名次 */
+.cd.face{display:grid;place-items:center;
+  background:linear-gradient(158deg in oklab,#FDFAF3,var(--stock) 46%,var(--stock-2));color:var(--stock-ink);
+  box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),0 6px 14px rgba(0,0,0,.35)}
+.cd.face::before{content:"";position:absolute;inset:5px;border-radius:6px;border:.5px solid var(--foil);opacity:.45}
+.cd.face .num{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:54px;line-height:1;
+  font-variation-settings:"opsz" 6;color:var(--stock-ink-2)}
+.cd.face .ix{position:absolute;left:9px;top:7px;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:16px;
+  font-variation-settings:"opsz" 6;color:var(--stock-ink-3)}
+.cd.face .ix.b{left:auto;right:9px;top:auto;bottom:7px;rotate:180deg}
+.stack.p1 .cd.face .num,.stack.p1 .cd.face .ix{color:var(--foil)}
+.stack.p1 .cd.face{box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),
+  0 6px 14px rgba(0,0,0,.35),0 0 60px oklch(.845 .128 84/.14)}
+.floor{width:min(560px,100%);height:1px;background:var(--hair);margin:0 auto}
+@media (prefers-reduced-motion:reduce){.cd{transform:none;animation:fadeIn .2s ease both}}
+@media (max-width:760px){
+  .stacks{gap:12px;height:250px;padding-top:88px}
+  .stack,.pile,.cd{width:88px}
+  .pile{height:calc(123px + var(--n) * 6px)}
+  .cd{height:123px;bottom:calc(var(--i) * 6px)}
+  .cd.face .num{font-size:42px}
+}
+/*==HTML==*/
+    <div class="stage">
+      <div class="stacks" id="stacks"></div>
+      <div class="floor"></div>
+    </div>
+<script>
+(function(){
+  const who = function(t){ return '<div class="who" style="--dw:' + t.dw + '"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div><span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span><span class="sc">' + sc(t.sc) + '</span></div>'; };
+  const T = END.tiers, order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  /* 幾張牌：第一名 7、第二 4、第三 2。發法是一輪一輪繞（三、二、一、三、二、一…），
+     誰的疊滿了就跳過——所以第一名那疊最後還在收牌，高度是看著長出來的 */
+  const N = {1:7, 2:4, 3:2}, sizes = T.map(function(t, i){ return N[i + 1] || 2; });
+  const delays = T.map(function(){ return []; });
+  let clock = 0, more = true;
+  while(more){
+    more = false;
+    for(let i = T.length - 1; i >= 0; i--){
+      if(delays[i].length < sizes[i]){ delays[i].push(clock); clock += 75; more = true; }
+    }
+  }
+  /* 每張牌歪一點點：一個固定的小序列，不是亂數——重播要長得一樣 */
+  const wob = [-1.6, 1.1, -.7, 1.8, -1.2, .6, -1.9, 1.4];
+  document.getElementById("stacks").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1, n = sizes[k - 1], ds = delays[k - 1];
+    t.dw = ((ds[ds.length - 1] + 380) / 1000).toFixed(2) + "s";
+    let cards = "";
+    for(let i = 0; i < n; i++){
+      const last = i === n - 1;
+      cards += '<div class="cd' + (last ? " face" : "") + '" style="--i:' + i + ';--d:' + (ds[i] / 1000).toFixed(2) + 's;--rz:' + wob[i % wob.length] + 'deg">' +
+        (last ? '<span class="ix">' + t.pos + '</span><span class="ix b">' + t.pos + '</span><span class="num">' + t.pos + '</span>' : "") + '</div>';
+    }
+    return '<div class="stack p' + k + '">' + who(t) + '<div class="pile" style="--n:' + (n - 1) + '">' + cards + '</div></div>';
+  }).join("");
+})();
+</script>

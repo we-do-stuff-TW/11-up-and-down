@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>B 翻牌 · 一張一張揭曉</title>
+<title>E 牌疊 · 一張一張發上去</title>
 <meta name="theme-color" content="#16332c">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -196,62 +196,45 @@ body::before{
   .who .nm{font-size:13px}.p1 .who .nm{font-size:15px}
 }
 
-/* TITLE: B 翻牌 · 一張一張揭曉 */
-/* ── B 案：翻牌。三張牌背朝上放在桌上，第三名先翻、再第二、最後第一 ──────────
-   翻牌是這個遊戲自己的手勢：叫墩翻王牌、收桌翻名次。牌面是米色的紙（跟房號那四張牌位同一種），
-   角落的索引寫的不是點數是名次，中間站著那個人。第一名那張大一號、放中間、最後翻。 */
-.hand{display:flex;align-items:flex-end;justify-content:center;gap:16px;perspective:1100px}
-.pc{position:relative;width:118px;aspect-ratio:5/7;flex:none;
-  transform-style:preserve-3d;transform:rotateY(180deg);
-  animation:flip .64s var(--e-out) forwards;animation-delay:var(--d)}
-.pc.p1{width:150px;margin-bottom:22px}
-@keyframes flip{to{transform:none}}
-.pc>div{position:absolute;inset:0;border-radius:11px;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-/* 牌背：跟線上那副一樣是深紅的格紋，中間一個 11 的菱形 */
-.pc .back{transform:rotateY(180deg);
+/* TITLE: E 牌疊 · 一張一張發上去 */
+/* ── E 案：講台是疊起來的牌。發牌一輪一輪繞，第一名那疊一直收到最後，越疊越高 ──────
+   高度還是名次，但台階是這個遊戲自己的東西：牌。底下都是牌背（線上那副的深紅格紋），
+   最上面一張翻開，寫的是名次。人站在牌疊上。 */
+.stacks{display:flex;align-items:flex-end;justify-content:center;gap:26px;height:310px;padding-top:100px}
+.stack{position:relative;width:110px;flex:none;display:flex;flex-direction:column;align-items:center}
+.stack .who{margin-bottom:12px}
+.pile{position:relative;width:110px;height:calc(154px + var(--n) * 7px)}
+.cd{position:absolute;left:0;bottom:calc(var(--i) * 7px);width:110px;height:154px;border-radius:9px;
+  rotate:var(--rz);opacity:0;transform:translate(70px,-110px) rotate(9deg);
+  animation:deal .46s var(--e-out) forwards;animation-delay:var(--d);
   background:
     repeating-linear-gradient(45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
     repeating-linear-gradient(-45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
     linear-gradient(160deg in oklab,#8E2228,#5E1418);
-  box-shadow:inset 0 0 0 1px rgba(0,0,0,.35),inset 0 0 0 5px #F1E9D6,inset 0 0 0 6px rgba(0,0,0,.18),var(--sh-1)}
-.pc .back::after{content:"11";position:absolute;left:50%;top:50%;translate:-50% -50%;
-  width:40px;height:40px;rotate:45deg;display:grid;place-items:center;
-  border:1px solid oklch(1 0 0/.5);color:#F1E9D6;font-family:"Bodoni Moda",Georgia,serif;font-weight:700;font-size:15px}
-/* 牌面：米色的紙，索引是名次 */
-.pc .face{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
-  background:linear-gradient(158deg in oklab,#FDFAF3,var(--stock) 46%,var(--stock-2));
-  color:var(--stock-ink);
-  box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),var(--sh-2)}
-.pc .face::before{content:"";position:absolute;inset:5px;border-radius:7px;border:.5px solid var(--foil);opacity:.45}
-.pc .ix{position:absolute;left:9px;top:7px;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;
-  font-size:22px;line-height:1;font-variation-settings:"opsz" 6;color:var(--stock-ink-2)}
-.pc .ix.b{left:auto;right:9px;top:auto;bottom:7px;rotate:180deg}
-.pc .faces{display:flex}
-.pc .faces>*{width:40px;height:40px;font-size:14px;color:var(--stock-ink);
-  background:var(--stock-3);box-shadow:0 0 0 1px var(--stock-hair)}
-.pc .faces>*+*{margin-left:-10px}
-.pc .nm{font-size:13px;font-weight:600;line-height:1.25;max-width:88%;text-wrap:balance;letter-spacing:.01em}
-.pc .sc{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;
-  font-size:14px;color:var(--stock-ink-2)}
-.pc.p1 .ix{color:var(--foil);font-size:28px}
-.pc.p1 .faces>*{width:54px;height:54px;font-size:18px}
-.pc.p1 .nm{font-size:16px}
-.pc.p1 .sc{color:var(--foil);font-size:16px}
-.pc.p1 .face{box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),var(--sh-2),
-  0 0 60px oklch(.845 .128 84/.16)}
-/* 桌上那三張牌的影子：一條線，牌放在它上面 */
-.line{width:min(560px,100%);height:1px;background:var(--hair);margin:26px auto 0}
-
-@media (prefers-reduced-motion:reduce){
-  .pc{transform:none;animation:fadeIn .2s ease both}
-  .pc .back{display:none}
-}
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.35),inset 0 0 0 5px #F1E9D6,inset 0 0 0 6px rgba(0,0,0,.18),
+    0 1px 0 rgba(0,0,0,.55),0 3px 6px rgba(0,0,0,.35)}
+@keyframes deal{to{opacity:1;transform:none}}
+/* 最上面那張：翻開的，米色的紙，中間是名次 */
+.cd.face{display:grid;place-items:center;
+  background:linear-gradient(158deg in oklab,#FDFAF3,var(--stock) 46%,var(--stock-2));color:var(--stock-ink);
+  box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),0 6px 14px rgba(0,0,0,.35)}
+.cd.face::before{content:"";position:absolute;inset:5px;border-radius:6px;border:.5px solid var(--foil);opacity:.45}
+.cd.face .num{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:54px;line-height:1;
+  font-variation-settings:"opsz" 6;color:var(--stock-ink-2)}
+.cd.face .ix{position:absolute;left:9px;top:7px;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:16px;
+  font-variation-settings:"opsz" 6;color:var(--stock-ink-3)}
+.cd.face .ix.b{left:auto;right:9px;top:auto;bottom:7px;rotate:180deg}
+.stack.p1 .cd.face .num,.stack.p1 .cd.face .ix{color:var(--foil)}
+.stack.p1 .cd.face{box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),
+  0 6px 14px rgba(0,0,0,.35),0 0 60px oklch(.845 .128 84/.14)}
+.floor{width:min(560px,100%);height:1px;background:var(--hair);margin:0 auto}
+@media (prefers-reduced-motion:reduce){.cd{transform:none;animation:fadeIn .2s ease both}}
 @media (max-width:760px){
-  .hand{gap:10px}
-  .pc{width:96px}.pc.p1{width:120px;margin-bottom:16px}
-  .pc .faces>*{width:34px;height:34px;font-size:12px}.pc.p1 .faces>*{width:44px;height:44px;font-size:15px}
-  .pc .nm{font-size:12px}.pc.p1 .nm{font-size:14px}
-  .pc .ix{font-size:18px}.pc.p1 .ix{font-size:23px}
+  .stacks{gap:12px;height:250px;padding-top:88px}
+  .stack,.pile,.cd{width:88px}
+  .pile{height:calc(123px + var(--n) * 6px)}
+  .cd{height:123px;bottom:calc(var(--i) * 6px)}
+  .cd.face .num{font-size:42px}
 }
 
 </style>
@@ -305,23 +288,36 @@ body::before{
 </script>
 
     <div class="stage">
-      <div class="hand" id="hand"></div>
-      <div class="line"></div>
+      <div class="stacks" id="stacks"></div>
+      <div class="floor"></div>
     </div>
 <script>
 (function(){
-  const T = END.tiers;
-  const order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
-  /* 第三張先翻，冠軍最後：每張差 .28 秒，翻完前一張的一半再翻下一張 */
-  const delay = function(t){ return {1:".62s", 2:".32s"}[T.indexOf(t) + 1] || ".05s"; };
-  document.getElementById("hand").innerHTML = order.map(function(t){
-    const k = T.indexOf(t) + 1;
-    return '<div class="pc p' + k + '" style="--d:' + delay(t) + '">' +
-      '<div class="back"></div>' +
-      '<div class="face"><span class="ix">' + t.pos + '</span><span class="ix b">' + t.pos + '</span>' +
-      '<div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div>' +
-      '<span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span>' +
-      '<span class="sc">' + sc(t.sc) + '</span></div></div>';
+  const who = function(t){ return '<div class="who" style="--dw:' + t.dw + '"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div><span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span><span class="sc">' + sc(t.sc) + '</span></div>'; };
+  const T = END.tiers, order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  /* 幾張牌：第一名 7、第二 4、第三 2。發法是一輪一輪繞（三、二、一、三、二、一…），
+     誰的疊滿了就跳過——所以第一名那疊最後還在收牌，高度是看著長出來的 */
+  const N = {1:7, 2:4, 3:2}, sizes = T.map(function(t, i){ return N[i + 1] || 2; });
+  const delays = T.map(function(){ return []; });
+  let clock = 0, more = true;
+  while(more){
+    more = false;
+    for(let i = T.length - 1; i >= 0; i--){
+      if(delays[i].length < sizes[i]){ delays[i].push(clock); clock += 75; more = true; }
+    }
+  }
+  /* 每張牌歪一點點：一個固定的小序列，不是亂數——重播要長得一樣 */
+  const wob = [-1.6, 1.1, -.7, 1.8, -1.2, .6, -1.9, 1.4];
+  document.getElementById("stacks").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1, n = sizes[k - 1], ds = delays[k - 1];
+    t.dw = ((ds[ds.length - 1] + 380) / 1000).toFixed(2) + "s";
+    let cards = "";
+    for(let i = 0; i < n; i++){
+      const last = i === n - 1;
+      cards += '<div class="cd' + (last ? " face" : "") + '" style="--i:' + i + ';--d:' + (ds[i] / 1000).toFixed(2) + 's;--rz:' + wob[i % wob.length] + 'deg">' +
+        (last ? '<span class="ix">' + t.pos + '</span><span class="ix b">' + t.pos + '</span><span class="num">' + t.pos + '</span>' : "") + '</div>';
+    }
+    return '<div class="stack p' + k + '">' + who(t) + '<div class="pile" style="--n:' + (n - 1) + '">' + cards + '</div></div>';
   }).join("");
 })();
 </script>
@@ -351,7 +347,7 @@ body::before{
   /* 原型切換器 */
   if(q.has("nodev")) $("dev").hidden = true;
   document.querySelectorAll("#dev a").forEach(function(a){
-    a.setAttribute("aria-current", a.dataset.v === "B" ? "page" : "false");
+    a.setAttribute("aria-current", a.dataset.v === "E" ? "page" : "false");
     a.href = a.getAttribute("href") + location.search;
   });
   const flip = function(k){
