@@ -910,27 +910,92 @@ body.in-lobby .app{display:none}
 .rules .note{padding:11px 0;border-top:1px solid var(--hair-2);border-bottom:1px solid var(--hair-2);margin:14px 0;color:var(--ink-3)}
 .rules strong{color:var(--ink);font-weight:600}
 
-/* 收桌只講前三名：第一名整個亮起來，二三名是它的註腳。剩下的人在計分表裡，
-   要看按「看計分表」——收桌那一刻要記住的是誰贏了，不是一張八列的表。 */
-.podium{list-style:none;margin:16px 0 14px;padding:0}
-.podium li{display:flex;align-items:baseline;gap:16px;padding:11px 2px;
-  border-bottom:1px solid var(--hair-2)}
-.podium li:first-child{border-top:1px solid var(--hair-2)}
-.podium .pl{flex:none;width:32px;font-family:"Bodoni Moda",Georgia,serif;font-size:23px;
-  font-weight:600;line-height:1;color:var(--ink-3);font-variant-numeric:tabular-nums}
-/* 一階可能站著好幾個同分的人，名字要排得下，所以讓它換行不要用刪節號吃掉 */
-.podium .pn{flex:1;min-width:0;overflow-wrap:anywhere;line-height:1.45;
-  font-size:15px;color:var(--ink)}
-.podium .pv{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
-  font-size:17px;font-weight:500;color:var(--ink-2)}
-.podium .p1{padding:16px 2px 17px}
-.podium .p1 .pl{font-size:40px;color:var(--brass)}
-.podium .p1 .pn{font-size:21px;font-weight:600;color:var(--brass);letter-spacing:.01em}
-.podium .p1 .pv{font-size:23px;color:var(--brass)}
+/* ================= 收桌 =================
+   打完那一頁。跟登入、大廳、開房、帳號／設定／規則同一張石板灰的紙（class 掛 .pg 拿它的地），
+   不是蓋在牌桌上的玻璃卡——牌桌是酒紅時收桌也不會跟著變色。
+   台上三疊牌：一輪一輪繞著發（三、二、一…），誰的疊滿了就跳過，第一名那疊最後還在收、越疊越高。
+   底下都是牌背（跟著當下那套牌面走），最上面一張翻開寫名次。三案與定案理由在 design/end/README.md。 */
+.end{--foil:#A9823C}
+.end .pg-top{padding-top:22px}
+.end-mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:16px 0 24px;overflow:auto;min-height:0}
+.end-cap{display:block;font-size:9.5px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:14px;animation:endIn .42s var(--e-out) both}
+.end-ask{font-family:"Bodoni Moda",Georgia,"Songti TC",serif;font-weight:600;
+  font-size:clamp(30px,4.6vw,44px);line-height:1.08;letter-spacing:-.008em;color:var(--ink);margin:0;
+  text-wrap:balance;animation:endIn .46s var(--e-out) both .05s}
+@keyframes endIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.stacks{display:flex;align-items:flex-end;justify-content:center;gap:26px;height:310px;padding-top:100px;margin-top:34px}
+.stack{position:relative;width:110px;flex:none;display:flex;flex-direction:column;align-items:center}
+/* 台上那個人：頭像、名字、分數。要等這一疊發完才亮 */
+.stack .who{display:flex;flex-direction:column;align-items:center;gap:7px;margin-bottom:12px;
+  opacity:0;transform:translateY(10px);animation:endIn .38s var(--e-out) forwards;animation-delay:var(--dw)}
+.stack .faces{display:flex}
+.stack .faces>*{width:44px;height:44px;border-radius:99px;object-fit:cover;flex:none;font-size:15px;
+  box-shadow:0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.3)}
+.stack .faces>*+*{margin-left:-11px}
+.stack .nm{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:.01em;line-height:1.3;max-width:170px;text-wrap:balance}
+.stack .sc{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink-2)}
+.stack.p1 .faces>*{width:56px;height:56px;font-size:19px}
+.stack.p1 .nm{font-size:17px}
+.stack.p1 .sc{color:var(--brass)}
+/* 牌疊：一張一張從右上角飛進來落定，每張歪一點點 */
+.pile{position:relative;width:110px;height:calc(154px + var(--n) * 7px)}
+.cd{position:absolute;left:0;bottom:calc(var(--i) * 7px);width:110px;height:154px;--cw:110px;--ch:154px;
+  rotate:var(--rz);opacity:0;transform:translate(70px,-110px) rotate(9deg);
+  animation:endDeal .46s var(--e-out) forwards;animation-delay:var(--d)}
+@keyframes endDeal{to{opacity:1;transform:none}}
+.cd .back{box-shadow:0 1px 0 rgba(0,0,0,.55),0 3px 6px rgba(0,0,0,.35)}
+/* 最上面那張：翻開的，這套牌面的紙，中間是名次 */
+.cd.face{display:grid;place-items:center;border-radius:calc(var(--cw) * .058);color:var(--card-ink);
+  background:linear-gradient(158deg in oklab,#FDFAF3,var(--card) 46%,var(--card-2));
+  box-shadow:inset 0 0 0 1px var(--card-line),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),0 6px 14px rgba(0,0,0,.35)}
+.cd.face::before{content:"";position:absolute;inset:5px;border-radius:6px;border:.5px solid var(--foil);opacity:.45}
+/* opsz 壓到 6（內文切法）：Bodoni 的展示切法在 40px 以下細筆會消失，1 變一根直棍、4 只剩豎筆 */
+.cd.face .num{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:54px;line-height:1;
+  font-variation-settings:"opsz" 6;color:rgba(26,23,20,.62)}
+.cd.face .ix{position:absolute;left:9px;top:7px;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:16px;
+  line-height:1;font-variation-settings:"opsz" 6;color:rgba(26,23,20,.40)}
+.cd.face .ix.b{left:auto;right:9px;top:auto;bottom:7px;rotate:180deg}
+.stack.p1 .cd.face .num,.stack.p1 .cd.face .ix{color:var(--foil)}
+.stack.p1 .cd.face{box-shadow:inset 0 0 0 1px var(--card-line),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),
+  0 6px 14px rgba(0,0,0,.35),0 0 60px oklch(.845 .128 84/.14)}
+.end-floor{width:min(560px,100%);height:1px;background:var(--hair)}
+
 /* 沒進前三名的話底下補一行自己的——收桌最想知道的還是「我第幾」 */
-.endmine{margin:0 0 16px;padding:0 2px;font-size:13px;color:var(--ink-3)}
-.endmine b{color:var(--ink-2);font-weight:500;font-family:"IBM Plex Mono",monospace}
-.endmsg{margin:0 0 10px;padding:0 2px;font-size:12.5px;color:var(--bad)}
+.end-mine{margin:22px 0 0;font-size:13px;color:var(--ink-3);animation:endIn .4s var(--e-out) both 1.3s}
+.end-mine b{color:var(--ink-2);font-weight:500;font-family:"IBM Plex Mono",monospace}
+.end-err{margin:14px 0 0;font-size:12.5px;color:var(--bad)}
+/* 整頁只有一顆銅色按鈕；返回房間／看計分表是大廳頁腳那種小字 */
+.end-acts{display:flex;flex-direction:column;align-items:center;gap:22px;margin-top:38px;
+  animation:endIn .46s var(--e-out) both 1.45s}
+.end-acts .lb-enter{padding:14px 40px}
+.end-ft{display:flex;gap:12px;align-items:center;color:var(--ink-3);font-size:12px}
+.end-ft button{padding:6px 2px;color:inherit;transition:color .18s}
+.end-ft button:hover{color:var(--ink)}
+.end-ft i{width:1px;height:10px;background:var(--hair);display:block}
+
+/* 動得少一點，不是不動：飛進來拿掉，只留淡入；分數與名次一開始就在 */
+@media (prefers-reduced-motion:reduce){
+  .end-cap,.end-ask,.end-mine,.end-acts{animation:endFade .2s ease both}
+  .cd{transform:none;animation:endFade .2s ease both}
+  .stack .who{transform:none;animation:endFade .2s ease both;animation-delay:.1s}
+  @keyframes endFade{from{opacity:0}to{opacity:1}}
+}
+@media (max-width:760px){
+  .end .pg-top{padding-top:14px}
+  .end-mid{padding-top:8px}
+  .stacks{gap:12px;height:250px;padding-top:88px;margin-top:26px}
+  .stack,.pile,.cd{width:88px}
+  .cd{--cw:88px;--ch:123px;height:123px;bottom:calc(var(--i) * 6px)}
+  .pile{height:calc(123px + var(--n) * 6px)}
+  .cd.face .num{font-size:42px}
+  .stack .faces>*{width:38px;height:38px;font-size:13px}
+  .stack.p1 .faces>*{width:48px;height:48px;font-size:16px}
+  .stack .nm{font-size:13px}.stack.p1 .nm{font-size:15px}
+  .end-acts{margin-top:30px;gap:18px}
+}
 
 /* ================= 連線 ================= */
 .code{font-family:"IBM Plex Mono",monospace;font-weight:500;letter-spacing:.2em;color:var(--brass)}
@@ -1774,19 +1839,28 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   </div>
 </div>
 
-<div class="overlay" id="endOv" hidden>
-  <div class="sheet">
-    <h2>牌局結束</h2>
-    <p class="sub" id="endSub"></p>
-    <ol class="podium" id="endTop"></ol>
-    <p class="endmine" id="endMine" hidden></p>
-    <p class="endmsg" id="endErr" hidden></p>
-    <div class="sheet-actions">
-      <button class="btn" id="endClose">看計分表</button>
-      <button class="btn" id="endBack">返回房間</button>
-      <button class="btn primary" id="endAgain">再來一局</button>
-    </div>
+<!-- ================= 收桌 =================
+     打完那一頁。掛 .pg 拿石板灰的地（見 .pg 那段），內容是誰贏了那一句、台上三疊牌、一顆銅色按鈕。
+     再來一局／返回房間／看計分表三條路的邏輯沒動，只換皮；填內容的是 showFinal()。 -->
+<div class="pg end" id="endOv" hidden>
+  <div class="pg-col">
+    <header class="pg-top">
+      <div class="pg-mk"><b>11</b><u>UP &amp; DOWN</u></div>
+      <button class="pg-x" id="endClose">看計分表</button>
+    </header>
   </div>
+  <main class="end-mid">
+    <span class="end-cap" id="endSub"></span>
+    <h1 class="end-ask" id="endAsk"></h1>
+    <div class="stacks" id="endStacks"></div>
+    <div class="end-floor"></div>
+    <p class="end-mine" id="endMine" hidden></p>
+    <p class="end-err" id="endErr" hidden></p>
+    <div class="end-acts">
+      <button class="lb-enter" id="endAgain">再來一局</button>
+      <div class="end-ft"><button id="endBack">返回房間</button><i></i><button id="endClose2">看計分表</button></div>
+    </div>
+  </main>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
@@ -2569,7 +2643,7 @@ SFX.frame = function(G, me, best, o){
    用事件委派，不去改任何一個 onclick——那些 handler 是別人的地盤。 */
 var OPENERS = {btnRules:1, btnPref:1, btnRoom:1, btnFinal:1, btnLobby:1,
                btnMe:1, rmMe:1, lbMe:1, lbRules:1, lbPref:1};
-var CLOSERS = {pgX:1, endClose:1, endBack:1, scoreClose:1};
+var CLOSERS = {pgX:1, endClose:1, endClose2:1, endBack:1, scoreClose:1};
 document.addEventListener("click", function(e){
   var el = e.target.closest ? e.target.closest("button, .opt, .bidbtn, [data-net]") : null;
   if(!el) return;
@@ -5070,17 +5144,48 @@ function showFinal(){
   const board = [];
   rank.forEach(function(e){
     const step = board.filter(function(r){ return r.pos === e.pos; })[0];
-    if(step) step.who.push(e.name);
-    else if(board.length < 3) board.push({pos:e.pos, sc:e.sc, who:[e.name]});
+    if(step) step.who.push(e);
+    else if(board.length < 3) board.push({pos:e.pos, sc:e.sc, who:[e]});
   });
-  /* 單人局不進戰績——收桌這一刻是唯一還說得上這句話的地方 */
-  $("endSub").textContent = G.log.length + " 局打完" + (MODE === "net" ? "" : " · 對 AI，不記戰績");
-  setHTML($("endTop"), board.map(function(r){
-    return '<li class="' + (r.pos === 1 ? "p1" : "") + '">' +
-      '<span class="pl">' + r.pos + '</span>' +
-      '<span class="pn">' + r.who.join("、") + '</span>' +
-      '<span class="pv">' + (r.sc > 0 ? "+" : "") + r.sc + '</span></li>';
+  /* 標題寫的是誰贏了，不是「牌局結束」四個字；單人局不進戰績——收桌這一刻是唯一還說得上這句話的地方 */
+  $("endSub").textContent = "牌局結束 · " + G.log.length + " 局" +
+    (MODE === "net" ? (NET.code ? " · 房號 " + NET.code : "") : " · 對 AI，不記戰績");
+  const nick = function(e){ return e.i === me ? "你" : (esc(G.seats[e.i].name) || ("座位 " + (e.i+1))); };
+  const first = board[0];
+  $("endAsk").textContent = !first ? "牌局結束"
+    : first.who.length > 1 ? first.who.map(nick).join("、") + " 平手"
+    : first.who[0].i === me ? "你贏了這一桌" : nick(first.who[0]) + " 贏了這一桌";
+
+  /* 台上三疊牌：第一名 7 張、第二 4、第三 2。發法是一輪一輪繞（三、二、一、三、二、一…），
+     誰的疊滿了就跳過——所以第一名那疊最後還在收牌，高度是看著長出來的。排法 2・1・3。 */
+  const SIZE = [7, 4, 2], STEP = 75, delays = board.map(function(){ return []; });
+  let clock = 0, more = true;
+  while(more){
+    more = false;
+    for(let k = board.length - 1; k >= 0; k--)
+      if(delays[k].length < SIZE[k]){ delays[k].push(clock); clock += STEP; more = true; }
+  }
+  const wob = [-1.6, 1.1, -.7, 1.8, -1.2, .6, -1.9];   /* 每張歪一點點：固定序列，重播長得一樣 */
+  const order = board.length >= 3 ? [board[1], board[0], board[2]] : board;
+  setHTML($("endStacks"), order.map(function(r){
+    const k = board.indexOf(r), ds = delays[k], cnt = SIZE[k];
+    let cards = "";
+    for(let i = 0; i < cnt; i++){
+      const top = i === cnt - 1;
+      cards += '<div class="cd' + (top ? " face" : "") + '" style="--i:' + i + ';--d:' + (ds[i] / 1000).toFixed(3) +
+        's;--rz:' + wob[i] + 'deg">' +
+        (top ? '<span class="ix">' + r.pos + '</span><span class="ix b">' + r.pos + '</span><span class="num">' + r.pos + '</span>'
+             : '<div class="back"></div>') + '</div>';
+    }
+    return '<div class="stack p' + (k + 1) + '">' +
+      '<div class="who" style="--dw:' + ((ds[cnt - 1] + 380) / 1000).toFixed(3) + 's"><div class="faces">' +
+        r.who.map(function(e){ const s = G.seats[e.i]; return roomFace(e.i === me ? "你" : s.name, s.kind === "human" && s.av); }).join("") +
+      '</div><span class="nm">' + r.who.map(nick).join("、") + '</span>' +
+      '<span class="sc">' + (r.sc > 0 ? "+" : "") + r.sc + '</span></div>' +
+      '<div class="pile" style="--n:' + (cnt - 1) + '">' + cards + '</div></div>';
   }).join(""));
+  /* 發牌的聲音跟畫面同一個節奏：幾張牌、發多久 */
+  if(window.SFX) SFX.deal(clock / STEP, clock / 1000, 0.05);
   const mine = me >= 0 ? rank.filter(function(e){ return e.i === me; })[0] : null;
   const outside = !!mine && !board.some(function(r){ return r.pos === mine.pos; });
   $("endMine").hidden = !outside;
@@ -5190,7 +5295,7 @@ $("btnSignOut").onclick = async function(){
   gotoLogin(true);
 };
 $("btnPref").onclick = function(){ openPg("pref"); };
-$("endClose").onclick = function(){ $("endOv").hidden = true; };
+$("endClose").onclick = $("endClose2").onclick = function(){ $("endOv").hidden = true; };
 /* 再來一局＝同一桌、同一批人、同一份規則，直接發牌，不經過房間那一站。
    連線局是兩趟：again 把房間退回等待狀態，start 才發牌——伺服器沒有「重開一場」
    這個動作，硬要加一個就得把兩邊的狀態機都改，這裡走現成的那兩顆。

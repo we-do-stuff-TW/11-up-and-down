@@ -3,7 +3,7 @@
 // 跑法：deno run -A scripts/end_test.ts
 //
 // ui_test 測「點下去會出得了牌嗎」，這一支測一場牌的兩個出口：
-//   · 打完：台上站前三名（同分同名次）、自己沒上台要補一行、三顆按鈕在該在的位置
+//   · 打完：台上三疊牌站前三名（同分同名次）、自己沒上台要補一行、三顆按鈕在該在的位置
 //   · 再來一局：同一桌同一批人直接發牌，不經過房間，分數歸零
 //   · 離開遊戲：設定頁最下面那顆要按兩下才走，走完回到大廳、桌子退回空桌
 // 開的是真的牌桌（無頭 Chrome），只插 _browser.ts 那兩個登入接縫。
@@ -73,32 +73,39 @@ try {
   await b.until(`UD.G.phase !== "lobby"`, "開打");
   await playOut();
 
-  /* ── 收桌：台上只有前三名 ── */
-  await b.until(`!document.getElementById("endOv").hidden`, "收桌浮層");
-  const end = await b.eval<{ rows: number; first: string; buttons: string[]; mine: string; sub: string }>(`
-    const li = [...document.querySelectorAll("#endTop li")];
+  /* ── 收桌：台上三疊牌，只有前三名 ── */
+  await b.until(`!document.getElementById("endOv").hidden`, "收桌那一頁");
+  const end = await b.eval<{ rows: number; first: string; buttons: string[]; mine: string; sub: string; ask: string; cards: number[] }>(`
+    const st = [...document.querySelectorAll("#endStacks .stack")];
+    const p1 = document.querySelector("#endStacks .stack.p1");
     return {
-      rows: li.length,
-      first: li[0] ? li[0].className + "|" + li[0].querySelector(".pl").textContent : "",
-      buttons: [...document.querySelectorAll("#endOv .sheet-actions button")]
+      rows: st.length,
+      first: p1 ? p1.querySelector(".cd.face .num").textContent : "",
+      cards: st.map(x => x.querySelectorAll(".cd").length),
+      buttons: [...document.querySelectorAll("#endOv .end-acts button")]
                  .filter(x=>!x.hidden).map(x=>x.textContent),
       mine: document.getElementById("endMine").hidden ? "" : document.getElementById("endMine").textContent,
-      sub: document.getElementById("endSub").textContent };`);
-  /* 台上是三階，不是三個人：同分站同一階，所以列數＝前三種分數的種數 */
+      sub: document.getElementById("endSub").textContent,
+      ask: document.getElementById("endAsk").textContent };`);
+  /* 台上是三疊，不是三個人：同分站同一疊，所以疊數＝前三種分數的種數 */
   const want = await b.eval<number>(`return Math.min(3, new Set(UD.G.score).size);`);
-  ok(end.rows === want, "台上要 " + want + " 階，實際 " + end.rows);
-  ok(end.first.startsWith("p1|1"), "第一名那一列是 p1／名次 1，實際 " + end.first);
+  ok(end.rows === want, "台上要 " + want + " 疊，實際 " + end.rows);
+  ok(end.first === "1", "第一名那疊翻開的牌寫的是 1，實際 " + JSON.stringify(end.first));
+  /* 排法 2・1・3，張數 4・7・2：第一名那疊最高 */
+  ok(end.cards.join(",") === (want === 3 ? "4,7,2" : want === 2 ? "7,4" : "7"),
+     "牌疊張數要是 2・1・3 的 4,7,2，實際 " + end.cards.join(","));
+  ok(/贏了這一桌|平手/.test(end.ask), "標題要寫誰贏了：" + end.ask);
   /* 同分的人要一起站上那一階，一個都不能漏 */
   const names = await b.eval<{ got: number; want: number }>(`
     const sc = UD.G.score;
     const tiers = [...new Set(sc)].sort((a,b)=>b-a).slice(0,3);
     return {
-      got: [...document.querySelectorAll("#endTop .pn")]
+      got: [...document.querySelectorAll("#endStacks .nm")]
              .reduce((n, e) => n + e.textContent.split("、").length, 0),
       want: sc.filter(v => tiers.indexOf(v) >= 0).length };`);
   ok(names.got === names.want,
      "前三階要站 " + names.want + " 個人，台上只有 " + names.got);
-  ok(end.buttons.join("／") === "看計分表／返回房間／再來一局", "三顆按鈕：" + end.buttons.join("／"));
+  ok(end.buttons.join("／") === "再來一局／返回房間／看計分表", "三顆按鈕：" + end.buttons.join("／"));
   ok(/不記戰績/.test(end.sub), "單人局要說不記戰績：" + end.sub);
   /* 自己站在台上就不要再補一行，沒站上去就一定要補 */
   const onBoard = await b.eval<boolean>(`
@@ -109,9 +116,14 @@ try {
   await shot("end_podium.png");
 
   /* ── 再來一局：直接發牌，不經過房間 ── */
+  /* 右上角跟頁腳的「看計分表」走同一條路 */
+  await b.eval(`document.getElementById("endClose2").click(); return 1`);
+  ok(await b.eval(`return document.getElementById("endOv").hidden`), "頁腳的看計分表要關掉那一頁");
+  await b.eval(`document.getElementById("btnFinal").click(); return 1`);
+  await b.until(`!document.getElementById("endOv").hidden`, "最終結果再打開");
   await b.eval(`document.getElementById("endAgain").click(); return 1`);
   await b.until(`UD.G.phase === "bid" || UD.G.phase === "play"`, "再來一局直接開始", 15000);
-  ok(await b.eval(`return document.getElementById("endOv").hidden`), "再來一局之後浮層要收掉");
+  ok(await b.eval(`return document.getElementById("endOv").hidden`), "再來一局之後那一頁要收掉");
   ok(await b.eval(`return document.getElementById("room").hidden`), "再來一局不經過房間");
   ok(await b.eval(`return UD.G.ri === 0 && UD.G.score.every(v => v === 0)`), "分數歸零、從第一局開始");
 
