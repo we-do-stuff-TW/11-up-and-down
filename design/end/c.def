@@ -1,0 +1,104 @@
+/* TITLE: C 獎章 · 名單上的三枚章，分數跑起來 */
+/* ── C 案：留在大廳那種印刷名單，但前三名各蓋一枚章，分數從 0 跑到最後 ────────
+   三案裡最安靜的一個：還是一行一行的線、還是同一份字，多的只有三枚 rosette
+   （第一名整枚銅色、二三名是線描）跟數字跑起來那一秒。名次不靠高度也不靠翻牌，靠章。 */
+.roll{list-style:none;margin:0;padding:0;width:min(520px,100%);text-align:left}
+.roll li{display:flex;align-items:center;gap:16px;padding:12px 2px;border-bottom:1px solid var(--hair-2);
+  opacity:0;transform:translateY(8px);animation:rowIn .34s var(--e-out) forwards;animation-delay:var(--d)}
+.roll li:first-child{border-top:1px solid var(--hair-2)}
+@keyframes rowIn{to{opacity:1;transform:none}}
+.roll .md{flex:none;width:36px;height:36px;display:grid;place-items:center}
+.roll .md svg{width:36px;height:36px;display:block;overflow:visible}
+.roll .pos{flex:none;width:24px;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:20px;
+  line-height:1;font-variation-settings:"opsz" 6;color:var(--ink-3);font-variant-numeric:tabular-nums;text-align:center}
+.roll .faces{display:flex;flex:none}
+.roll .faces>*{width:32px;height:32px;font-size:12px}
+.roll .faces>*+*{margin-left:-9px}
+.roll .nm{flex:1;min-width:0;font-size:14.5px;color:var(--ink);line-height:1.35;overflow-wrap:anywhere}
+.roll .sc{flex:none;font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;
+  font-size:16px;color:var(--ink-2)}
+/* 分數跑起來：@property 讓數字本身可以被動畫，不用 JS 逐幀改字 */
+@property --n{syntax:"<integer>";inherits:false;initial-value:0}
+.roll .sc b{font-weight:500;--n:0;counter-reset:n var(--n);
+  animation:count .9s var(--e-out) forwards;animation-delay:calc(var(--d) + .2s)}
+.roll .sc b::after{content:counter(n)}
+@keyframes count{to{--n:var(--to)}}
+/* 前三名那三列 */
+.roll li.t{padding:14px 2px}
+.roll li.t1{padding:18px 2px}
+.roll li.t1 .pos{color:var(--brass);font-size:26px}
+.roll li.t1 .nm{font-size:19px;font-weight:600;color:var(--brass)}
+.roll li.t1 .sc{color:var(--brass);font-size:20px}
+.roll li.t1 .faces>*{width:42px;height:42px;font-size:15px}
+/* 第一名那一列底下的線是銅色的，從左邊畫過來 */
+.roll li.t1{border-bottom-color:transparent;position:relative}
+.roll li.t1::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--brass);
+  transform-origin:0 50%;transform:scaleX(0);animation:draw .6s var(--e-out) forwards;animation-delay:calc(var(--d) + .3s)}
+@keyframes draw{to{transform:none}}
+/* 章：rosette。第一名銅色實心、二三名線描；蓋上去的時候從 1.3 縮回來、像蓋章 */
+.roll .md svg{opacity:0;transform:scale(1.3);animation:stamp .32s var(--e-out) forwards;animation-delay:calc(var(--d) + .16s)}
+@keyframes stamp{to{opacity:1;transform:none}}
+.roll li.rest .md{visibility:hidden}
+.roll li.rest{opacity:0;animation-name:rowInDim}
+@keyframes rowInDim{to{opacity:.62;transform:none}}
+/* 其餘的人：小一號、淡一階；沒進前三的自己那一列亮回來 */
+.roll li.rest .nm{font-size:13.5px;color:var(--ink-2)}
+.roll li.rest .sc{font-size:14px;color:var(--ink-3)}
+.roll li.rest.me{animation-name:rowIn}
+.roll li.rest.me .nm{color:var(--ink)}
+.roll li.rest .faces>*{width:26px;height:26px;font-size:10.5px}
+
+@media (prefers-reduced-motion:reduce){
+  .roll li{transform:none;animation:fadeIn .2s ease both}
+  .roll li.rest{animation-name:fadeInDim}
+  @keyframes fadeInDim{to{opacity:.62}}
+  .roll .sc b{animation:none;--n:var(--to)}
+  .roll .md svg{transform:none;animation:fadeIn .2s ease both}
+  .roll li.t1::after{transform:none;animation:none}
+}
+/*==HTML==*/
+    <div class="stage" style="display:flex;justify-content:center">
+      <ol class="roll" id="roll"></ol>
+    </div>
+<script>
+(function(){
+  const T = END.tiers;
+  /* rosette：12 個圓瓣圍一圈，中間一個圓，底下兩條緞帶 */
+  const petals = function(){
+    let d = "";
+    for(let i=0;i<12;i++){ const a = i * Math.PI / 6; d += '<circle cx="' + (18 + 9.5*Math.cos(a)).toFixed(2) + '" cy="' + (15 + 9.5*Math.sin(a)).toFixed(2) + '" r="3.6"/>'; }
+    return d;
+  };
+  const medal = function(k, pos){
+    const c = k === 1 ? "var(--brass)" : "var(--ink-3)";
+    const fill = k === 1 ? 'fill="' + c + '"' : 'fill="none" stroke="' + c + '" stroke-width="1"';
+    return '<svg viewBox="0 0 36 40" aria-hidden="true">' +
+      '<path d="M12 22 L9 37 L14.5 33.5 L18 38 L21.5 33.5 L27 37 L24 22" fill="none" stroke="' + c + '" stroke-width="1"/>' +
+      '<g ' + fill + '>' + petals() + '</g>' +
+      '<circle cx="18" cy="15" r="8.5" ' + (k === 1 ? 'fill="oklch(.760 .112 84)"' : 'fill="var(--felt)"') + ' stroke="' + c + '" stroke-width="1"/>' +
+      '<text x="18" y="18.6" text-anchor="middle" font-family="Bodoni Moda,Georgia,serif" font-weight="700" font-size="11" fill="' + (k === 1 ? "#241906" : c) + '">' + pos + '</text>' +
+      '</svg>';
+  };
+  let h = "", d = 0;
+  T.forEach(function(t, i){
+    const k = i + 1;
+    h += '<li class="t t' + k + '" style="--d:' + (d/1000).toFixed(2) + 's">' +
+      '<span class="md">' + medal(k, t.pos) + '</span>' +
+      '<div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div>' +
+      '<span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span>' +
+      '<span class="sc">' + (t.sc > 0 ? "+" : t.sc < 0 ? "−" : "") + '<b style="--to:' + Math.abs(t.sc) + '"></b></span></li>';
+    d += 70;
+  });
+  /* 沒進前三的人也在單子上，只是退到後面 */
+  const onBoard = T.reduce(function(a, t){ return a.concat(t.who); }, []);
+  END.rank.filter(function(p){ return onBoard.indexOf(p) < 0; }).forEach(function(p){
+    h += '<li class="rest' + (p.me ? " me" : "") + '" style="--d:' + (d/1000).toFixed(2) + 's">' +
+      '<span class="md"></span><span class="pos">' + p.pos + '</span>' +
+      '<div class="faces">' + face(p) + '</div>' +
+      '<span class="nm">' + (p.me ? "你" : p.n) + '</span>' +
+      '<span class="sc">' + (p.sc > 0 ? "+" : p.sc < 0 ? "−" : "") + '<b style="--to:' + Math.abs(p.sc) + '"></b></span></li>';
+    d += 55;
+  });
+  document.getElementById("roll").innerHTML = h;
+})();
+</script>

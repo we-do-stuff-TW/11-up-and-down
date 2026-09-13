@@ -1,0 +1,43 @@
+    <p class="mine" id="endMine" hidden></p>
+    <div class="acts">
+      <button class="go" id="btnAgain">再來一局</button>
+      <div class="ft"><button id="btnRoom">返回房間</button><i></i><button id="btnLedger2">看計分表</button></div>
+    </div>
+  </main>
+</div>
+
+<nav class="dev" id="dev">
+  <a href="a.html" data-v="A">A 獎台</a><a href="b.html" data-v="B">B 翻牌</a><a href="c.html" data-v="C">C 獎章</a>
+  <i></i><button id="devTie">同分</button><button id="devMe">我贏</button><button id="devSolo">單人</button>
+  <i></i><button id="devReplay">重播</button>
+</nav>
+
+<script>
+(function(){
+  const q = new URLSearchParams(location.search);
+  const $ = function(id){ return document.getElementById(id); };
+  const TIE = q.has("tie"), ME = q.has("me"), SOLO = q.has("solo");
+  const me = END.me, onBoard = END.tiers.some(function(t){ return t.who.indexOf(me) >= 0; });
+  $("endMine").hidden = onBoard;
+  if(!onBoard) $("endMine").innerHTML = "你第 <b>" + me.pos + "</b> / " + END.P.length + " · <b>" + (me.sc > 0 ? "+" : "") + me.sc + "</b> 分";
+
+  /* 原型切換器 */
+  if(q.has("nodev")) $("dev").hidden = true;
+  document.querySelectorAll("#dev a").forEach(function(a){
+    a.setAttribute("aria-current", a.dataset.v === "__V__" ? "page" : "false");
+    a.href = a.getAttribute("href") + location.search;
+  });
+  const flip = function(k){
+    const u = new URL(location.href);
+    if(u.searchParams.has(k)) u.searchParams.delete(k); else u.searchParams.set(k, "");
+    location.href = u.pathname + (u.search ? u.search.replace(/=(&|$)/g, "$1") : "");
+  };
+  $("devTie").setAttribute("aria-pressed", TIE); $("devMe").setAttribute("aria-pressed", ME); $("devSolo").setAttribute("aria-pressed", SOLO);
+  $("devTie").onclick = function(){ flip("tie"); };
+  $("devMe").onclick = function(){ flip("me"); };
+  $("devSolo").onclick = function(){ flip("solo"); };
+  $("devReplay").onclick = function(){ location.reload(); };
+  /* 圖上那幾顆按鈕在原型裡不接東西 */
+  ["btnLedger","btnLedger2","btnRoom","btnAgain"].forEach(function(id){ $(id).onclick = function(e){ e.preventDefault(); }; });
+})();
+</script>

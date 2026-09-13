@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A 獎台 · 三階升起</title>
+<meta name="theme-color" content="#16332c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500&family=Libre+Baskerville:wght@700&display=swap">
+<style>
+/* 取自 docs/index.html 的 :root——大廳跟牌桌是同一個房間，色票不另立一套 */
+html,body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --felt: oklch(.245 .042 168); --felt-deep: oklch(.165 .034 168); --glow: oklch(.375 .058 168);
+  --ink: oklch(.965 .014 92); --ink-2: oklch(.805 .017 92); --ink-3: oklch(.700 .016 92);
+  --hair: oklch(.90 .02 92 / .155); --hair-2: oklch(.90 .02 92 / .075);
+  --brass: oklch(.845 .128 84); --brass-2: oklch(.760 .112 84); --brass-soft: oklch(.845 .128 84 / .16);
+  --good: oklch(.800 .125 156); --bad: oklch(.735 .135 32);
+  --glass: oklch(.98 .012 92 / .085); --glass-edge: oklch(1 0 0 / .20); --glass-lip: oklch(1 0 0 / .34);
+  --card:#F8F5EC; --card-2:#ECE5D2; --card-ink:#1A1714; --card-red:#A32B25; --card-line:rgba(26,23,20,.20);
+  --sh-1: 0 1px 2px rgba(0,0,0,.34), 0 6px 16px rgba(0,0,0,.30);
+  --sh-2: 0 2px 5px rgba(0,0,0,.38), 0 16px 38px rgba(0,0,0,.42);
+  --sh-glass: 0 1px 1px rgba(0,0,0,.20), 0 10px 30px rgba(0,0,0,.34);
+  --e-out: cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+input{font:inherit}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{text-wrap:pretty}
+body{
+  min-height:100dvh;display:flex;flex-direction:column;
+  background:var(--felt-deep);color:var(--ink);
+  font-family:"Archivo","Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(circle at 18% 6%,  rgba(255,255,255,.050), transparent 9%),
+    radial-gradient(circle at 42% 11%, rgba(255,255,255,.038), transparent 11%),
+    radial-gradient(circle at 24% 27%, rgba(255,255,255,.046), transparent 12%),
+    radial-gradient(circle at 63% 38%, rgba(255,255,255,.042), transparent 15%),
+    radial-gradient(circle at 48% 62%, rgba(255,255,255,.040), transparent 11%),
+    radial-gradient(circle at 89% 78%, rgba(255,255,255,.052), transparent 13%),
+    radial-gradient(circle at 58% 92%, rgba(255,255,255,.062), transparent 18%),
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+}
+::selection{background:var(--brass-soft);color:var(--ink)}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px;border-radius:6px}
+.av{width:38px;height:38px;border-radius:99px;object-fit:cover;background:var(--glass);box-shadow:0 0 0 1px var(--hair);flex:none}
+.k{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3)}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+/* ── 名片專用（cream stock）─────────────────────────────── */
+:root{
+  --stock:#FAF6EC; --stock-2:#EDE6D4; --stock-3:#E2D9C2;
+  --stock-ink:#1A1714; --stock-ink-2:rgba(26,23,20,.62); --stock-ink-3:rgba(26,23,20,.40);
+  --stock-hair:rgba(26,23,20,.14); --stock-hair-2:rgba(26,23,20,.075);
+  --foil:#A9823C; --foil-2:#C4A15A;
+}
+.bodoni{font-family:"Bodoni Moda",Georgia,"Songti TC",serif}
+.serif{font-family:"Libre Baskerville",Georgia,serif}
+
+/* ── 開房頁共用底 ───────────────────────────────────────────
+   色票＝大廳那張空桌的狀態：trump 為 null → paintTable 的 TABLE_NONE
+   {h:250,c:.014}，hs=1 所以 L=.285。灰、冷、不帶綠。 */
+:root{
+  --felt:      oklch(.285 .0098 250);
+  --felt-deep: oklch(.197 .0078 250);
+  --glow:      oklch(.400 .0137 250);
+  --wood:      oklch(.255 .022 62);
+  --wood-2:    oklch(.185 .018 62);
+  --foil:#A9823C; --foil-2:#C4A15A;
+  --stock:#FAF6EC; --stock-2:#EDE6D4; --stock-ink:#1A1714;
+}
+/* 絨面的細顆粒。一張 140×140 的 turbulence 貼滿，透明度壓到剛好看得出不是純色 */
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.16;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.55'/></svg>")}
+
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.bodoni{font-family:"Bodoni Moda",Georgia,"Songti TC",serif}
+.cap{font-size:9.5px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-3)}
+
+/* 字標：跟大廳同一顆 */
+.mk{display:flex;align-items:baseline;gap:12px;line-height:1}
+.mk b{font-family:"Bodoni Moda",Georgia,serif;font-size:23px;font-weight:700}
+.mk u{text-decoration:none;font-size:8.5px;font-weight:600;letter-spacing:.34em;color:var(--ink-3)}
+
+/* 頭像：有照片就放照片，沒有就一個字 */
+.av{width:38px;height:38px;border-radius:99px;object-fit:cover;flex:none;
+  box-shadow:0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.34)}
+.mono-av{width:38px;height:38px;border-radius:99px;flex:none;display:grid;place-items:center;
+  font-size:14px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);
+  background:linear-gradient(160deg in oklab,oklch(1 0 0/.10),oklch(1 0 0/.035));
+  box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.3)}
+
+/* 唯一的高對比 CTA */
+.go{display:block;width:100%;text-align:center;padding:14px 28px;border-radius:99px;
+  font-size:15px;font-weight:600;letter-spacing:.06em;
+  background:linear-gradient(178deg in oklab,var(--brass),var(--brass-2));color:#241906;
+  box-shadow:inset 0 1px 0 oklch(1 0 0/.5),0 2px 6px rgba(0,0,0,.3),0 14px 34px oklch(.845 .128 84/.22);
+  transition:transform .18s var(--e-out),box-shadow .22s}
+.go:hover{box-shadow:inset 0 1px 0 oklch(1 0 0/.5),0 2px 6px rgba(0,0,0,.3),0 18px 46px oklch(.845 .128 84/.34)}
+.go:active{transform:scale(.985)}
+
+/* 玻璃控制項：能按的東西才浮起來 */
+.glass{background:var(--glass);box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair),var(--sh-glass)}
+.ghost{color:var(--ink-3);font-size:12px;padding:8px 12px;border-radius:99px;transition:color .18s,background .18s}
+.ghost:hover{color:var(--ink);background:oklch(1 0 0/.05)}
+
+/* 原型切換：正式版沒有這條 */
+.dev{position:fixed;left:50%;top:12px;translate:-50% 0;z-index:99;display:flex;gap:2px;padding:3px;
+  border-radius:99px;background:oklch(0 0 0/.44);box-shadow:0 0 0 1px var(--hair);backdrop-filter:blur(8px)}
+.dev button{padding:6px 15px;border-radius:99px;font-size:11.5px;color:var(--ink-3);transition:.18s}
+.dev button[aria-pressed=true]{background:oklch(1 0 0/.10);color:var(--ink)}
+.dev button:disabled{opacity:.32}
+.dev i{width:1px;height:14px;background:var(--hair);display:block;margin:0 4px;align-self:center}
+@media print{.dev{display:none}}
+
+/* ── 收桌那一頁的殼：跟大廳同一個 register ─────────────────────────────
+   石板灰的地（_base.css 把 --felt 換成大廳那組 250 色相）、Bodoni 的一句大字、
+   線分隔不用面、整頁只有一顆銅色按鈕。三案共用這個殼，差別只在中間那一塊怎麼站三個人。 */
+.end{flex:1;display:flex;flex-direction:column;min-height:100dvh;
+  padding:22px clamp(18px,3vw,40px) calc(28px + env(safe-area-inset-bottom));
+  animation:pgIn .26s var(--e-out) both}
+@keyframes pgIn{from{opacity:0}to{opacity:1}}
+.top{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.top .ghost{margin-right:-12px}
+
+.mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:26px 0 10px}
+.mid>.cap{margin-bottom:14px;animation:riseIn .42s var(--e-out) both}
+.ask{font-family:"Bodoni Moda",Georgia,"Songti TC",serif;font-weight:600;
+  font-size:clamp(30px,4.6vw,44px);line-height:1.08;letter-spacing:-.008em;color:var(--ink);
+  animation:riseIn .46s var(--e-out) both .05s}
+@keyframes riseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.stage{width:min(560px,100%);margin:34px 0 0}
+
+.mine{margin:22px 0 0;font-size:13px;color:var(--ink-3);animation:riseIn .4s var(--e-out) both 1.3s}
+.mine b{color:var(--ink-2);font-weight:500;font-family:"IBM Plex Mono",ui-monospace,monospace}
+
+.acts{display:flex;flex-direction:column;align-items:center;gap:22px;margin-top:38px;
+  animation:riseIn .46s var(--e-out) both 1.45s}
+.acts .go{width:auto;padding:14px 40px}
+.ft{display:flex;gap:12px;align-items:center;color:var(--ink-3);font-size:12px}
+.ft button{padding:6px 2px;color:inherit;transition:color .18s}
+.ft button:hover{color:var(--ink)}
+.ft i{width:1px;height:10px;background:var(--hair);display:block}
+
+/* 頭像 */
+.disc{display:grid;place-items:center;border-radius:99px;flex:none;
+  font-size:13px;font-weight:600;color:var(--ink-2);
+  background:linear-gradient(160deg in oklab,oklch(1 0 0/.10),oklch(1 0 0/.035));
+  box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.3)}
+
+/* 動得少一點，不是不動：位移拿掉，只留淡入 */
+@media (prefers-reduced-motion:reduce){
+  .end,.mid>.cap,.ask,.mine,.acts{animation:fadeIn .2s ease both}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+}
+
+/* 切換器多兩排狀態鈕 */
+.dev a{padding:6px 15px;border-radius:99px;font-size:11.5px;color:var(--ink-3);text-decoration:none;transition:.18s}
+.dev a[aria-current=page]{background:oklch(1 0 0/.10);color:var(--ink)}
+.dev button[aria-pressed=true]{color:var(--brass)}
+
+@media (max-width:760px){
+  .end{padding:16px 16px calc(22px + env(safe-area-inset-bottom))}
+  .mid{padding-top:14px}
+  .stage{margin-top:26px}
+  .acts{margin-top:30px;gap:18px}
+}
+
+/* TITLE: A 獎台 · 三階升起 */
+/* ── A 案：獎台。三階從地上升起，第三、第二、第一依序，人站到台上才亮 ─────────
+   高度就是名次：不必讀數字也看得出誰在最上面。台階畫成線稿——hairline 邊、
+   比地亮一點點的面——跟開房頁那個橢圓座位表是同一支筆。第一階的頂邊是銅色的。 */
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:12px;
+  height:280px;padding-top:110px}
+.step{position:relative;flex:1;max-width:172px;display:flex;flex-direction:column;align-items:center;
+  overflow:visible}
+.step .who{display:flex;flex-direction:column;align-items:center;gap:7px;margin-bottom:12px;
+  opacity:0;transform:translateY(10px);
+  animation:whoIn .38s var(--e-out) forwards;animation-delay:calc(var(--d) + .30s)}
+@keyframes whoIn{to{opacity:1;transform:none}}
+.step .faces{display:flex}
+.step .faces>*{width:44px;height:44px;font-size:15px}
+.step .faces>*+*{margin-left:-11px}
+.step .nm{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:.01em;line-height:1.3;
+  max-width:170px;text-wrap:balance}
+.step .sc{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;
+  font-size:14px;color:var(--ink-2)}
+/* 台階本體：一個往上推的方塊，外面套一層 overflow:hidden 當地板——它是從地板底下升上來的 */
+.step .well{width:100%;height:var(--h);overflow:hidden;display:flex;align-items:flex-end}
+.step .block{width:100%;height:100%;border-radius:8px 8px 0 0;
+  background:linear-gradient(180deg in oklab,oklch(1 0 0/.07),oklch(1 0 0/.025) 70%);
+  box-shadow:inset 0 1px 0 var(--hair),inset 1px 0 0 var(--hair-2),inset -1px 0 0 var(--hair-2);
+  display:grid;place-items:start center;padding-top:14px;
+  transform:translateY(100%);animation:rise .52s var(--e-out) forwards;animation-delay:var(--d)}
+@keyframes rise{to{transform:none}}
+/* opsz 壓到 6（內文切法）：Bodoni 的展示切法在 40px 以下細筆會消失，1 變成一根直棍、4 只剩豎筆 */
+.step .num{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:34px;line-height:1;
+  font-variation-settings:"opsz" 6;color:var(--ink-3)}
+.step.p1{--h:150px}.step.p2{--h:108px}.step.p3{--h:82px}
+.step.p1 .block{box-shadow:inset 0 1px 0 var(--brass),inset 1px 0 0 var(--hair-2),inset -1px 0 0 var(--hair-2),
+  0 -14px 40px oklch(.845 .128 84/.10)}
+.step.p1 .num{color:var(--brass);font-size:44px}
+.step.p1 .faces>*{width:56px;height:56px;font-size:19px}
+.step.p1 .nm{font-size:17px}
+.step.p1 .sc{color:var(--brass)}
+/* 地板：一條 hairline，台階從它底下升上來 */
+.floor{width:min(560px,100%);height:1px;background:var(--hair);margin:0 auto}
+
+@media (prefers-reduced-motion:reduce){
+  .step .block{transform:none;animation:fadeIn .2s ease both}
+  .step .who{transform:none;animation:fadeIn .2s ease both;animation-delay:.1s}
+}
+@media (max-width:760px){
+  .podium{height:228px;padding-top:96px;gap:8px}
+  .step.p1{--h:118px}.step.p2{--h:84px}.step.p3{--h:64px}
+  .step .faces>*{width:38px;height:38px;font-size:13px}
+  .step.p1 .faces>*{width:48px;height:48px;font-size:16px}
+  .step .nm{font-size:13px}.step.p1 .nm{font-size:15px}
+  .step .num{font-size:28px}.step.p1 .num{font-size:36px}
+}
+
+</style>
+</head>
+<body>
+<div class="end" id="end">
+  <header class="top">
+    <div class="mk"><b>11</b><u>UP &amp; DOWN</u></div>
+    <button class="ghost" id="btnLedger">看計分表</button>
+  </header>
+
+  <main class="mid">
+    <span class="cap" id="endCap">牌局結束</span>
+    <h1 class="ask" id="endAsk">—</h1>
+<script>
+/* 原型的資料：六個人的一桌，21 局打完。?tie 讓第一名與第三名各有人同分、?me 讓你是第一名、
+   ?solo 是對 AI 的單人局。正式版拿的是 G.seats／G.score，名次算法跟 showFinal() 一樣：同分同名次。 */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const TIE = q.has("tie"), ME = q.has("me"), SOLO = q.has("solo");
+  const AV = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NiIgaGVpZ2h0PSI5NiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjZDJhNzZjIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjOGY1YTNjIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiBmaWxsPSJ1cmwoI2cpIi8+PGNpcmNsZSBjeD0iNDgiIGN5PSIzOCIgcj0iMTgiIGZpbGw9IiNmN2YyZTQiLz48cGF0aCBkPSJNMTQgOTZjMC0yMCAxNS0zMiAzNC0zMnMzNCAxMiAzNCAzMnoiIGZpbGw9IiNmN2YyZTQiLz48L3N2Zz4=";
+  let P = SOLO
+    ? [{n:"你",me:1,av:AV,sc:54},{n:"B",ai:1,sc:61},{n:"C",ai:1,sc:47},{n:"D",ai:1,sc:31},{n:"E",ai:1,sc:22},{n:"F",ai:1,sc:-4}]
+    : [{n:"阿哲",sc:61},{n:"Francis",me:1,av:AV,sc:54},{n:"小美",sc:47},{n:"大衛",sc:31},{n:"AI 5",ai:1,sc:22},{n:"AI 6",ai:1,sc:-4}];
+  if(TIE){ P[1].sc = 61; P[3].sc = 47; }
+  if(ME){ P[1].sc = 66; }
+  P.forEach(function(p){ p.pos = 1 + P.filter(function(x){ return x.sc > p.sc; }).length; });
+  const rank = P.slice().sort(function(a,b){ return b.sc - a.sc; });
+  /* 台上三階：同分站同一階（跟 docs/index.html 的 showFinal 同一套） */
+  const tiers = [];
+  rank.forEach(function(p){
+    const t = tiers.filter(function(r){ return r.pos === p.pos; })[0];
+    if(t) t.who.push(p); else if(tiers.length < 3) tiers.push({pos:p.pos, sc:p.sc, who:[p]});
+  });
+  const me = P.filter(function(p){ return p.me; })[0];
+  const first = tiers[0];
+  const $ = function(id){ return document.getElementById(id); };
+  $("endCap").textContent = SOLO ? "牌局結束 · 21 局 · 對 AI，不記戰績" : "牌局結束 · 21 局 · 房號 7K2M";
+  const nm = function(p){ return p.me ? "你" : p.n; };
+  $("endAsk").textContent =
+    first.who.length > 1 ? first.who.map(nm).join("、") + " 平手"
+    : first.who[0].me ? "你贏了這一桌" : first.who[0].n + " 贏了這一桌";
+  window.END = {P:P, rank:rank, tiers:tiers, me:me, solo:SOLO};
+  /* 頭像：有照片放照片，沒有就名字第一個字 */
+  window.face = function(p, cls){
+    return p.av ? '<img class="av ' + (cls||"") + '" src="' + p.av + '" alt="">'
+                : '<span class="disc ' + (cls||"") + '">' + (p.me ? "你" : p.n).slice(0,1) + '</span>';
+  };
+  window.sc = function(v){ return (v > 0 ? "+" : "") + v; };
+})();
+</script>
+
+    <div class="stage">
+      <div class="podium" id="podium"></div>
+      <div class="floor"></div>
+    </div>
+<script>
+(function(){
+  const T = END.tiers;
+  /* 排法是 2・1・3：第一名站中間最高。只有兩階就 1・2，一階就一個 */
+  const order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  /* 升起的順序：第三、第二、第一——最後上來的是冠軍 */
+  const delay = function(t){ return {1:".26s", 2:".12s"}[T.indexOf(t) + 1] || "0s"; };
+  document.getElementById("podium").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1;
+    return '<div class="step p' + k + '" style="--d:' + delay(t) + '">' +
+      '<div class="who"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div>' +
+      '<span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span>' +
+      '<span class="sc">' + sc(t.sc) + '</span></div>' +
+      '<div class="well"><div class="block"><span class="num">' + t.pos + '</span></div></div></div>';
+  }).join("");
+})();
+</script>
+    <p class="mine" id="endMine" hidden></p>
+    <div class="acts">
+      <button class="go" id="btnAgain">再來一局</button>
+      <div class="ft"><button id="btnRoom">返回房間</button><i></i><button id="btnLedger2">看計分表</button></div>
+    </div>
+  </main>
+</div>
+
+<nav class="dev" id="dev">
+  <a href="a.html" data-v="A">A 獎台</a><a href="b.html" data-v="B">B 翻牌</a><a href="c.html" data-v="C">C 獎章</a>
+  <i></i><button id="devTie">同分</button><button id="devMe">我贏</button><button id="devSolo">單人</button>
+  <i></i><button id="devReplay">重播</button>
+</nav>
+
+<script>
+(function(){
+  const q = new URLSearchParams(location.search);
+  const $ = function(id){ return document.getElementById(id); };
+  const TIE = q.has("tie"), ME = q.has("me"), SOLO = q.has("solo");
+  const me = END.me, onBoard = END.tiers.some(function(t){ return t.who.indexOf(me) >= 0; });
+  $("endMine").hidden = onBoard;
+  if(!onBoard) $("endMine").innerHTML = "你第 <b>" + me.pos + "</b> / " + END.P.length + " · <b>" + (me.sc > 0 ? "+" : "") + me.sc + "</b> 分";
+
+  /* 原型切換器 */
+  if(q.has("nodev")) $("dev").hidden = true;
+  document.querySelectorAll("#dev a").forEach(function(a){
+    a.setAttribute("aria-current", a.dataset.v === "A" ? "page" : "false");
+    a.href = a.getAttribute("href") + location.search;
+  });
+  const flip = function(k){
+    const u = new URL(location.href);
+    if(u.searchParams.has(k)) u.searchParams.delete(k); else u.searchParams.set(k, "");
+    location.href = u.pathname + (u.search ? u.search.replace(/=(&|$)/g, "$1") : "");
+  };
+  $("devTie").setAttribute("aria-pressed", TIE); $("devMe").setAttribute("aria-pressed", ME); $("devSolo").setAttribute("aria-pressed", SOLO);
+  $("devTie").onclick = function(){ flip("tie"); };
+  $("devMe").onclick = function(){ flip("me"); };
+  $("devSolo").onclick = function(){ flip("solo"); };
+  $("devReplay").onclick = function(){ location.reload(); };
+  /* 圖上那幾顆按鈕在原型裡不接東西 */
+  ["btnLedger","btnLedger2","btnRoom","btnAgain"].forEach(function(id){ $(id).onclick = function(e){ e.preventDefault(); }; });
+})();
+</script>
+
+</body>
+</html>

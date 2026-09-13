@@ -1,0 +1,74 @@
+/* TITLE: A 獎台 · 三階升起 */
+/* ── A 案：獎台。三階從地上升起，第三、第二、第一依序，人站到台上才亮 ─────────
+   高度就是名次：不必讀數字也看得出誰在最上面。台階畫成線稿——hairline 邊、
+   比地亮一點點的面——跟開房頁那個橢圓座位表是同一支筆。第一階的頂邊是銅色的。 */
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:12px;
+  height:280px;padding-top:110px}
+.step{position:relative;flex:1;max-width:172px;display:flex;flex-direction:column;align-items:center;
+  overflow:visible}
+.step .who{display:flex;flex-direction:column;align-items:center;gap:7px;margin-bottom:12px;
+  opacity:0;transform:translateY(10px);
+  animation:whoIn .38s var(--e-out) forwards;animation-delay:calc(var(--d) + .30s)}
+@keyframes whoIn{to{opacity:1;transform:none}}
+.step .faces{display:flex}
+.step .faces>*{width:44px;height:44px;font-size:15px}
+.step .faces>*+*{margin-left:-11px}
+.step .nm{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:.01em;line-height:1.3;
+  max-width:170px;text-wrap:balance}
+.step .sc{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;
+  font-size:14px;color:var(--ink-2)}
+/* 台階本體：一個往上推的方塊，外面套一層 overflow:hidden 當地板——它是從地板底下升上來的 */
+.step .well{width:100%;height:var(--h);overflow:hidden;display:flex;align-items:flex-end}
+.step .block{width:100%;height:100%;border-radius:8px 8px 0 0;
+  background:linear-gradient(180deg in oklab,oklch(1 0 0/.07),oklch(1 0 0/.025) 70%);
+  box-shadow:inset 0 1px 0 var(--hair),inset 1px 0 0 var(--hair-2),inset -1px 0 0 var(--hair-2);
+  display:grid;place-items:start center;padding-top:14px;
+  transform:translateY(100%);animation:rise .52s var(--e-out) forwards;animation-delay:var(--d)}
+@keyframes rise{to{transform:none}}
+/* opsz 壓到 6（內文切法）：Bodoni 的展示切法在 40px 以下細筆會消失，1 變成一根直棍、4 只剩豎筆 */
+.step .num{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:34px;line-height:1;
+  font-variation-settings:"opsz" 6;color:var(--ink-3)}
+.step.p1{--h:150px}.step.p2{--h:108px}.step.p3{--h:82px}
+.step.p1 .block{box-shadow:inset 0 1px 0 var(--brass),inset 1px 0 0 var(--hair-2),inset -1px 0 0 var(--hair-2),
+  0 -14px 40px oklch(.845 .128 84/.10)}
+.step.p1 .num{color:var(--brass);font-size:44px}
+.step.p1 .faces>*{width:56px;height:56px;font-size:19px}
+.step.p1 .nm{font-size:17px}
+.step.p1 .sc{color:var(--brass)}
+/* 地板：一條 hairline，台階從它底下升上來 */
+.floor{width:min(560px,100%);height:1px;background:var(--hair);margin:0 auto}
+
+@media (prefers-reduced-motion:reduce){
+  .step .block{transform:none;animation:fadeIn .2s ease both}
+  .step .who{transform:none;animation:fadeIn .2s ease both;animation-delay:.1s}
+}
+@media (max-width:760px){
+  .podium{height:228px;padding-top:96px;gap:8px}
+  .step.p1{--h:118px}.step.p2{--h:84px}.step.p3{--h:64px}
+  .step .faces>*{width:38px;height:38px;font-size:13px}
+  .step.p1 .faces>*{width:48px;height:48px;font-size:16px}
+  .step .nm{font-size:13px}.step.p1 .nm{font-size:15px}
+  .step .num{font-size:28px}.step.p1 .num{font-size:36px}
+}
+/*==HTML==*/
+    <div class="stage">
+      <div class="podium" id="podium"></div>
+      <div class="floor"></div>
+    </div>
+<script>
+(function(){
+  const T = END.tiers;
+  /* 排法是 2・1・3：第一名站中間最高。只有兩階就 1・2，一階就一個 */
+  const order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  /* 升起的順序：第三、第二、第一——最後上來的是冠軍 */
+  const delay = function(t){ return {1:".26s", 2:".12s"}[T.indexOf(t) + 1] || "0s"; };
+  document.getElementById("podium").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1;
+    return '<div class="step p' + k + '" style="--d:' + delay(t) + '">' +
+      '<div class="who"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div>' +
+      '<span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span>' +
+      '<span class="sc">' + sc(t.sc) + '</span></div>' +
+      '<div class="well"><div class="block"><span class="num">' + t.pos + '</span></div></div></div>';
+  }).join("");
+})();
+</script>
