@@ -39,13 +39,27 @@ console 用 `UD.fx()` 看現在幾檔、`UD.fx("high")` 現場換。
 
 | 檔案 | 是什麼 |
 |---|---|
-| `table-before.jpg` | 改之前的立體牌桌（同一個取景，這一場 session 一開始截的） |
+| `table-before.jpg` | 改之前的立體牌桌 |
+| `table-before-vs-high.jpg` | 改之前｜高檔，全幅並排 |
 | `table-high.jpg` | 現在的高檔：銅鑲線、牌的真接觸陰影、牌庫錯開、書櫃有深度 |
 | `table-mid.jpg` | 中檔：沒有 AO 與精算，其餘都在 |
 | `table-low.jpg` | 低檔：後處理整條不建，假的接觸陰影回來 |
 | `proto-A-vs-D.jpg` | 原型的 A（線上舊版）｜D（六層＋三層不做的）全幅並排 |
 | `proto-cards.jpg` | 牌面近拍：亞麻壓紋、層疊的側邊、牌微微拱起 |
 | `proto-chair.jpg` | 椅子：滾邊、釘扣、收分的腳、木扶手蓋 |
+
+## 「改之前」那張是怎麼截的
+
+`git worktree add /tmp/ud-before d842532`（這個 commit 的前一個）開一份獨立的檢出，
+再用**跟新版完全一樣的流程**（`scripts/_browser.ts` ＋ 同一支截圖腳本 ＋ 同樣的
+Emulation 1600×1000 DPR2）截一次。兩張的取景、人數、燈光條件都一樣，只有發到的牌不同。
+
+**踩過一次的坑，記在這裡免得再犯**：第一版的「改之前」是用「複製一份 `docs/` 到暫存資料夾 ＋
+自己開 `python3 -m http.server`」截的，那張圖**每張牌都只有角標、中間一片空白**。
+牌面的邊框、點數、人像是由一張 SVG `<image>` 畫進貼圖的，角標的字是另外用 canvas 疊的
+（`<image>` 載進來的 SVG 是密封的，讀不到頁面字型）——所以那張 SVG 沒載到的時候，
+看起來就是「牌是空白的，但角標還在」。Francis 看到那張圖第一句就是「怎麼是空白的？」。
+**要截舊版一律開 worktree 走原本的測試 harness，不要自己複製 docs/ 另開 server。**
 
 ## 驗證
 
