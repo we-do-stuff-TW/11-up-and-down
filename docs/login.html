@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>登入 · 11 Up &amp; Down</title>
-<script>document.title = T("登入 · 11 Up & Down");</script>
 <meta name="description" content="用 Google 登入，坐上 11 Up &amp; Down 的牌桌。">
 <meta name="theme-color" content="#1e2126">
 <script>
@@ -37,6 +36,7 @@ var EN = {
 };
 function T(zh){ return (LANG === "en" && EN[zh]) || zh; }
 document.documentElement.lang = LANG === "en" ? "en" : "zh-Hant";
+document.title = T("登入 · 11 Up & Down");
 </script>
 <meta name="robots" content="noindex">
 <meta property="og:title" content="11 Up &amp; Down">
