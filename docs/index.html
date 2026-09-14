@@ -6402,14 +6402,33 @@ const AO_OP = .58;                   /* 接觸陰影最深的濃度 */
 
 /* 每張牌的圖（邊框、花色、人像）由 2D 那邊的 faceArtSVG() 給成獨立 SVG，這裡載成 Image 畫進貼圖；
    字另外用 canvas 疊——外部字型進不了當成圖片載入的 SVG。牌背同理。換牌面就整組重載。 */
-const ART = {face:{}, back:null, ready:null, deck:null};
-function loadImg(src){
+const ART = {face:{}, back:null, ready:null, deck:null, rev:0};
+function loadImg(src, tries){
   return new Promise(function(res){
     const im = new Image();
-    im.onload = function(){ res(im); };
-    im.onerror = function(){ res(null); };
+    /* onload 只代表「載到了」。SVG 是畫到 canvas 那一刻才光柵化的，
+       在慢的環境（無頭 Chrome、行動裝置剛開機）光柵化還沒好就 drawImage，
+       畫出來是一片空白——牌面就變成「只有角標、中間空白」。decode() 等到真的能畫。 */
+    im.onload = function(){
+      if(im.decode) im.decode().then(function(){ res(im); }, function(){ res(im); });
+      else res(im);
+    };
+    /* 一張牌面圖載不到的後果很嚴重：它會以「只有角標、中間一片空白」的樣子被烤進圖集，
+       而圖集只在開場與換牌面時畫，之後再也不會補。所以失敗要重試，別安靜地收下 null。 */
+    im.onerror = function(){
+      const t = (tries || 0) + 1;
+      if(t < 3) res(loadImg(src, t));
+      else{ console.warn("牌面圖載不到（試了 3 次）"); res(null); }
+    };
     im.src = src;
   });
+}
+/* 同時只載幾張。一次把 53 張 data: URI 丟給瀏覽器，會有幾張直接 onerror——
+   不是圖壞了，是一次開太多（無頭 Chrome 上特別明顯，整副牌都可能空白）。 */
+function pool(make, n){
+  let i = 0;
+  const run = () => i < make.length ? make[i++]().then(run) : null;
+  return Promise.all(Array.from({length:Math.min(n, make.length)}, run));
 }
 const svgImg = txt => loadImg("data:image/svg+xml;charset=utf-8," + encodeURIComponent(txt));
 function artReady(){
@@ -6420,12 +6439,12 @@ function artReady(){
     const jobs = [];
     for(let r = 2; r <= 14; r++) for(let s = 0; s < 4; s++){
       const k = r + ":" + s;
-      jobs.push(svgImg(UD.faceArtSVG({r:r, s:s})).then(function(im){ ART.face[k] = im; }));
+      jobs.push(() => svgImg(UD.faceArtSVG({r:r, s:s})).then(function(im){ ART.face[k] = im; }));
     }
     /* 鬼牌：r=15、s=4，跟其他牌走同一條路 */
-    jobs.push(svgImg(UD.faceArtSVG({r:15, s:UD.JS})).then(function(im){ ART.face["15:" + UD.JS] = im; }));
-    jobs.push(svgImg(UD.backArt()).then(function(im){ ART.back = im; }));
-    return Promise.all(jobs);
+    jobs.push(() => svgImg(UD.faceArtSVG({r:15, s:UD.JS})).then(function(im){ ART.face["15:" + UD.JS] = im; }));
+    jobs.push(() => svgImg(UD.backArt()).then(function(im){ ART.back = im; }));
+    return pool(jobs, 8).then(function(){ ART.rev++; });   /* 圖到齊了：版號 +1，讓畫過的圖集知道自己該重畫 */
   });
   return ART.ready;
 }
@@ -7511,7 +7530,7 @@ function placeChairs(){
   });
 }
 
-/* ================= 後處理：接觸陰影、暗角顆粒、靜止時精算 =================
+/* ================= 後處理：接觸陰影、暗角、靜止時精算 =================
    這一層最不像真的地方不是零件不夠細，是光：整間房均勻亮、沒有接觸陰影，
    所以牌看起來像浮在桌上，書櫃像一張貼圖。這一段補的就是那件事。
 
@@ -7527,27 +7546,26 @@ function placeChairs(){
 const FX_REFINE_MAX = 24;        /* 靜止之後最多疊幾格 */
 const FX_SLOW_MS = 26;           /* 每格超過這個就降一檔 */
 const FX = {
-  tier:"low", mods:null, comp:null, gtao:null, grain:null,
+  tier:"low", mods:null, comp:null, gtao:null, vig:null,
   accA:null, accB:null, accN:0, quad:null, qscene:null, qcam:null, blend:null, show:null,
   ms:0, frames:0, decal:true, forced:false
 };
-/* 暗角＋顆粒。放在 OutputPass 之後——顆粒要加在「色調映射之後」的顯示空間裡，
-   那才是底片的那一層；加在前面會被色調映射整平。 */
-const FX_GRAIN = {
-  uniforms:{tDiffuse:{value:null}, amount:{value:.034}, seed:{value:0}, vig:{value:.22}},
+/* 暗角。放在 OutputPass 之後——這一層是加在色調映射之後的顯示空間裡的。
+   原本這裡還疊了一層底片顆粒（2026-09-15 拿掉）：顆粒每一格換一次隨機種子，
+   而壁爐的火每 90ms 要求重畫一格，整張畫面的顆粒就跟著火在爬；
+   Francis 看到的就是那個。種子固定之後不爬了，但他決定連顆粒本身都不要。 */
+const FX_VIG = {
+  uniforms:{tDiffuse:{value:null}, vig:{value:.14}},
   vertexShader:"varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }",
   fragmentShader:[
-    "uniform sampler2D tDiffuse; uniform float amount, seed, vig; varying vec2 vUv;",
-    "float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.545); }",
+    "uniform sampler2D tDiffuse; uniform float vig; varying vec2 vUv;",
     "void main(){",
     "  vec4 c = texture2D(tDiffuse, vUv);",
-    /* 暗角：鏡頭邊緣自然的衰減，四個角沉下去，視線就被收回桌子中央 */
+    /* 鏡頭邊緣自然的衰減，四個角沉下去，視線就被收回桌子中央。
+       起點刻意推到半徑 45%：從 28% 開始的話，手牌正好落在斜坡上，自己的牌會被壓暗一成多。 */
     "  vec2 q = vUv - .5;",
     "  float r = length(q * vec2(1.05, 1.25));",
-    "  c.rgb *= 1. - vig * smoothstep(.28, .82, r);",
-    /* 顆粒：暗部多、亮部少——底片就是這樣，亮部的銀粒子已經飽和了 */
-    "  float l = dot(c.rgb, vec3(.299, .587, .114));",
-    "  c.rgb += (hash(vUv * 1024. + seed) - .5) * amount * (1.2 - l);",
+    "  c.rgb *= 1. - vig * smoothstep(.45, .96, r);",
     "  gl_FragColor = c;",
     "}"
   ].join("\n")
@@ -7593,7 +7611,7 @@ function fxDecal(on){
 }
 function fxBuild(){
   if(FX.comp){ FX.comp.dispose(); FX.comp = null; }
-  FX.gtao = FX.grain = null;
+  FX.gtao = FX.vig = null;
   if(!FX.mods || FX.tier === "low" || !S || !S.boxW){ fxDecal(true); return; }
   const M = FX.mods;
   const rt = new THREE.WebGLRenderTarget(1, 1, {type:THREE.HalfFloatType, samples:4});
@@ -7609,8 +7627,8 @@ function fxBuild(){
     c.addPass(g); FX.gtao = g;
   }
   c.addPass(new M.OutputPass());
-  FX.grain = new M.ShaderPass(FX_GRAIN);
-  c.addPass(FX.grain);
+  FX.vig = new M.ShaderPass(FX_VIG);
+  c.addPass(FX.vig);
   /* 精算要自己拿到最後一張圖去疊，所以最後一個 pass 不直接畫到畫面上 */
   c.renderToScreen = !fxRefine();
   /* setSize 吃的是 CSS 像素、內部自己乘 pixelRatio；但 pixelRatio 是建構時抓的，
@@ -7658,7 +7676,6 @@ function fxResize(){
 /* 這一格畫出去。沒有 composer 就走原本那條，整層不會因為後處理垮掉。 */
 function fxRender(){
   const t0 = performance.now();
-  if(FX.grain) FX.grain.uniforms.seed.value = Math.random() * 1000;
   if(!FX.comp) S.r.render(S.scene, S.camera);
   else if(!fxRefine()) FX.comp.render();
   else{
@@ -7843,9 +7860,9 @@ function paper(map, o){
      /* 亞麻壓紋（cambric finish）：真牌表面一層交叉的細凸紋。
         只給 normalMap 是看不見的——紙很粗糙、鏡面反射又壓得很低，漫射光把起伏吃掉了。
         看得到織理是因為表面那層極薄的塗佈：掠射角會沿著紋路反一道光，那是 clearcoat 在做的事。 */
-     normalMap:linenNormal(), normalScale:new THREE.Vector2(.55, .55),
+     normalMap:linenNormal(), normalScale:new THREE.Vector2(.40, .40),
      clearcoat:.34, clearcoatRoughness:.30, clearcoatNormalMap:linenNormal(),
-     clearcoatNormalScale:new THREE.Vector2(.95, .95),
+     clearcoatNormalScale:new THREE.Vector2(.60, .60),
      sheen:.14, sheenRoughness:.45}, o || {}));
 }
 /* 壓紋的節距要挑過：一張牌寬 200 格時近拍剛好一格兩個畫素，正好落在取樣極限上，
@@ -7933,8 +7950,12 @@ function kill(c, to, dur, o){
    所以狀態跳著來（連線延遲、對手秒出、重新整理）也不會卡在半路。 */
 function rebuildAtlas(minRank, jokers){
   jokers = jokers ? 1 : 0;
-  if(S.minRank === minRank && S.jokers === jokers) return;
-  S.minRank = minRank; S.jokers = jokers;
+  /* 也要比 ART 的版號。sync() 有可能在 boot() 還在等牌面圖的時候就先跑
+     （進牌桌、有人開局都會觸發），那一次畫出來的圖集每張牌中間都是空的；
+     只比牌組設定的話，boot() 後面那次就會早退，空白圖集從此定住——
+     整副牌只剩角標、中間一片空白。 */
+  if(S.minRank === minRank && S.jokers === jokers && S.artRev === ART.rev) return;
+  S.minRank = minRank; S.jokers = jokers; S.artRev = ART.rev;
   for(const m of S.mats.values()){ if(m.map) m.map.dispose(); m.dispose(); }
   S.mats.clear();
   if(S.atlas) S.atlas.tex.dispose();
@@ -8681,7 +8702,9 @@ function frame(t){
     placeOverlays();
     fxRender();
   }
-  else if(fxPending() || fireMoved){  /* 停手了：抖動取樣繼續疊，畫面自己收斂 */
+  else if(fxPending() || (fireMoved && !fxRefine())){
+    /* 停手了：要嘛抖動取樣還在疊（畫面自己收斂），要嘛這台機器不疊、火照跳。
+       高檔疊完之後就停手——第 25 格之後每一格的權重不到 1/25，火在不在燒都看不出來。 */
     fxRender();
   }
 }

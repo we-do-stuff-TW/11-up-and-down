@@ -2,6 +2,11 @@
 
 **狀態**：完成（2026-09-14 開、同日做完；報告見 [`agent/reports/0001-3d-fidelity/`](../reports/0001-3d-fidelity/README.md)、決策見 [ADR 0001](../adr/0001-3d-post-processing.md)）
 
+> **2026-09-15 修正**：Francis 看到成品說「有顆粒在動」「牌面有點不清楚」。
+> 顆粒那一層**整段拿掉**（暗角留著、收到 `.14`），亞麻壓紋收到 `.60`，
+> 另外修掉一個牌面圖集會畫在圖到齊之前的 bug。全部見
+> [`agent/reports/0002-3d-grain-and-faces/`](../reports/0002-3d-grain-and-faces/README.md)。
+
 ## 目標
 
 一句話：把 `design/fidelity` 原型裡 Francis 定案的六層效果接進 `docs/index.html` 的 3D 呈現層，
@@ -18,7 +23,7 @@
 |---|---|
 | 軟陰影 | `VSMShadowMap`、`radius 4`、`blurSamples 12`、`bias 0`／`normalBias .02` |
 | 接觸陰影 AO | GTAOPass，`radius .85`／`scale 2.0`／`samples 16`；開了就把假的 AO 貼片關掉 |
-| 暗角＋顆粒 | 自寫 ShaderPass，`vig .22`、`amount .034`，暗部多顆粒亮部少，放在 OutputPass 之後 |
+| 暗角＋顆粒 | 自寫 ShaderPass，`vig .22`、`amount .034`，暗部多顆粒亮部少，放在 OutputPass 之後（顆粒 2026-09-15 拿掉） |
 | 靜止時精算 | 抖動取樣累積 24 格；壁爐的火只要求重畫、不重置累積 |
 | 材質微結構 | 牌＝亞麻壓紋（`clearcoat` ＋ `clearcoatNormalMap`）＋層疊側邊；桌布＝絨毛法線＋方向性高光；木沿＝導管孔＋銅鑲線；骰子＝法線凹點 |
 | 幾何細節 | 椅子＝滾邊／釘扣凹陷／收分的腳／木扶手蓋／各歪一點；牌庫＝每張錯開；手牌＝微微拱起；書＝深淺前後不一 |
@@ -61,7 +66,7 @@ AO 是六層裡最貴的一層（多一次深度法線 pass ＋ 16 取樣 ＋ �
 ## DoD
 
 - [x] 立體牌桌六層全開。2D 版的算繪路徑一行沒動；共用的只有設定頁多出來的「畫質」那一列。
-- [~] 手機自動降檔已做（> 26 ms 降一檔，只降不升）。**桌機的絕對毫秒數還沒在真 GPU 上量**——無頭 Chrome 走 swiftshader，量到的數字只能看相對大小。
+- [x] 手機自動降檔已做（> 26 ms 降一檔，只降不升）。真 GPU 也量了（2026-09-15）：M1 Ultra 高檔在動 7.7 ms、靜下來 3.7 ms，離門檻很遠。
 - [x] 五支全過（含 `net_test.ts`），另加 `i18n_scan.ts` 平面／立體兩種都過。
 - [x] `ui_test`／`end_test` 打完整場走過這些路徑；三檔各自開局打三墩截圖確認。
 - [x] `agent/reports/0001-3d-fidelity/`，已登記。
