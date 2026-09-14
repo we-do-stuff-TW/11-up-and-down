@@ -5,6 +5,10 @@
  * 每一站掃一次 DOM：看得到的文字節點與 aria-label／placeholder／title 裡還有沒有中文。
  * 有的話印出「哪一段字、掛在哪個元素上」——那就是字典漏掉的 key。
  *
+ * ⚠️ 輸出不要用 tail／head 截。漏翻是偶發的（有些字只在某個時刻出現在畫面上），
+ *    失敗那一次印的「哪一段字、掛在哪個元素上」就是唯一的線索，截掉就再也找不回來了。
+ *    要跑多輪就整段存檔：`for i in 1 2 3; do deno run -A scripts/i18n_scan.ts; done > scan.log 2>&1`
+ *
  *   deno run -A scripts/i18n_scan.ts          # 掃英文版
  *   deno run -A scripts/i18n_scan.ts zh       # 反過來掃中文版有沒有跑出英文（只看字典裡的英文值）
  *   SHOT=1 deno run -A scripts/i18n_scan.ts   # 順手截圖到 design/i18n/
