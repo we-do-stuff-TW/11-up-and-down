@@ -1,0 +1,91 @@
+const DIE_A = .34, DIE_R = .075;        /* 邊長與圓角：賭場骰是尖角，家用骰是圓角，這裡取圓角 */
+const PIPS3 = {1:[4], 2:[2,6], 3:[2,4,6], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,3,6,2,5,8]};
+function diePaint(v, bump){
+  const N = 256, cv = document.createElement("canvas");
+  cv.width = cv.height = N;
+  const g = cv.getContext("2d");
+  if(bump){ g.fillStyle = "#ffffff"; g.fillRect(0, 0, N, N); }
+  else{
+    /* 象牙胎：中間亮一點、四邊沉一點，再撒一層極細的雜點當紙紋 */
+    const bg = g.createRadialGradient(N * .42, N * .38, N * .06, N * .5, N * .5, N * .78);
+    bg.addColorStop(0, "#FBF5E4"); bg.addColorStop(.62, "#F0E7D0"); bg.addColorStop(1, "#DFD4B9");
+    g.fillStyle = bg; g.fillRect(0, 0, N, N);
+    g.globalAlpha = .05;
+    for(let i = 0; i < 900; i++){
+      g.fillStyle = (i & 1) ? "#8a7f66" : "#ffffff";
+      g.fillRect(Math.random() * N, Math.random() * N, 1.2, 1.2);
+    }
+    g.globalAlpha = 1;
+  }
+  /* 點位：3×3 格，格心在 .5/2.5/4.5 個格寬處。整組縮到面的 62%，圓角轉過去也不會被壓到 */
+  const span = N * .64, o = (N - span) / 2, cell = span / 3, rad = cell * .375;
+  for(const i of PIPS3[v]){
+    const cx = o + ((i % 3) + .5) * cell, cy = o + (Math.floor(i / 3) + .5) * cell;
+    if(bump){
+      /* 灰階＝高度。坑底最黑、坑口漸層回到白，bumpMap 讀出來就是一個圓凹 */
+      const gr = g.createRadialGradient(cx, cy, 0, cx, cy, rad * 1.18);
+      gr.addColorStop(0, "#101010"); gr.addColorStop(.66, "#2a2a2a");
+      gr.addColorStop(.9, "#b4b4b4"); gr.addColorStop(1, "#ffffff");
+      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rad * 1.18, 0, Math.PI * 2); g.fill();
+      continue;
+    }
+    /* 坑口外一圈很淡的暗影，讓點看起來是陷下去的而不是印上去的 */
+    const halo = g.createRadialGradient(cx, cy, rad * .9, cx, cy, rad * 1.4);
+    halo.addColorStop(0, "rgba(90,78,58,.34)"); halo.addColorStop(1, "rgba(90,78,58,0)");
+    g.fillStyle = halo; g.beginPath(); g.arc(cx, cy, rad * 1.4, 0, Math.PI * 2); g.fill();
+    /* 坑本身：左上最深、右下被彈回來的光提亮一線 */
+    const pit = g.createRadialGradient(cx - rad * .34, cy - rad * .34, rad * .06, cx, cy, rad);
+    pit.addColorStop(0, "#171310"); pit.addColorStop(.55, "#221C17"); pit.addColorStop(1, "#3B3129");
+    g.fillStyle = pit; g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); g.fill();
+    g.save();
+    g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); g.clip();
+    g.strokeStyle = "rgba(255,240,210,.42)"; g.lineWidth = rad * .22;
+    g.beginPath(); g.arc(cx, cy, rad * .84, Math.PI * .12, Math.PI * .86); g.stroke();
+    g.restore();
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  if(!bump) tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = S.maxAniso;
+  return tex;
+}
+function dieFaceMat(v){
+  if(dieFaceMats[v]) return dieFaceMats[v];
+  return dieFaceMats[v] = new THREE.MeshPhysicalMaterial({
+    map:diePaint(v, false), bumpMap:diePaint(v, true), bumpScale:1.6,
+    color:0xffffff, roughness:.34, metalness:0, clearcoat:.42, clearcoatRoughness:.20
+  });
+}
+/* 圓角立方體：BoxGeometry 本來就切好六個面（六組材質、每面一張完整 UV），
+   再把每個頂點推到「內縮方塊 + 半徑」的殼上就變圓角——十二條邊、八個角都是圓的。 */
+function roundedBox(a, r, seg){
+  const g = new THREE.BoxGeometry(a, a, a, seg, seg, seg);
+  const pos = g.attributes.position, nor = g.attributes.normal, inner = a / 2 - r;
+  const cl = x => Math.max(-inner, Math.min(inner, x));
+  for(let i = 0; i < pos.count; i++){
+    const px = pos.getX(i), py = pos.getY(i), pz = pos.getZ(i);
+    const cx = cl(px), cy = cl(py), cz = cl(pz);
+    let dx = px - cx, dy = py - cy, dz = pz - cz;
+    const L = Math.hypot(dx, dy, dz) || 1;
+    dx /= L; dy /= L; dz /= L;
+    pos.setXYZ(i, cx + dx * r, cy + dy * r, cz + dz * r);
+    nor.setXYZ(i, dx, dy, dz);
+  }
+  pos.needsUpdate = true; nor.needsUpdate = true;
+  return g;
+}
+/* 六個面照真骰子排：對面相加是 7，而且是右手骰（1 朝上、2 朝前時 3 在右手邊）。
+   要讓哪一面朝上不是重排點數，是把整顆骰子轉過去——跟手上轉一顆真骰子一樣。 */
+const DIE_UP = {1:[0, 0], 2:[-Math.PI/2, 0], 3:[0, 0, Math.PI/2], 4:[0, 0, -Math.PI/2],
+                5:[Math.PI/2, 0], 6:[Math.PI, 0]};
+function dieMesh(v){
+  if(!dieGeo) dieGeo = roundedBox(DIE_A, DIE_R, 8);
+  /* BoxGeometry 的六組依序是 +x −x +y −y +z −z */
+  const faces = [3, 4, 1, 6, 2, 5];
+  const g = new THREE.Group();
+  const m = new THREE.Mesh(dieGeo, faces.map(dieFaceMat));
+  const up = DIE_UP[v] || DIE_UP[1];
+  m.rotation.set(up[0], up[1], up[2] || 0);
+  m.castShadow = true; m.receiveShadow = true;
+  g.add(m);
+  return g;
+}

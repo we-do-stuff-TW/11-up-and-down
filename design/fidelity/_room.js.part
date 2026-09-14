@@ -1,0 +1,374 @@
+function buildRoom(r, scene){
+  const FLOOR_Y = -TABLE_H, CEIL_Y = ROOM_CEIL, RX = ROOM_RX, ZB = ROOM_ZB, ZF = ROOM_ZF;
+  const MAXA = r.capabilities.getMaxAnisotropy();
+
+  /* ---- 畫布貼圖 ---- */
+  function cv2d(w, h){ const c = document.createElement("canvas"); c.width = w; c.height = h; return [c, c.getContext("2d")]; }
+  function ctex(c, o){
+    const t = new THREE.CanvasTexture(c);
+    if(!o || !o.linear) t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = MAXA;
+    if(o && o.repeat){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(o.repeat[0], o.repeat[1]); }
+    return t;
+  }
+  const hex = (a, b, c) => "rgb(" + (a|0) + "," + (b|0) + "," + (c|0) + ")";
+  /* 一塊有年輪走向的木板：u 沿板長、v 橫過板寬。a 深色、b 淺色 */
+  function woodCanvas(a, b, W, H, seed, streak){
+    const [c, g] = cv2d(W, H), im = g.createImageData(W, H), d = im.data;
+    const low = sampler(noiseField(256, 4, 3, seed), 256), hi = sampler(noiseField(256, 32, 3, seed + 1), 256);
+    for(let y = 0; y < H; y++) for(let x = 0; x < W; x++){
+      const u = x / W, v = y / H;
+      const wob = (low(u * 2, v * .5) - .5) * 2.2;
+      const ring = .5 + .5 * Math.sin((v * streak + wob + (hi(u * 3, v) - .5) * .4) * Math.PI * 2);
+      const k = Math.pow(ring, 1.4) * .62 + hi(u * 12, v * 3) * .38;
+      const i = (y * W + x) * 4;
+      d[i] = a[0] + (b[0] - a[0]) * k; d[i+1] = a[1] + (b[1] - a[1]) * k; d[i+2] = a[2] + (b[2] - a[2]) * k; d[i+3] = 255;
+    }
+    g.putImageData(im, 0, 0);
+    return c;
+  }
+  const WOOD = {walnut:{a:[0x3a,0x24,0x16], b:[0x6c,0x48,0x2f]}, dark:{a:[0x2a,0x18,0x0e], b:[0x55,0x36,0x22]}};
+  const woodMats = {};
+  function woodMat(kind, rep){
+    const key = kind + (rep || "");
+    if(woodMats[key]) return woodMats[key];
+    const w = WOOD[kind], t = ctex(woodCanvas(w.a, w.b, 1024, 256, kind === "walnut" ? 21 : 61, 7), {repeat:rep || [1, 1]});
+    return woodMats[key] = new THREE.MeshPhysicalMaterial({map:t, roughness:.55, metalness:0, bumpMap:t, bumpScale:.0015, clearcoat:.25, clearcoatRoughness:.4});
+  }
+  /* 寬板地板：一排一排錯開的長板，每塊深淺不一 */
+  function plankFloor(w, PH){
+    const Nn = 1024, [c, g] = cv2d(Nn, Nn), rnd = mulberry32(9);
+    g.fillStyle = hex(w.a[0] * .5, w.a[1] * .5, w.a[2] * .5); g.fillRect(0, 0, Nn, Nn);
+    const plank = woodCanvas(w.a, w.b, 1024, 64, 45, 4);
+    const rows = Math.round(Nn / PH);
+    for(let rw = 0; rw < rows; rw++){
+      const off = (rw % 3) * 340 + rnd() * 120;
+      for(let x = -Nn + (off % 600); x < Nn; x += 600){
+        const sh = .84 + rnd() * .32;
+        g.globalAlpha = 1; g.drawImage(plank, 0, 0, 1024, 64, x, rw * PH + 1, 596, PH - 2);
+        g.globalAlpha = Math.max(0, 1 - sh); g.fillStyle = "#000"; g.fillRect(x, rw * PH + 1, 596, PH - 2);
+        g.globalAlpha = Math.max(0, sh - 1) * .5; g.fillStyle = "#fff"; g.fillRect(x, rw * PH + 1, 596, PH - 2);
+      }
+    }
+    g.globalAlpha = 1;
+    return c;
+  }
+  /* 織紋：一層細細的經緯線壓在圖案上，再用 soft-light 疊一層染色不均，毯子才不像印出來的 */
+  function weaveOver(g, W, H, k){
+    g.save();
+    for(let y = 0; y < H; y += 3){ g.fillStyle = (y % 6 === 0) ? "rgba(0,0,0," + k + ")" : "rgba(255,255,255," + (k * .55) + ")"; g.fillRect(0, y, W, 1.5); }
+    for(let x = 0; x < W; x += 3){ g.fillStyle = (x % 6 === 0) ? "rgba(0,0,0," + (k * .6) + ")" : "rgba(255,255,255," + (k * .35) + ")"; g.fillRect(x, 0, 1.2, H); }
+    const f = noiseField(128, 6, 3, 77), [nc, ng] = cv2d(128, 128), im = ng.createImageData(128, 128);
+    for(let i = 0; i < f.length; i++){ const v = 128 + (f[i] - .5) * 90; im.data[i*4] = im.data[i*4+1] = im.data[i*4+2] = v; im.data[i*4+3] = 255; }
+    ng.putImageData(im, 0, 0);
+    g.globalCompositeOperation = "soft-light"; g.globalAlpha = .9;
+    g.fillStyle = g.createPattern(nc, "repeat");
+    g.save(); g.scale(4, 4); g.fillRect(0, 0, W / 4, H / 4); g.restore();
+    g.restore();
+  }
+  function weaveBump(W, H){
+    const [c, g] = cv2d(W, H);
+    g.fillStyle = "#808080"; g.fillRect(0, 0, W, H);
+    for(let y = 0; y < H; y += 3){ g.fillStyle = (y % 6 === 0) ? "#5a5a5a" : "#a0a0a0"; g.fillRect(0, y, W, 1.5); }
+    for(let x = 0; x < W; x += 3){ g.fillStyle = (x % 6 === 0) ? "#666" : "#999"; g.fillRect(x, 0, 1.2, H); }
+    const t = ctex(c, {linear:true}); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); return t;
+  }
+  /* 毯子兩端的流蘇：畫在透明畫布邊上 */
+  function fringe(g, W, H, pad, col){
+    g.strokeStyle = col; g.lineWidth = 2.2; g.lineCap = "round";
+    for(let y = pad + 4; y < H - pad; y += 7){
+      const j = Math.sin(y * .37) * 5;
+      g.beginPath(); g.moveTo(pad, y); g.lineTo(6 + j, y + Math.sin(y) * 3); g.stroke();
+      g.beginPath(); g.moveTo(W - pad, y); g.lineTo(W - 6 - j, y + Math.cos(y) * 3); g.stroke();
+    }
+  }
+  /* 波斯團花：茜紅底、靛藍團花與角花、象牙細紋邊。畫在 2048×1536 的座標上，實際畫布縮四分之三 */
+  function persianRug(){
+    const W = 2048, H = 1536, P = 46, K = .75, [c, g] = cv2d(W * K, H * K);
+    g.scale(K, K);
+    const madder = "#7a2e26", indigo = "#24304d", ivory = "#d9cbb0", gold = "#b58a3c", deep = "#4d1c18";
+    fringe(g, W, H, P, ivory);
+    g.fillStyle = ivory; g.fillRect(P, P, W - 2*P, H - 2*P);
+    g.fillStyle = indigo; g.fillRect(P + 30, P + 30, W - 2*P - 60, H - 2*P - 60);
+    const flower = (x, y, rd) => { g.fillStyle = ivory; for(let k = 0; k < 8; k++){ const a = k / 8 * Math.PI * 2; g.beginPath(); g.arc(x + Math.cos(a) * rd * .6, y + Math.sin(a) * rd * .6, rd * .42, 0, Math.PI * 2); g.fill(); } g.fillStyle = gold; g.beginPath(); g.arc(x, y, rd * .3, 0, Math.PI * 2); g.fill(); };
+    for(let x = P + 110; x < W - P - 60; x += 160){ flower(x, P + 105, 34); flower(x, H - P - 105, 34); }
+    for(let y = P + 265; y < H - P - 200; y += 160){ flower(P + 105, y, 34); flower(W - P - 105, y, 34); }
+    g.fillStyle = ivory; g.fillRect(P + 180, P + 180, W - 2*P - 360, H - 2*P - 360);
+    g.fillStyle = madder; g.fillRect(P + 200, P + 200, W - 2*P - 400, H - 2*P - 400);
+    const corner = (x, y, sx, sy) => {
+      const lobe = (n, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(x, y); g.lineTo(x + sx * n, y); g.quadraticCurveTo(x + sx * n * .62, y + sy * n * .29, x + sx * n * .48, y + sy * n * .48); g.quadraticCurveTo(x + sx * n * .29, y + sy * n * .62, x, y + sy * n); g.closePath(); g.fill(); };
+      lobe(420, indigo); lobe(330, ivory); lobe(280, indigo);
+    };
+    corner(P + 200, P + 200, 1, 1); corner(W - P - 200, P + 200, -1, 1); corner(P + 200, H - P - 200, 1, -1); corner(W - P - 200, H - P - 200, -1, -1);
+    const cx = W / 2, cy = H / 2;
+    const lobed = (rd, n, col) => { g.fillStyle = col; g.beginPath(); for(let k = 0; k <= n * 2; k++){ const a = k / (n * 2) * Math.PI * 2, rr = rd * (k % 2 ? .86 : 1); g.lineTo(cx + Math.cos(a) * rr * 1.25, cy + Math.sin(a) * rr); } g.closePath(); g.fill(); };
+    lobed(400, 12, ivory); lobed(372, 12, indigo); lobed(300, 10, ivory); lobed(272, 10, madder); lobed(190, 8, indigo); lobed(160, 8, gold); lobed(96, 8, deep); lobed(60, 6, ivory);
+    g.fillStyle = indigo;
+    for(const s of [-1, 1]){ g.beginPath(); g.moveTo(cx, cy + s * 560); g.lineTo(cx + 70, cy + s * 430); g.lineTo(cx - 70, cy + s * 430); g.closePath(); g.fill(); }
+    g.fillStyle = "rgba(217,203,176,.55)";
+    for(let y = P + 330; y < H - P - 300; y += 110) for(let x = P + 330; x < W - P - 300; x += 110){
+      if(Math.hypot(x - cx, (y - cy) * 1.25) < 520) continue;
+      g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.fill(); g.fillRect(x - 16, y - 1.5, 32, 3); g.fillRect(x - 1.5, y - 16, 3, 32);
+    }
+    weaveOver(g, W, H, .14);
+    return c;
+  }
+  /* 書脊：淺灰底、兩道更淺的橫帶，乘上每本書自己的顏色就是燙金書名的位置 */
+  function spineTex(){
+    const [c, g] = cv2d(64, 128);
+    g.fillStyle = "#d4d4d4"; g.fillRect(0, 0, 64, 128);
+    g.fillStyle = "#f6f6f6"; g.fillRect(6, 14, 52, 4); g.fillRect(6, 24, 52, 2); g.fillRect(6, 100, 52, 3);
+    g.fillStyle = "#bdbdbd"; g.fillRect(0, 0, 3, 128); g.fillRect(61, 0, 3, 128);
+    return ctex(c);
+  }
+  /* 護牆板：一格 6 × 11 個世界單位，下方矮板、腰線、上方高板、踢腳 */
+  function panelCanvas(){
+    const W = 768, H = 1408, [c, g] = cv2d(W, H), w = WOOD.dark;
+    const base = woodCanvas(w.a, w.b, 256, 1408, 63, 9);
+    g.save(); g.translate(W, 0); g.rotate(Math.PI / 2); g.drawImage(base, 0, 0, 256, 1408, 0, 0, 1408, W); g.restore();   /* 直紋 */
+    const u = W / 6;
+    const panel = (x, y, pw, ph) => {
+      g.fillStyle = "rgba(0,0,0,.28)"; g.fillRect(x, y, pw, ph);
+      g.fillStyle = "rgba(255,225,190,.10)"; g.fillRect(x + 10, y + 10, pw - 20, ph - 20);
+      g.fillStyle = "rgba(255,240,210,.22)"; g.fillRect(x + 10, y + 10, pw - 20, 3); g.fillRect(x + 10, y + 10, 3, ph - 20);
+      g.fillStyle = "rgba(0,0,0,.45)"; g.fillRect(x + 10, y + ph - 13, pw - 20, 3); g.fillRect(x + pw - 13, y + 10, 3, ph - 20);
+      g.fillStyle = "rgba(255,225,190,.06)"; g.fillRect(x + 26, y + 26, pw - 52, ph - 52);
+    };
+    const rail = (y, h) => { g.fillStyle = "rgba(255,230,200,.16)"; g.fillRect(0, y, W, h); g.fillStyle = "rgba(0,0,0,.4)"; g.fillRect(0, y + h - 4, W, 4); g.fillStyle = "rgba(255,240,215,.3)"; g.fillRect(0, y, W, 3); };
+    for(const k of [0, 1]){ panel(k * W / 2 + .35 * u, .9 * u, W / 2 - .7 * u, 6.4 * u); panel(k * W / 2 + .35 * u, 8.3 * u, W / 2 - .7 * u, 2.1 * u); }
+    rail(7.6 * u, .4 * u); rail(.2 * u, .3 * u); rail(10.6 * u, .4 * u);
+    return c;
+  }
+  /* 掛畫：暗色風景一片 */
+  function paintingCanvas(seed){
+    const W = 512, H = 384, [c, g] = cv2d(W, H);
+    const gr = g.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, "#3b3f57"); gr.addColorStop(.6, "#8a7a6a"); gr.addColorStop(1, "#23201c");
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    const f = sampler(noiseField(128, 3, 3, seed), 128);
+    g.fillStyle = "#1c1a18"; g.beginPath(); g.moveTo(0, H);
+    for(let x = 0; x <= W; x += 6) g.lineTo(x, H * .62 + (f(x / W, .5) - .5) * 160);
+    g.lineTo(W, H); g.closePath(); g.fill();
+    g.fillStyle = "rgba(255,230,180,.25)"; g.beginPath(); g.arc(W * .68, H * .3, 26, 0, Math.PI * 2); g.fill();
+    return c;
+  }
+  function flameTex(){
+    const W = 128, H = 192, [c, g] = cv2d(W, H);
+    g.beginPath(); g.moveTo(64, 4); g.bezierCurveTo(120, 80, 122, 150, 64, 186); g.bezierCurveTo(6, 150, 8, 80, 64, 4); g.closePath(); g.clip();
+    const gr = g.createRadialGradient(64, 140, 4, 64, 120, 110);
+    gr.addColorStop(0, "rgba(255,246,200,1)"); gr.addColorStop(.3, "rgba(255,170,60,.95)"); gr.addColorStop(.62, "rgba(220,80,20,.5)"); gr.addColorStop(1, "rgba(120,20,0,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    return ctex(c);
+  }
+
+  /* ---- 幾何零件 ---- */
+  function box(w, h, d, mat, x, y, z){
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    if(x !== undefined) m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true; return m;
+  }
+  /* 圓角盒：圓角矩形往 z 擠出、邊緣倒圓。沒載 addons，所以不用 RoundedBoxGeometry */
+  const rboxGeo = new Map();
+  function rbox(w, h, d, rad, mat, x, y, z){
+    const key = [w, h, d, rad].join(",");
+    let geo = rboxGeo.get(key);
+    if(!geo){
+      const R = Math.min(rad, w / 2 - .01, h / 2 - .01, d / 2 - .01), cr = Math.max(.01, Math.min(R, (w - 2 * R) / 2, (h - 2 * R) / 2));
+      const sw = w - 2 * R, sh = h - 2 * R, s = new THREE.Shape();
+      s.moveTo(-sw/2 + cr, -sh/2); s.lineTo(sw/2 - cr, -sh/2); s.quadraticCurveTo(sw/2, -sh/2, sw/2, -sh/2 + cr);
+      s.lineTo(sw/2, sh/2 - cr); s.quadraticCurveTo(sw/2, sh/2, sw/2 - cr, sh/2); s.lineTo(-sw/2 + cr, sh/2);
+      s.quadraticCurveTo(-sw/2, sh/2, -sw/2, sh/2 - cr); s.lineTo(-sw/2, -sh/2 + cr); s.quadraticCurveTo(-sw/2, -sh/2, -sw/2 + cr, -sh/2);
+      geo = new THREE.ExtrudeGeometry(s, {depth:d - 2 * R, bevelEnabled:true, bevelThickness:R, bevelSize:R, bevelSegments:3, curveSegments:5});
+      geo.center();
+      rboxGeo.set(key, geo);
+    }
+    const m = new THREE.Mesh(geo, mat);
+    if(x !== undefined) m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true; return m;
+  }
+  function cyl(rt, rb, h, mat, x, y, z, seg){
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 24), mat);
+    if(x !== undefined) m.position.set(x, y, z);
+    m.castShadow = m.receiveShadow = true; return m;
+  }
+  const BRASS = new THREE.MeshStandardMaterial({color:0xC9A552, metalness:.85, roughness:.32});
+  const BRASS_DARK = new THREE.MeshStandardMaterial({color:0x6b5230, metalness:.8, roughness:.4});
+  const STONE = new THREE.MeshStandardMaterial({color:0xb2a189, roughness:.9});
+  /* 墨綠絲絨：sheen 給布在側光下那層淡淡的回光 */
+  const uphMat = col => new THREE.MeshPhysicalMaterial({color:col, roughness:.85, metalness:0, sheen:.5, sheenRoughness:.7, sheenColor:new THREE.Color(0x5f8a72)});
+  const MOSS = uphMat(0x17332a);
+  const SHADE = () => new THREE.MeshStandardMaterial({color:0xe8d7b5, emissive:0xffc98a, emissiveIntensity:1.2, side:THREE.DoubleSide, roughness:.9});
+
+  /* 書：整間房的書收進一個 InstancedMesh，一次畫完。每本書一個矩陣、一個顏色 */
+  const PALETTE = ["#5a221c","#6b2a24","#1f3a30","#172e25","#22293f","#2c3550","#8e6a2b","#23201d","#2e2622","#3b302a","#4b2d3c","#6a4b3a","#7a5a3a","#7a2e26","#b0813a"];
+  const books = {mats:[], cols:[], rnd:mulberry32(303)};
+  function shade(hexCol, rnd){ const c = new THREE.Color(hexCol); c.offsetHSL(0, 0, (rnd() - .5) * .08); return c; }
+  /* 書櫃：兩側板、背板、頂底板、層板，層板上塞滿書（偶爾一疊橫放、偶爾留一口氣） */
+  function bookcase(o){
+    const g = new THREE.Group();
+    const w = o.w, h = o.h, d = o.d || 1.15, n = o.shelves || 6, T = .1, mat = o.mat;
+    g.add(box(.12, h, d, mat, -w/2 + .06, h/2, 0), box(.12, h, d, mat, w/2 - .06, h/2, 0));
+    g.add(box(w, h, .06, mat, 0, h/2, -d/2 + .03));
+    g.add(box(w, T, d, mat, 0, h - T/2, 0));
+    g.add(box(w, .35, d, mat, 0, .175, 0));
+    const y0 = .35, ch = (h - y0 - T) / n;
+    for(let k = 0; k < n; k++) g.add(box(w - .24, T, d - .04, mat, 0, y0 + k * ch + T/2, 0));
+    g.position.set(o.x, o.y, o.z); g.rotation.y = o.ry || 0; g.updateMatrixWorld(true);
+    const rnd = books.rnd, m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), e = new THREE.Euler();
+    const put = (col) => { m.compose(p, q, s).premultiply(g.matrixWorld); books.mats.push(m.clone()); books.cols.push(col); };
+    for(let k = 0; k < n; k++){
+      const base = y0 + k * ch + T, hmax = ch * .92;
+      let x = -w/2 + .12 + .06 + rnd() * .15;
+      const fill = (o.fill || .92) - (k === n - 1 ? .25 * rnd() : 0);
+      const xEnd = -w/2 + .12 + (w - .24) * fill;
+      while(x < xEnd){
+        const rr = rnd();
+        if(rr < .07){ x += .25 + rnd() * .7; continue; }
+        if(rr < .16){
+          const cnt = 2 + Math.floor(rnd() * 3), bl = .62 + rnd() * .25, bd = .78 + rnd() * .12; let yy = base;
+          for(let i = 0; i < cnt; i++){
+            const th = .12 + rnd() * .1;
+            p.set(x + bl/2, yy + th/2, (rnd() - .5) * .08); s.set(bl, th, bd * .8); e.set(0, (rnd() - .5) * .16, 0); q.setFromEuler(e);
+            put(shade(PALETTE[Math.floor(rnd() * PALETTE.length)], rnd)); yy += th;
+          }
+          x += bl + .06; continue;
+        }
+        const th = .13 + rnd() * .19, bh = hmax * (.66 + rnd() * .34), bd = d * (.6 + rnd() * .18);
+        const lean = (rr > .92 && x > -w/2 + .6) ? (rnd() - .5) * .2 : 0;
+        p.set(x + th/2 + Math.abs(lean) * bh * .5, base + bh/2, -d/2 + .06 + bd/2 + (rnd() - .5) * .06);
+        s.set(th, bh, bd); e.set(0, 0, lean); q.setFromEuler(e);
+        put(shade(PALETTE[Math.floor(rnd() * PALETTE.length)], rnd));
+        x += th + .012 + Math.abs(lean) * .6;
+      }
+    }
+    return g;
+  }
+  function buildBooks(){
+    const n = books.mats.length;
+    const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({map:spineTex(), roughness:.78, metalness:0}), n);
+    for(let i = 0; i < n; i++){ im.setMatrixAt(i, books.mats[i]); im.setColorAt(i, books.cols[i]); }
+    im.instanceMatrix.needsUpdate = true; if(im.instanceColor) im.instanceColor.needsUpdate = true;
+    im.castShadow = im.receiveShadow = true;
+    return im;
+  }
+  /* 墨綠軟包椅：圓角坐墊、微微後仰的靰背、兩側扶手，底下一圈深木座與短腳，靰背上兩對釘扣。
+     椅子的正面朝 +z；擺到座位上再轉向桌心 */
+  const chairWood = woodMat("dark");
+  const btnMat = new THREE.MeshStandardMaterial({color:0x162c23, roughness:.9});
+  function chair(){
+    const g = new THREE.Group(), legs = .42;
+    for(const sx of [-1, 1]) for(const sz of [-1, 1]) g.add(cyl(.09, .07, legs, chairWood, sx * .82, legs/2, sz * .75, 12));
+    g.add(box(1.8, .5, 1.76, chairWood, 0, legs + .25, 0));
+    g.add(rbox(2.0, .52, 1.96, .15, MOSS, 0, legs + .74, .02));
+    const back = rbox(2.0, 1.8, .46, .17, MOSS, 0, legs + 1.56, -.86); back.rotation.x = -.13; g.add(back);
+    for(const sx of [-1, 1]) g.add(rbox(.4, .7, 1.86, .13, MOSS, sx * .99, legs + .94, -.06));
+    for(const sx of [-.5, .5]) for(const yy of [1.55, 2.15]){ const b = cyl(.06, .06, .03, btnMat, sx, legs + yy, -.62 - (yy - 1.55) * .117, 10); b.rotation.x = Math.PI/2 - .13; g.add(b); }
+    return g;
+  }
+  /* 壁燈：銅座、短桿、亮著的布罩，裡面一顆點光 */
+  function sconce(){
+    const g = new THREE.Group();
+    g.add(box(.16, .5, .08, BRASS_DARK, 0, 0, .04), cyl(.03, .03, .5, BRASS, 0, .25, .3, 8));
+    const sh = new THREE.Mesh(new THREE.ConeGeometry(.36, .42, 24, 1, true), SHADE()); sh.position.set(0, .6, .3); g.add(sh);
+    const l = new THREE.PointLight(0xffc78a, 4.5, 9, 2); l.position.set(0, .5, .45); g.add(l);
+    return g;
+  }
+  function floorLamp(){
+    const g = new THREE.Group();
+    g.add(cyl(.5, .55, .08, BRASS_DARK, 0, .04, 0, 32), cyl(.04, .04, 5.6, BRASS, 0, 2.85, 0, 12));
+    const sh = new THREE.Mesh(new THREE.CylinderGeometry(.85, 1.0, 1.1, 40, 1, true), SHADE()); sh.material.emissiveIntensity = .8; sh.position.y = 5.75; g.add(sh);
+    const l = new THREE.PointLight(0xffc78a, 6, 12, 2); l.position.y = 5.5; g.add(l);
+    return g;
+  }
+  function picture(w, h, seed, frameMat){
+    const g = new THREE.Group();
+    g.add(box(w + .3, h + .3, .12, frameMat, 0, 0, 0));
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({map:ctex(paintingCanvas(seed)), roughness:.7}));
+    p.position.z = .065; g.add(p);
+    return g;
+  }
+  /* 吊燈：桌子上方一盞寬罩——遊戲那盞頂燈的形體。鏡頭看不到它，翻王牌時燈亮一下牆上會有它的影子 */
+  function pendant(){
+    const g = new THREE.Group();
+    const out = new THREE.Mesh(new THREE.ConeGeometry(1.9, 1.25, 48, 1, true), new THREE.MeshStandardMaterial({color:0x2c231a, metalness:.55, roughness:.45}));
+    const inn = new THREE.Mesh(new THREE.ConeGeometry(1.86, 1.22, 48, 1, true), new THREE.MeshStandardMaterial({color:0xffe6c4, emissive:0xffd9a8, emissiveIntensity:1.6, side:THREE.BackSide}));
+    out.position.y = inn.position.y = 6.75; g.add(out, inn);
+    g.add(cyl(.09, .09, .6, BRASS_DARK, 0, 7.6, 0, 16), cyl(.025, .025, CEIL_Y - 7.9, BRASS_DARK, 0, (CEIL_Y + 7.9)/2, 0, 8));
+    g.position.set(-.3, 0, 1.0);
+    return g;
+  }
+  /* 壁爐：石砌門框與爐膛、爐台、柴與火。火是三片相加混色的火焰貼圖，tick() 讓它一直呼吸 */
+  function fireplace(){
+    const g = new THREE.Group(), D = .95, OW = 3.8, OH = 3.1;
+    g.add(box(.9, OH + .7, D, STONE, -OW/2 - .45, (OH + .7)/2, 0), box(.9, OH + .7, D, STONE, OW/2 + .45, (OH + .7)/2, 0));
+    g.add(box(OW + 1.8, .75, D, STONE, 0, OH + .7 + .375, 0));
+    g.add(box(OW + 2.4, .18, D + .3, woodMat("dark"), 0, OH + 1.45 + .09, .12));
+    g.add(box(OW + 2.4, .5, D + .2, STONE, 0, -.23, .1));
+    const inner = new THREE.MeshStandardMaterial({color:0x17110e, roughness:1});
+    g.add(box(OW, OH, .1, inner, 0, OH/2, -D/2 + .05), box(OW, .1, D, inner, 0, .05, 0));
+    const logMat = new THREE.MeshStandardMaterial({color:0x3a2416, roughness:.95});
+    const l1 = cyl(.19, .19, 2.4, logMat, 0, .3, -.15, 12); l1.rotation.z = Math.PI/2; g.add(l1);
+    const l2 = cyl(.17, .17, 2.2, logMat, .2, .62, -.05, 12); l2.rotation.z = Math.PI/2 + .12; l2.rotation.y = .25; g.add(l2);
+    const ember = new THREE.Mesh(new THREE.PlaneGeometry(2.2, .5), new THREE.MeshBasicMaterial({color:new THREE.Color(0xff5a1a).multiplyScalar(2.5), transparent:true, opacity:.9, blending:THREE.AdditiveBlending, depthWrite:false}));
+    ember.rotation.x = -Math.PI/2; ember.position.set(0, .12, -.1); g.add(ember);
+    const FT = flameTex(), flames = [];
+    for(let i = 0; i < 3; i++){
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.65), new THREE.MeshBasicMaterial({map:FT, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
+      f.position.set((i - 1) * .55, .95, (i - 1) * .12); f.rotation.y = (i - 1) * .35; g.add(f); flames.push(f);
+    }
+    /* 火光要照得到桌邊：距離 26、強度 110（decay 2 之下到桌心約剩 0.6） */
+    const light = new THREE.PointLight(0xff8c3a, 110, 26, 2); light.position.set(0, 1.5, 1.4); g.add(light);
+    g.userData.tick = function(t){
+      const s = t / 1000;
+      light.intensity = 110 * (1 + .16 * Math.sin(s * 9.1) + .10 * Math.sin(s * 23.7 + 1) + .06 * Math.sin(s * 41.3));
+      flames.forEach((f, i) => { f.scale.y = 1 + .14 * Math.sin(s * (7 + i * 2.3) + i); f.scale.x = 1 + .08 * Math.sin(s * (11 + i) + i * 2); f.material.opacity = .78 + .2 * Math.sin(s * (13 + i * 3) + i); });
+      ember.material.opacity = .75 + .2 * Math.sin(s * 5.3);
+    };
+    return g;
+  }
+
+  /* ---- 拼房間 ---- */
+  const g = new THREE.Group();
+  const dark = woodMat("dark", [2, 1]);
+  const planks = ctex(plankFloor(WOOD.dark, 128), {repeat:[2 * RX / 11, (ZF - ZB) / 11]});
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(2 * RX, ZF - ZB),
+    new THREE.MeshPhysicalMaterial({map:planks, roughness:.62, metalness:0, bumpMap:planks, bumpScale:.002, clearcoat:.12, clearcoatRoughness:.5}));
+  floor.rotation.x = -Math.PI/2; floor.position.set(0, FLOOR_Y, (ZF + ZB)/2); floor.receiveShadow = true; g.add(floor);
+  const H = CEIL_Y - FLOOR_Y, ym = (CEIL_Y + FLOOR_Y)/2, zc = (ZF + ZB)/2;
+  const panelT = ctex(panelCanvas(), {repeat:[2 * RX / 6, 1]});
+  const panelMat = new THREE.MeshPhysicalMaterial({map:panelT, roughness:.5, metalness:0, bumpMap:panelT, bumpScale:.01, clearcoat:.2, clearcoatRoughness:.5});
+  const panelSideT = panelT.clone(); panelSideT.repeat.set((ZF - ZB) / 6, 1); panelSideT.needsUpdate = true;
+  const panelSide = panelMat.clone(); panelSide.map = panelSideT; panelSide.bumpMap = panelSideT;
+  const wall = (w, mat) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, H), mat); m.receiveShadow = true; return m; };
+  const back = wall(2 * RX, panelMat); back.position.set(0, ym, ZB); g.add(back);
+  const front = wall(2 * RX, panelMat); front.position.set(0, ym, ZF); front.rotation.y = Math.PI; g.add(front);
+  const left = wall(ZF - ZB, panelSide); left.position.set(-RX, ym, zc); left.rotation.y = Math.PI/2; g.add(left);
+  const right = wall(ZF - ZB, panelSide); right.position.set(RX, ym, zc); right.rotation.y = -Math.PI/2; g.add(right);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(2 * RX, ZF - ZB), new THREE.MeshStandardMaterial({color:0x8f7d64, roughness:1}));
+  ceil.rotation.x = Math.PI/2; ceil.position.set(0, CEIL_Y, zc); g.add(ceil);
+  g.add(box(2 * RX, .5, .08, dark, 0, FLOOR_Y + .25, ZB + .04), box(.08, .5, ZF - ZB, dark, -RX + .04, FLOOR_Y + .25, zc), box(.08, .5, ZF - ZB, dark, RX - .04, FLOOR_Y + .25, zc), box(2 * RX, .5, .08, dark, 0, FLOOR_Y + .25, ZF - .04));
+  /* 地毯 */
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(19, 14.25), new THREE.MeshPhysicalMaterial({map:ctex(persianRug()), transparent:true, roughness:1, metalness:0,
+    bumpMap:weaveBump(1024, 768), bumpScale:.012, sheen:.35, sheenRoughness:.8, sheenColor:new THREE.Color(0x3a2a1a)}));
+  rug.rotation.x = -Math.PI/2; rug.position.y = FLOOR_Y + .012; rug.receiveShadow = true; g.add(rug);
+  /* 對面：嵌牆書櫃、兩盞壁燈 */
+  g.add(bookcase({w:20.4, h:8.6, d:1.25, shelves:6, mat:dark, x:0, y:FLOOR_Y, z:ZB + .65, fill:.95}));
+  for(const sx of [-1, 1]){ const sc = sconce(); sc.position.set(sx * 11.9, FLOOR_Y + 4.4, ZB + .08); g.add(sc); }
+  /* 右手邊：石砌壁爐、爐台上的蠟燭與鐘 */
+  const fp = fireplace(); fp.position.set(RX - .5, FLOOR_Y, -2.2); fp.rotation.y = -Math.PI/2; g.add(fp);
+  const candleMat = new THREE.MeshStandardMaterial({color:0xefe3c8, roughness:.7});
+  for(const dz of [-2.1, -1.7]){
+    g.add(cyl(.08, .08, .7, candleMat, RX - .95, FLOOR_Y + 5.3, -2.2 + dz, 10));
+    const fl = new THREE.Mesh(new THREE.SphereGeometry(.06, 8, 8), new THREE.MeshBasicMaterial({color:new THREE.Color(0xffc060).multiplyScalar(6)})); fl.position.set(RX - .95, FLOOR_Y + 5.75, -2.2 + dz); g.add(fl);
+  }
+  const cl = new THREE.PointLight(0xffc070, 1.2, 5, 2); cl.position.set(RX - 1.2, FLOOR_Y + 5.9, -4.1); g.add(cl);
+  g.add(box(.9, 1.1, .35, BRASS_DARK, RX - .95, FLOOR_Y + 5.55, -.3));
+  /* 左手邊：窄書櫃、一幅畫、落地燈 */
+  g.add(bookcase({w:6.2, h:8.6, d:1.2, shelves:6, mat:dark, x:-RX + .62, y:FLOOR_Y, z:-6.5, ry:Math.PI/2}));
+  const pic = picture(5.2, 3.8, 3, woodMat("walnut")); pic.position.set(-RX + .1, FLOOR_Y + 5.4, 2.2); pic.rotation.y = Math.PI/2; g.add(pic);
+  const lamp2 = floorLamp(); lamp2.position.set(-RX + 2.6, FLOOR_Y, 6.0); g.add(lamp2);
+  g.add(pendant());
+  g.add(buildBooks());
+  scene.add(g);
+  return {g:g, floor:floor, tick:fp.userData.tick, chair:chair, last:0};
+}

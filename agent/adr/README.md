@@ -15,6 +15,6 @@
 
 | # | 決策 | 狀態 | 日期 |
 |---|---|---|---|
-| | | | |
+| 0001 | [立體牌桌加一層後處理,並用「不動就不畫」換品質](0001-3d-post-processing.md) | Accepted | 2026-09-14 |
 
 狀態:`Proposed` / `Accepted` / `Deprecated` / `Superseded by NNNN`
