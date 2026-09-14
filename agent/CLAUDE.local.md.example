@@ -1,0 +1,12 @@
+# CLAUDE.local.md — 個人/本機覆蓋(範本)
+
+> 用法:複製本檔為**專案根目錄**的 `CLAUDE.local.md`(Claude Code 只會在根目錄自動載入它),並確認 `.gitignore` 裡有 `CLAUDE.local.md`。
+> 放「只屬於這台機器/只屬於你個人」的東西,不進版控。
+
+## 本機路徑
+
+<!-- 例:PARC_VAULT_PATH=/Users/lc/... 這類只在你機器上成立的路徑。 -->
+
+## 個人偏好覆蓋
+
+<!-- 只對你生效、不想寫進團隊共享 CLAUDE.md 的偏好。 -->
