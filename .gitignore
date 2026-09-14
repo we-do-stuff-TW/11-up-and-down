@@ -4,3 +4,4 @@ _head.txt
 supabase/.temp/
 CLAUDE.local.md
 .claude/settings.local.json
+design/i18n/_fail-*.png

@@ -15,11 +15,88 @@
  */
 import { Browser } from "./_browser.ts";
 
+/* ---------------- 開瀏覽器之前的靜態檢查 ----------------
+   走一遍頁面只看得到「那一刻畫面上有的字」。錯誤分支、少見的狀態、
+   要特定規則才出現的句子，走十二站是走不到的。
+   所以先做一件不必開瀏覽器的事：把程式裡所有中文字串 literal 抓出來，
+   比對有沒有進字典。字串裡是 HTML 片段的話，中文在文字節點與 aria-label 上
+   ——那是 i18nDOM 的事，所以拆到那一層再比對。 */
+const ALLOW = new Set([
+  "中文",          /* 語言那一排，兩個選項各寫自己的語言 */
+  "座位",          /* 引擎給空位的預設名，由畫面層的 seatName() 換掉 */
+]);
+/* console.* 的訊息是寫給開發者看的，永遠不上畫面。認「那一行是不是 console 呼叫」
+   而不是把訊息內容寫進白名單——訊息改一個字白名單就失效了。 */
+const isDevLog = (src: string, at: number) =>
+  /console\.(log|warn|error|info|debug)\s*\($/.test(
+    src.slice(Math.max(0, at - 80), at).split("\n").pop() ?? "",
+  );
+function staticCheck(): string[] {
+  const src = Deno.readTextFileSync("docs/index.html");
+  const dict = src.match(/window\.I18N_EN = \{[\s\S]*?\n\};/);
+  if (!dict) throw new Error("找不到字典（window.I18N_EN）");
+  // deno-lint-ignore no-explicit-any
+  const D = new Function("return " + dict[0].replace("window.I18N_EN = ", ""))() as Record<string, any>;
+  const known = new Set<string>(Object.keys(D));
+  for (const v of Object.values(D)) if (v && typeof v === "object" && v.zh) known.add(v.zh);
+  const dictAt = src.indexOf(dict[0]), dictEnd = dictAt + dict[0].length;
+
+  const CJK = /[㐀-鿿豈-﫿＀-￯]/;
+  const hits: string[] = [];
+  const blocks = /<script(?: type="module")?>([\s\S]*?)<\/script>/g;
+  let b: RegExpExecArray | null;
+  while ((b = blocks.exec(src))) {
+    const at = b.index + b[0].indexOf(b[1]), text = b[1];
+    if (at < dictEnd && at + text.length > dictAt) continue;      /* 字典自己跳過 */
+    let i = 0, mode = "code", quote = "", buf = "", bufAt = 0;
+    while (i < text.length) {
+      const c = text[i], c2 = text[i + 1];
+      if (mode === "code") {
+        if (c === "/" && c2 === "/") { mode = "lc"; i += 2; continue; }
+        if (c === "/" && c2 === "*") { mode = "bc"; i += 2; continue; }
+        if (c === '"' || c === "'" || c === "`") { mode = "str"; quote = c; buf = ""; bufAt = at + i; i++; continue; }
+        i++; continue;
+      }
+      if (mode === "lc") { if (c === "\n") mode = "code"; i++; continue; }
+      if (mode === "bc") { if (c === "*" && c2 === "/") { mode = "code"; i += 2; continue; } i++; continue; }
+      if (c === "\\") { buf += text.substr(i, 2); i += 2; continue; }
+      if (c === quote) {
+        if (CJK.test(buf) && !known.has(buf)) {
+          const segs: string[] = [];
+          buf.replace(/\\"/g, '"')
+            .replace(/(aria-label|placeholder|title|alt)="([^"]*)"/g, (_m, _a, v) => { segs.push(v); return " "; })
+            .replace(/<[^>]*>/g, "\u0001")
+            .split("\u0001").forEach((t) => segs.push(t));
+          /* 字串從屬性中間開始時，拆出來的第一段會帶著 "> 之類的殘渣，剝掉再比 */
+          const bad = segs.map((t) => t.replace(/^[\s"'>\/]+/, "").trim())
+            .filter((t) => t && CJK.test(t) && !known.has(t) && !ALLOW.has(t));
+          if (bad.length && !isDevLog(src, bufAt)) {
+            hits.push("docs/index.html:" + src.slice(0, bufAt).split("\n").length + "  " + bad.join(" ／ "));
+          }
+        }
+        mode = "code"; quote = ""; i++; continue;
+      }
+      if (quote !== "`" && c === "\n") { mode = "code"; quote = ""; i++; continue; }
+      buf += c; i++;
+    }
+  }
+  return hits;
+}
+
 const LANG = Deno.args[0] === "zh" ? "zh" : "en";
 const SHOT = Deno.env.get("SHOT") === "1";
 /* DIM=3 走立體牌桌：座位名、骰子計數環、狀態列在那邊仍然是疊在畫布上的 DOM，
    一樣要跟著語言走，所以兩種牌桌都要掃過。 */
 const DIM = Deno.env.get("DIM") === "3" ? "3" : "2";
+/* console.warn 那幾句是寫給開發者看的，不上畫面，所以靜態檢查只在英文那一輪跑一次就好 */
+const stat = staticCheck();
+if (stat.length) {
+  console.log("\n靜態檢查：程式裡有中文字串沒進字典");
+  for (const h of stat) console.log("   · " + h);
+  console.log("  （console.warn 之類不上畫面的，加進 i18n_scan.ts 的 ALLOW）");
+  Deno.exitCode = 1;
+}
+
 const b = await Browser.start({ gl: true });
 
 /* 中文版要反過來檢查：畫面上不該出現字典裡的任何一句英文。
@@ -99,7 +176,16 @@ const SCAN = `
 const found: Record<string, string[]> = {};
 async function scan(where: string) {
   const rows = await b.eval<string[]>(LANG === "en" ? SCAN : SCAN_EN);
-  if (rows.length) found[where] = rows;
+  if (rows.length) {
+    found[where] = rows;
+    /* 偶發的漏翻往往只中一次，沒有當下那張畫面就定位不了。失敗就一定留一張。 */
+    await Deno.mkdir("design/i18n", { recursive: true });
+    const bad = await b.cdp("Page.captureScreenshot", { format: "png" }) as { data: string };
+    await Deno.writeFile(
+      `design/i18n/_fail-${LANG}-${DIM}d-${where}.png`,
+      Uint8Array.from(atob(bad.data), (c) => c.charCodeAt(0)),
+    );
+  }
   if (SHOT) {
     /* 等淡入淡出走完再按快門，不然會拍到兩頁疊在一起的那一格 */
     await new Promise((r) => setTimeout(r, 450));
@@ -211,7 +297,7 @@ try {
       console.log(`\n  [${p}]`);
       for (const r of found[p]) { console.log("   · " + r); n++; }
     }
-    console.log(`\n  ✗ ${n} 處沒有跟著語言走\n`);
+    console.log(`\n  ✗ ${n} 處沒有跟著語言走（失敗那一站的畫面留在 design/i18n/_fail-*.png）\n`);
     Deno.exitCode = 1;
   }
 } finally {
