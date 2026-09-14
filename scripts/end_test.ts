@@ -46,7 +46,7 @@ async function playOut(ms = 120000) {
 }
 
 try {
-  await b.open("?pace=1&hold=1");
+  await b.open("?lang=zh&pace=1&hold=1");
   await b.eval(`TUNE.roundGap = 120; return 1`);
   /* 這一整場裡頁面頂層丟出來的錯，最後一條一起驗 */
   await b.eval(`window.__errs = [];

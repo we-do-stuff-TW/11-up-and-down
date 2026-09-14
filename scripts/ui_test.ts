@@ -49,7 +49,7 @@ const anyCard = () => b.eval<{ id: string; x: number; y: number } | null>(
 );
 
 try {
-  await b.open("?pace=1&hold=1");
+  await b.open("?lang=zh&pace=1&hold=1");
   await b.eval(`TUNE.roundGap = 150; return 1`);   /* 局與局之間不必等 2.2 秒 */
 
   /* ── 開一桌自己打 ── */
@@ -152,7 +152,7 @@ try {
 let skipped = "";
 const g = await Browser.start({ gl: true });
 try {
-  await g.open("?dim=3&pace=1&hold=1");
+  await g.open("?lang=zh&dim=3&pace=1&hold=1");
   await g.eval(`TUNE.roundGap = 150; return 1`);
   try {
     await g.until(

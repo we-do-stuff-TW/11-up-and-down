@@ -125,6 +125,8 @@ export class Browser {
 
   #session = "";
   /** 開一個分頁、附上去、載入牌桌，等到程式準備好 */
+  /* 每支測試都在 query 上帶 lang=zh：介面有中英兩種，斷言寫的是中文那一份，
+     不釘住的話跑在英文語系的機器上會整批對不上（頁面預設跟著 navigator.language）。 */
   async open(query = ""): Promise<void> {
     const t = await this.#send("Target.createTarget", { url: "about:blank" });
     const a = await this.#send("Target.attachToTarget", { targetId: t.targetId, flatten: true });

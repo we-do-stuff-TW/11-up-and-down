@@ -1,0 +1,140 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>全英文版 · 設定裡可切換</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:opsz,wght@6..96,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#15181d;color:#F2EFE6;font-family:Archivo,"PingFang TC",sans-serif;padding:34px 40px 70px}
+h1{font-family:"Bodoni Moda",serif;font-size:30px;font-weight:600;margin:0 0 6px}
+.sub{color:#9a968c;font-size:13.5px;line-height:1.75;margin:0 0 26px;max-width:80ch}
+.sub b{color:#F2EFE6;font-weight:500}
+code,.mono{font-family:"IBM Plex Mono",monospace;font-size:.92em;color:#C4A15A}
+.row{margin-bottom:38px}
+.hd{display:flex;align-items:baseline;gap:14px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.12)}
+.hd b{font-size:15px}
+.hd span{color:#9a968c;font-size:12.5px}
+img{width:100%;display:block;border-radius:8px;box-shadow:0 1px 0 rgba(255,255,255,.08),0 18px 40px rgba(0,0,0,.5)}
+figure{margin:0}
+figcaption{font-size:11px;color:#9a968c;letter-spacing:.14em;margin-bottom:6px;text-transform:uppercase}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.note{color:#9a968c;font-size:12.5px;line-height:1.75;margin:12px 0 0;max-width:90ch}
+.note u{text-decoration:none;color:#F2EFE6}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:10px}
+th,td{text-align:left;padding:9px 16px 9px 0;border-bottom:1px solid rgba(255,255,255,.1);vertical-align:top}
+th{color:#9a968c;font-weight:500;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase}
+.ok{color:#7fae86}
+ul{margin:10px 0 0;padding-left:18px;color:#9a968c;font-size:12.5px;line-height:1.85;max-width:90ch}
+ul u{text-decoration:none;color:#F2EFE6}
+.tabs{display:flex;gap:8px;margin:0 0 18px}
+.tabs button{font:inherit;font-size:12.5px;background:none;color:#9a968c;border:1px solid rgba(255,255,255,.16);
+  border-radius:999px;padding:6px 15px;cursor:pointer}
+.tabs button[aria-pressed=true]{color:#15181d;background:#C4A15A;border-color:#C4A15A}
+@media(max-width:900px){body{padding:24px 18px 50px}.two{grid-template-columns:1fr}}
+</style></head><body>
+
+<h1>全英文版 · 設定裡可切換</h1>
+<p class="sub">整個介面兩種語言：<b>牌桌、大廳、開房頁、帳號／設定／規則、收桌、登入頁</b>，
+連<b>伺服器回來的錯誤訊息</b>都翻了（在客端對照，edge function 一行沒動、不必重新 deploy）。
+預設<b>跟著瀏覽器</b>——<code>navigator.language</code> 是 zh 開頭給中文，其餘一律英文；
+使用者在設定裡選過之後，以他選的為準（記在 <code>localStorage['ud.lang']</code>）。
+底下每一組都是<b>左中右英</b>，同一站、同一刻、同一張牌局。</p>
+
+<div class="tabs">
+  <button aria-pressed="true" data-dim="2d">平面牌桌</button>
+  <button aria-pressed="false" data-dim="3d">立體牌桌</button>
+</div>
+
+<div class="row"><div class="hd"><b>設定</b><span>語言排在最前面——它管的是這一頁上其他每一排的字。兩個選項各自寫自己的語言，不會中文的人也認得出哪個是哪個</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="pref" src="zh-2d-pref.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="pref" src="en-2d-pref.png"></figure></div>
+  <p class="note"><u>牌面的名字也翻：</u>愛德華金邊 → Edwardian Gilt、賭場四色 → Casino Four-Colour、青花 → Blue Willow。
+  立體鏡頭那兩顆刻意不叫 Table——上面一排「牌桌」已經是 Table 了，所以是 <b>The game ／ The study</b>。</p></div>
+
+<div class="row"><div class="hd"><b>牌桌</b><span>頂列的數字、座位牌、狀態列、計分表</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="table-play" src="zh-2d-table-play.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="table-play" src="en-2d-table-play.png"></figure></div>
+  <p class="note"><u>英文的單複數有做：</u>「每人 1 張」是 <b>EACH 1 card</b> 不是 1 cards，「1 副」是 <b>1 deck</b>。
+  字典裡寫成 <code>%1 %1{card|cards}</code>，看第一個參數是不是 1。
+  讀螢幕的人聽到的牌名也換語序：中文是「紅心A」，英文是 <b>Ace of Hearts</b>——A/K/Q/J 念整個字，不是一個字母。</p></div>
+
+<div class="row"><div class="hd"><b>叫墩</b><span>骰子那一排、最後一位的預告（剛好／欠幾／超幾）</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="table-bid" src="zh-2d-table-bid.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="table-bid" src="en-2d-table-bid.png"></figure></div></div>
+
+<div class="row"><div class="hd"><b>規則</b><span>整頁說明文字。夾著 <code>&lt;strong&gt;</code> 的長句是整塊換掉的，不是一段一段翻</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="rules" src="zh-2d-rules.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="rules" src="en-2d-rules.png"></figure></div>
+  <p class="note">計分那幾格、牌組那一句、叫墩方式那一段，都是<u>照這一桌現在的規則即時算出來</u>的，
+  兩種語言走的是同一個 <code>roundPoints()</code>——介面跟引擎不會各說各話。</p></div>
+
+<div class="row"><div class="hd"><b>開房頁</b><span>座位表、房號、這一桌的規則</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="room" src="zh-2d-room.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="room" src="en-2d-room.png"></figure></div></div>
+
+<div class="row"><div class="hd"><b>規則設定</b><span>只有房主按得動的那一扇</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="room-rules" src="zh-2d-room-rules.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="room-rules" src="en-2d-room-rules.png"></figure></div>
+  <p class="note"><u>全形標點在英文版換回半形：</u>分數例子的「＋13」變 <b>+13</b>，選項之間的「／」變 <b>/</b>。
+  全形的寬度是為了跟中文的版面對齊，放在英文裡看起來像壞掉。</p></div>
+
+<div class="row"><div class="hd"><b>大廳</b><span>四張空牌位、回剛才那一桌</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="lobby" src="zh-2d-lobby.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="lobby" src="en-2d-lobby.png"></figure></div></div>
+
+<div class="row"><div class="hd"><b>帳號</b><span>戰績那一段</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="account" src="zh-2d-account.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="account" src="en-2d-account.png"></figure></div></div>
+
+<div class="row"><div class="hd"><b>收桌</b><span>台上三疊牌、誰贏了那一句</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="end" src="zh-2d-end.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="end" src="en-2d-end.png"></figure></div></div>
+
+<div class="row"><div class="hd"><b>牌局中的設定</b><span>多一顆「離開遊戲」，按第二下才真的走</span></div>
+  <div class="two"><figure><figcaption>中文</figcaption><img data-s="pref-in-game" src="zh-2d-pref-in-game.png"></figure>
+  <figure><figcaption>English</figcaption><img data-s="pref-in-game" src="en-2d-pref-in-game.png"></figure></div></div>
+
+<div class="row"><div class="hd"><b>來回切一趟</b><span>切成另一種語言再切回來，畫面要跟沒切過一模一樣</span></div>
+  <div class="two"><figure><figcaption>中文 → English → 中文</figcaption><img data-s="switched-back" src="zh-2d-switched-back.png"></figure>
+  <figure><figcaption>English → 中文 → English</figcaption><img data-s="switched-back" src="en-2d-switched-back.png"></figure></div>
+  <p class="note">每個節點第一次被翻譯時，中文原文記進一張 WeakMap，之後永遠拿原文去查字典。
+  <u>不這樣做的話，切回中文時會拿英文去查字典、查不到、就卡在英文。</u></p></div>
+
+<div class="row"><div class="hd"><b>怎麼做的</b><span>兩個 <code>&lt;script&gt;</code> 塊，都在 <code>docs/index.html</code> 裡</span></div>
+  <table>
+    <tr><th>零件</th><th>做什麼</th></tr>
+    <tr><td class="mono">I18N_EN</td><td>字典。<b>key 是中文原文</b>，不是另造一套 <code>t("lobby.join")</code>——那種 key 讀 diff 什麼都看不出來。
+      短到會撞車的字（「中」「開」「關」「牌」「計分」）才用 slug，值寫成 <code>{zh, en}</code>。</td></tr>
+    <tr><td class="mono">T(zh, …)</td><td>給 JS 組出來的句子。英文語序跟中文常常相反，所以那種句子不能用 <code>+</code> 接，
+      要整句丟進來配 <code>%1 %2</code>。</td></tr>
+    <tr><td class="mono">i18nDOM(root)</td><td>走一遍 DOM 換文字節點與 <code>aria-label</code>／<code>placeholder</code>／<code>title</code>。
+      掛在 <code>setHTML()</code> 上——動態畫出來的 HTML 全部經過那裡，所以 <b>paint 函式幾乎一行都不用改</b>。</td></tr>
+    <tr><td class="mono">data-i18n</td><td>句子中間夾著 <code>&lt;strong&gt;</code> 的（規則頁那幾段），文字節點會被切碎，
+      一段一段翻很難看。那種整塊 innerHTML 一次換掉。</td></tr>
+  </table>
+  <p class="note"><u>要加一句新的字怎麼辦：</u>照常用中文寫在程式裡，然後把那句中文當 key 加進字典。
+  沒加進去也不會壞——查不到就原樣顯示中文，底下那支掃描腳本會把它抓出來。</p></div>
+
+<div class="row"><div class="hd"><b>驗過了什麼</b><span><code>deno run -A scripts/i18n_scan.ts</code></span></div>
+  <ul>
+    <li><u>殘留中文掃描。</u>開 <code>?lang=en</code>，把 12 站走一遍（大廳、設定、帳號、規則、開房、規則設定、
+      叫墩、出牌、來回切、牌局中的設定、收桌），每一站掃看得到的文字節點與四種屬性。
+      <b>平面與立體各跑一次，0 筆殘留。</b></li>
+    <li><u>反過來也掃。</u><code>i18n_scan.ts zh</code> 檢查中文版沒有跑出字典裡的英文（「the hook」是那條規則的名字，中文版也這樣寫，不算）。</li>
+    <li><u>來回切那一趟是真的按下去的</u>，不是重新開網址——<code>?lang=</code> 走的是開機那條路，設定頁那顆按鈕是另一條。</li>
+    <li><u>既有六支測試全過</u>（引擎 321 場、兩份規則 56,758 組、手指與畫面、連線時序、收桌、登入簽章）。
+      測試的網址現在都帶 <code>?lang=zh</code>——斷言寫的是中文文案，不釘住的話跑在英文語系的機器上會整批對不上。</li>
+  </ul></div>
+
+<script>
+/* 平面／立體只是換同一組截圖的檔名 */
+const tabs = document.querySelectorAll(".tabs button");
+tabs.forEach(b => b.onclick = () => {
+  const dim = b.dataset.dim;
+  tabs.forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  document.querySelectorAll("img[data-s]").forEach(img => {
+    const lang = img.src.includes("/en-") ? "en" : "zh";
+    img.src = lang + "-" + dim + "-" + img.dataset.s + ".png";
+  });
+});
+</script>
+</body></html>

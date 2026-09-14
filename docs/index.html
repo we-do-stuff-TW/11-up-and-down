@@ -8,6 +8,16 @@
 <meta name="theme-color" content="#1e2126">
 <meta property="og:title" content="11 Up &amp; Down">
 <meta property="og:description" content="叫墩撲克。用 Google 登入，跟朋友同桌打 21 局。">
+<!-- three 的 addons（後處理那幾個 pass）內部是 `import ... from "three"`，要靠這張表解開。
+     對應的網址跟底下 3D 那層 `import()` 的那一支完全一樣——模組的身分是「解析後的網址」，
+     一樣就是同一份實體，不會變成兩個 three（那會讓 instanceof 與常數全部對不上）。
+     ⚠️ 一份文件只吃得下一張 import map：不要再加第二張，後來那張會被整張丟掉。 -->
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+}}
+</script>
 <script>
 /* 門禁。刻意寫在 head 的最前面——連字型那條 <link> 都在它後面：
    等待中的 stylesheet 會擋住後面每一支 inline script 執行，排在字型後面的話，
@@ -1569,7 +1579,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
     <!-- 頂列只放「這一桌」的事。平面／立體、速度、音效是你這台裝置的偏好，
          它們的家在設定頁（和牌面、鏡頭擺在一起），不在牌桌上。 -->
     <div class="tools">
-      <button class="btn" id="btnScore">計分</button>
+      <button class="btn" id="btnScore" data-i18n="ui.scoreBtn">計分</button>
       <button class="btn" id="btnPref">設定</button>
       <button class="btn" id="btnRules">規則</button>
       <button class="btn" id="btnRoom">房間</button>
@@ -1635,7 +1645,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   <div class="lb-or"><i></i><span>或者</span><i></i></div>
   <div class="lb-alt">
     <button class="lb-al" id="lbHost">開一桌</button>
-    <button class="lb-al" id="lbSolo">一個人打</button>
+    <button class="lb-al" id="lbSolo" data-i18n="lb.solo">一個人打</button>
     <button class="lb-al" id="lbDrop" hidden>不回去了</button>
   </div>
 
@@ -1716,6 +1726,13 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
       <!-- ---- 設定：這台裝置上的偏好。頂列那幾顆快速開關在這裡也有一份 ---- -->
       <section class="pg-pane" data-pane="pref" role="tabpanel" hidden>
         <div class="pg-f">
+          <label data-i18n="pref.lang">語言</label>
+          <div class="bd">
+            <div class="opts" id="optLang"></div>
+          </div>
+        </div>
+
+        <div class="pg-f">
           <label>牌面</label>
           <div class="bd">
             <div class="opts" id="optDeck"></div>
@@ -1756,7 +1773,7 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
              「離開房間」同一條路：伺服器把位子讓出來（牌局中不抽椅子，改 AI 代打），
              所以這一場不會有你那一列進 results。 -->
         <div class="pg-out" id="prefQuit" hidden>
-          <p class="pg-say" id="quitSay" hidden>離開之後這一局就不算了，戰績上不會有這一場。</p>
+          <p class="pg-say" id="quitSay" hidden data-i18n="pref.quitSay">離開之後這一局就不算了，戰績上不會有這一場。</p>
           <span class="pg-outb">
             <button class="pg-quiet" id="quitNo" hidden>留下</button>
             <button class="pg-quiet" id="btnQuit">離開遊戲</button>
@@ -1769,24 +1786,24 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
       <section class="pg-pane" data-pane="rules" role="tabpanel" hidden>
         <div class="pg-two">
           <div class="rules">
-            <h3>局數階梯</h3>
-            <p>第 1 局每人 1 張，每局加 1 張，到 11 張後一路遞減回 1 張，共 21 局。若牌數不足 11 張，階梯頂點會自動降到牌數允許的最大值。</p>
+            <h3 data-i18n="rules.h.ladder">局數階梯</h3>
+            <p data-i18n="rules.p.ladder">第 1 局每人 1 張，每局加 1 張，到 11 張後一路遞減回 1 張，共 21 局。若牌數不足 11 張，階梯頂點會自動降到牌數允許的最大值。</p>
 
-            <h3>王牌</h3>
-            <p>每局發完牌後，翻開牌庫最上面一張，該花色即本局王牌，整局不變。發完牌若牌庫剛好空了，該局<strong>無王</strong>。桌面顏色會跟著王牌走——黑色花色是冷綠，紅色花色是暖酒，無王是石板灰；局數越接近 11，桌色越深。</p>
+            <h3 data-i18n="rules.h.trump">王牌</h3>
+            <p data-i18n="rules.p.trump">每局發完牌後，翻開牌庫最上面一張，該花色即本局王牌，整局不變。發完牌若牌庫剛好空了，該局<strong>無王</strong>。桌面顏色會跟著王牌走——黑色花色是冷綠，紅色花色是暖酒，無王是石板灰；局數越接近 11，桌色越深。</p>
 
-            <h3>叫墩（放骰子）</h3>
-            <p>宣告自己會贏幾墩，範圍 <code>0</code> 到<strong>本局張數</strong>。起始玩家每局輪替一位：第 1 局第一座、第 2 局第二座，以此類推。</p>
+            <h3 data-i18n="rules.h.bid">叫墩（放骰子）</h3>
+            <p data-i18n="rules.p.bid">宣告自己會贏幾墩，範圍 <code>0</code> 到<strong>本局張數</strong>。起始玩家每局輪替一位：第 1 局第一座、第 2 局第二座，以此類推。</p>
             <p id="ruBid"></p>
-            <div class="note">實體提醒：一顆骰子只能顯示 1–6，叫 7–11 墩時桌上需要兩顆骰子或一顆 d12。介面在 7 以上改用數字面。</div>
+            <div class="note" data-i18n="rules.note.die">實體提醒：一顆骰子只能顯示 1–6，叫 7–11 墩時桌上需要兩顆骰子或一顆 d12。介面在 7 以上改用數字面。</div>
 
-            <h3>出牌</h3>
+            <h3 data-i18n="rules.h.play">出牌</h3>
             <ol>
-              <li>本局第一墩由起始玩家先出，之後每墩由<strong>上一墩的贏家</strong>先出。</li>
-              <li>首張牌的花色為跟牌花色，手上有該花色<strong>必須跟出</strong>。</li>
-              <li>沒有該花色時可出任意牌；出王牌花色可以吃墩，其他花色即廢牌。</li>
-              <li>該墩有人出王牌，最大的王牌贏；沒有王牌，跟牌花色最大者贏。</li>
-              <li>雙副牌出現同點同花時，<strong>先出的那張贏</strong>。</li>
+              <li data-i18n="rules.li.play1">本局第一墩由起始玩家先出，之後每墩由<strong>上一墩的贏家</strong>先出。</li>
+              <li data-i18n="rules.li.play2">首張牌的花色為跟牌花色，手上有該花色<strong>必須跟出</strong>。</li>
+              <li data-i18n="rules.li.play3">沒有該花色時可出任意牌；出王牌花色可以吃墩，其他花色即廢牌。</li>
+              <li data-i18n="rules.li.play4">該墩有人出王牌，最大的王牌贏；沒有王牌，跟牌花色最大者贏。</li>
+              <li data-i18n="rules.li.play5">雙副牌出現同點同花時，<strong>先出的那張贏</strong>。</li>
             </ol>
             <p id="ruJoker"></p>
           </div>
@@ -1794,23 +1811,23 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
           <i class="pg-rule" aria-hidden="true"></i>
 
           <div class="rules">
-            <h3>計分</h3>
+            <h3 data-i18n="rules.h.score">計分</h3>
             <div id="ruScore"></div>
 
-            <h3>牌組</h3>
+            <h3 data-i18n="rules.h.deck">牌組</h3>
             <p id="ruDeck"></p>
 
-            <h3>連線</h3>
+            <h3 data-i18n="rules.h.online">連線</h3>
             <ul>
-              <li><strong>手牌別人真的看不到。</strong> 發牌在伺服器上發生，每個人的手牌寫進一張沒有任何讀取權限的表，只有你自己的那份會回到你的裝置——房主也看不到。同時叫墩還沒翻開的數字放在同一個地方。</li>
-              <li><strong>規則由房主定，開打前才改得動。</strong> 等待房間裡改，全桌都看得到；按下開始就鎖住，整場不變。</li>
-              <li><strong>幾個人進來就幾個人玩。</strong> 不必挑位子，人不夠房主可以加 AI 湊。至少兩個人才開得了局，最多十個。</li>
-              <li>房主關掉分頁時牌局暫停，任一在座玩家會自動接手。</li>
-              <li>玩家斷線超過 30 秒，該座位改由 AI 代打，本人回來可以繼續。</li>
+              <li data-i18n="rules.li.on1"><strong>手牌別人真的看不到。</strong> 發牌在伺服器上發生，每個人的手牌寫進一張沒有任何讀取權限的表，只有你自己的那份會回到你的裝置——房主也看不到。同時叫墩還沒翻開的數字放在同一個地方。</li>
+              <li data-i18n="rules.li.on2"><strong>規則由房主定，開打前才改得動。</strong> 等待房間裡改，全桌都看得到；按下開始就鎖住，整場不變。</li>
+              <li data-i18n="rules.li.on3"><strong>幾個人進來就幾個人玩。</strong> 不必挑位子，人不夠房主可以加 AI 湊。至少兩個人才開得了局，最多十個。</li>
+              <li data-i18n="rules.li.on4">房主關掉分頁時牌局暫停，任一在座玩家會自動接手。</li>
+              <li data-i18n="rules.li.on5">玩家斷線超過 30 秒，該座位改由 AI 代打，本人回來可以繼續。</li>
             </ul>
 
-            <h3>改規則</h3>
-            <p>叫墩方式、末位限制、鬼牌、牌組、三段計分都在<strong>等待房間</strong>裡調，只有房主按得動，全桌都看得到。開打之後鎖住，整場不變。一個人打也一樣，在你自己那間房間裡調。</p>
+            <h3 data-i18n="rules.h.change">改規則</h3>
+            <p data-i18n="rules.p.change">叫墩方式、末位限制、鬼牌、牌組、三段計分都在<strong>等待房間</strong>裡調，只有房主按得動，全桌都看得到。開打之後鎖住，整場不變。一個人打也一樣，在你自己那間房間裡調。</p>
           </div>
         </div>
       </section>
@@ -1843,6 +1860,554 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   </main>
 </div>
 
+<!-- ================= 英文字典 =================
+     key 是中文原文；短到會跟別處撞車的字（「中」「開」「關」「牌」）改用 slug，
+     值寫成 {zh,en} 兩種都放。帶變數的句子用 %1 %2——英文語序跟中文常常相反，
+     所以那種句子不能在程式裡用 + 接，要整句丟進 T()。
+     排序照畫面走：共用 → 頂列 → 牌桌 → 計分表 → 大廳 → 開房 → 帳號 → 設定 → 規則 → 收桌 → 錯誤。 -->
+<script>
+window.I18N_EN = {
+
+/* ---------------- 共用 ---------------- */
+"你":"You",
+"%1（你）":"%1 (you)",
+"座位 %1":"Seat %1",
+"玩家":"Player",
+"離線":"Offline",
+"在線上":"Online",
+"房主":"Host",
+"關閉":"Close",
+"登出":"Sign out",
+"設定":"Settings",
+"規則":"Rules",
+"房間":"Room",
+"房間 %1":"Room %1",
+"帳號":"Account",
+"sep.comma":{zh:"、", en:", "},
+/* 全形的標點在中文的版面裡才對得齊，英文要換回半形 */
+"＋":"+",
+"／":"/",
+"？":"?",
+
+/* 花色與牌名。中文是「黑桃A」，英文語序相反，A/K/Q/J 還要念成整個字 */
+"黑桃":"Spades", "紅心":"Hearts", "方塊":"Diamonds", "梅花":"Clubs",
+"%1%2":"%2 of %1",
+"card.joker":{zh:"鬼牌", en:"Joker"},
+"card.jokerSuffix":{zh:" 鬼牌", en:" Joker"},
+
+/* ---------------- <head> ---------------- */
+"叫墩撲克。1→11→1 共 21 局，手牌由伺服器發，誰都偷看不到。":
+  "A trick-bidding card game. 21 rounds climbing 1→11→1. Hands are dealt on the server — nobody can peek.",
+"叫墩撲克。用 Google 登入，跟朋友同桌打 21 局。":
+  "A trick-bidding card game. Sign in with Google and play 21 rounds with friends.",
+
+/* ---------------- 頂列 ---------------- */
+"局數階梯":"Round ladder",
+"ui.scoreBtn":"Score",
+"你的帳號":"Your account",
+"你的帳號：%1":"Your account: %1",
+"計分表":"Scoreboard",
+
+/* ---------------- 牌桌：頂列那排數字 ---------------- */
+"房號":"Room code",
+"局":"Rd",
+"每人":"Each",
+"unit.cards":{zh:"張", en:"%1{card|cards}"},
+"王牌":"Trump",
+"無":"none",
+"墩":"Tricks",
+
+/* ---------------- 牌桌：牌庫與狀態列 ---------------- */
+"翻到<b>鬼牌</b> · 本局無王":"Turned up a <b>Joker</b> · no trump",
+"等待開始":"Waiting to start",
+"本局無王":"No trump this round",
+"尚未開始":"Not started",
+"等所有人放好骰子":"Waiting for everyone to bid",
+"等待出牌":"Waiting for a card",
+"房間已開好，房號 <b class=\"code\">%1</b>":"Room is ready — code <b class=\"code\">%1</b>",
+"看座位":"See the seats",
+"還沒開局":"No game yet",
+"回大廳":"Back to lobby",
+"房主已離線":"The host is offline",
+"全桌同時叫，選好先蓋著":"Everyone bids at once, face down",
+"你要叫幾墩？":"How many tricks?",
+"不能叫":"can't bid",
+"剛好":"Exact",
+"欠 %1":"%1 short",
+"超 %1":"%1 over",
+"等其他人放骰子…":"Waiting for the others…",
+"正在放骰子…":"is bidding…",
+"輪到<b>你</b>出牌":"<b>Your</b> turn to play",
+"出牌中…":"is playing…",
+"<b>%1</b> 用 %2 贏得這墩":"<b>%1</b> takes the trick with %2",
+"第 %1 局結束":"Round %1 over",
+"下一局 · 每人 %1 張":"Next round · %1 %1{card|cards} each",
+"準備收桌":"Wrapping up",
+"馬上開始":"Start now",
+"牌局結束":"Game over",
+"最終結果":"Final result",
+"你目前是觀戰者。點右上角的「房間」選一個空位入座；牌局進行中入座要等下一局開始。":
+  "You're watching. Tap Room in the top bar and pick an open seat — if a game is running you'll join at the next round.",
+"等房主開始":"Waiting for the host",
+"手牌已出完":"No cards left",
+
+/* ---------------- 牌桌：座位牌與骰子 ---------------- */
+"已經放好，還沒翻開":"Placed, not turned up yet",
+"叫 0 墩":"Bid 0 tricks",
+"叫 %1 墩":"Bid %1 %1{trick|tricks}",
+"還沒叫":"no bid yet",
+"已經放好":"placed",
+"叫 %1 墩，已贏 %2 墩":"Bid %1, won %2",
+"，超了 %1 墩":", %1 over",
+"，還差 %1 墩":", %1 to go",
+"，剛好":", exactly right",
+"我贏得 %1 墩":"I've won %1 %1{trick|tricks}",
+"本局 <b>%1</b> 墩":"<b>%1</b> this round",
+
+/* ---------------- 計分表 ---------------- */
+"第 %1 局":"Round %1",
+"無王":"NT",
+"%1 副 · %2 張 · %3 人":"%1 %1{deck|decks} · %2 cards · %3 players",
+
+/* ---------------- 大廳 ---------------- */
+"加入誰的桌？":"Join whose table?",
+"回剛才那一桌？":"Back to that table?",
+"四碼房號":"Four-character room code",
+"進去":"Enter",
+"回去":"Return",
+"或者":"or",
+"開一桌":"Host a table",
+"lb.solo":{zh:"一個人打", en:"Play solo"},
+"不回去了":"Never mind",
+"<b>%1</b> 場 · <b>%2</b> 次第一 · 叫中 <b>%3%</b>":
+  "<b>%1</b> games · <b>%2</b> wins · <b>%3%</b> bids hit",
+"還沒有打完的紀錄":"No finished games yet",
+
+/* ---------------- 開房頁 ---------------- */
+"離開房間":"Leave room",
+"room.solo":{zh:"一個人打", en:"Solo"},
+"局 · 對 AI，不記戰績":"rounds · vs AI, not recorded",
+"按一下複製":"Tap to copy",
+"複製好了":"Copied",
+"複製不了":"Couldn't copy",
+"移除":"Remove",
+"空位":"Open seat",
+"再一個對手":"One more opponent",
+"等人進來":"Waiting for players",
+"放一個 AI":"Add an AI",
+"這一桌的規則":"Rules at this table",
+"rm.edit":{zh:"設定", en:"Edit"},
+"房主決定":"Host decides",
+"開打了，鎖住":"Locked — game under way",
+"這樣算":"How it scores",
+"叫 %1，拿 %2":"Bid %1, take %2",
+"%1 張牌 · %2 個人":"%1 cards · %2 %2{player|players}",
+"<b>%1</b> 張到頂 · <b>%2</b> 局":"<b>%1</b> at the peak · <b>%2</b> %2{round|rounds}",
+"開始":"Start",
+"至少要兩個人":"At least two players",
+"等房主按開始":"Waiting for the host to start",
+"回到牌桌":"Back to the table",
+"完成":"Done",
+"牌數":"Cards",
+"最多每人":"Peak hand",
+"總局數":"Rounds",
+"房號 %1":"Room %1",
+"%1 人就座":"%1 seated",
+"rm.g.bid":{zh:"叫墩", en:"Bidding"},
+"rm.g.cards":{zh:"牌", en:"Cards"},
+"rm.g.score":{zh:"計分", en:"Scoring"},
+"方式":"Style",
+
+/* ---------------- 規則旋鈕（開房頁與設定共用一份 RULE_UI） ---------------- */
+"叫墩":"Bidding",
+"依序公開叫":"In turn, face up",
+"同時叫墩":"All at once",
+"末位限制":"Last bidder",
+"the hook":"the hook",
+"不限制":"No limit",
+"鬼牌":"Jokers",
+"不放":"None",
+"放兩張":"Two in the deck",
+"牌組":"Deck",
+"單副":"One deck",
+"雙副":"Two decks",
+"最小點數":"Lowest rank",
+"%1 以上":"%1 and up",
+"叫中得分":"Bid hit",
+"10＋叫":"10 + bid",
+"10×叫":"10 × bid",
+"10＋叫²":"10 + bid²",
+"叫 0 中了":"Bid 0 hit",
+"5 分":"5 points",
+"5＋該局張數":"5 + cards this round",
+"沒叫中":"Bid missed",
+"扣差額":"−difference",
+"扣 10×差":"−10 × difference",
+"扣差額²":"−difference²",
+
+/* ---------------- 帳號 ---------------- */
+"帳號、設定與規則":"Account, settings and rules",
+"桌上顯示的名字":"Name at the table",
+"最多 10 個字":"Up to 10 characters",
+"戰績":"Record",
+"連線元件沒載入成功，看不到戰績。":"The connection library didn't load, so there's no record to show.",
+"讀取中…":"Loading…",
+"戰績還沒開通——資料表 <b>results</b> 建好之後這裡就會有東西。":
+  "Records aren't switched on yet — once the <b>results</b> table exists, they'll show up here.",
+"還沒有打完的紀錄。":"No finished games yet.",
+"場數":"Games",
+"拿第一":"Wins",
+"叫中率":"Bids hit",
+"第 %1 / %2":"#%1 of %2",
+"登出中…":"Signing out…",
+
+/* ---------------- 設定 ---------------- */
+"pref.lang":"Language",
+"牌面":"Card face",
+"牌桌":"Table",
+"立體鏡頭":"3D camera",
+"出牌速度":"Pace",
+"音效":"Sound",
+"平面":"2D",
+"立體":"3D",
+"牌局":"The game",
+"書房":"The study",
+"spd.slow":{zh:"慢", en:"Slow"},
+"spd.mid":{zh:"中", en:"Medium"},
+"spd.fast":{zh:"快", en:"Fast"},
+"sfx.on":{zh:"開", en:"On"},
+"sfx.off":{zh:"關", en:"Off"},
+"這個裝置沒有 WebGL，只有平面牌桌。":"This device has no WebGL, so the table stays flat.",
+"pref.quitSay":"Leave now and this game won't count — it won't appear in your record.",
+"留下":"Stay",
+"離開遊戲":"Leave game",
+"確定離開":"Yes, leave",
+
+/* 牌面的名字 */
+"愛德華金邊":"Edwardian Gilt",
+"賭場":"Casino",
+"賭場四色":"Casino Four-Colour",
+"鈔票雕刻":"Banknote Engraving",
+"青花":"Blue Willow",
+
+/* 立體牌桌 */
+"這個裝置沒有 WebGL":"This device has no WebGL",
+"正在鋪桌…":"Setting the table…",
+"立體牌桌載入失敗":"The 3D table didn't load",
+"保守局":"Under",
+"搶墩局":"Over",
+
+/* ---------------- 規則頁 ---------------- */
+"rules.h.ladder":"The ladder",
+"rules.p.ladder":
+  "Round 1 deals one card each, and every round adds one until it reaches 11 — then it climbs back down to one. 21 rounds in all. If the deck can't reach 11, the top of the ladder drops to the largest hand the deck allows.",
+"rules.h.trump":"Trump",
+"rules.p.trump":
+  "After the deal, the top card of the stock is turned up: that suit is trump for the whole round. If the deal empties the stock, the round is played with <strong>no trump</strong>. The felt takes its colour from the trump suit — cool green for the black suits, warm wine for the red ones, slate grey for no trump — and the closer the round is to 11, the deeper it goes.",
+"rules.h.bid":"Bidding (placing your die)",
+"rules.p.bid":
+  "Declare how many tricks you'll win, anywhere from <code>0</code> to <strong>the number of cards in your hand</strong>. The starting player moves one seat each round: seat one in round 1, seat two in round 2, and so on.",
+"rules.note.die":
+  "If you're playing with real dice: one die only shows 1–6, so bids of 7–11 need two dice or a d12. On screen, anything above 6 switches to a numeral.",
+"rules.h.play":"Playing a trick",
+"rules.li.play1":
+  "The starting player leads the first trick; after that, the <strong>winner of the previous trick</strong> leads.",
+"rules.li.play2":
+  "The first card sets the suit to follow. If you hold that suit, you <strong>must follow it</strong>.",
+"rules.li.play3":
+  "If you don't hold it, play anything. A trump takes the trick; any other suit is simply discarded.",
+"rules.li.play4":
+  "If anyone trumps, the highest trump wins. If nobody does, the highest card of the led suit wins.",
+"rules.li.play5":
+  "With two decks, identical cards can meet — the one <strong>played first</strong> wins.",
+"rules.h.score":"Scoring",
+"rules.h.deck":"The deck",
+"rules.h.online":"Online",
+"rules.li.on1":
+  "<strong>Nobody can see your hand.</strong> The deal happens on the server, and each hand is written to a table with no read access at all — only your own comes back to your device, and not even the host sees it. Sealed bids live in the same place.",
+"rules.li.on2":
+  "<strong>The host sets the rules, and only before the deal.</strong> Change them in the waiting room where the whole table can see; once Start is pressed they're locked for the game.",
+"rules.li.on3":
+  "<strong>However many turn up is however many play.</strong> No picking seats; if you're short, the host can add AI players. Two to start, ten at most.",
+"rules.li.on4":"If the host closes the tab the game pauses, and any seated player takes over automatically.",
+"rules.li.on5":"After 30 seconds offline a seat is played by AI; you can pick it up again when you're back.",
+"rules.h.change":"Changing the rules",
+"rules.p.change":
+  "Bidding style, the last-bidder limit, jokers, the deck and all three scoring dials live in the <strong>waiting room</strong>. Only the host can touch them, and the whole table sees the change. Once the game starts they're locked. Solo play works the same way — you set them in your own room.",
+
+/* 規則頁裡跟著這一桌的 cfg 重寫的那幾段 */
+"<strong>同時叫墩</strong>：全桌同時選，選好先蓋著，等所有人都放好才一起翻開——桌上看得到誰決定了，看不到幾墩。沒有人有資訊優勢，也就沒有末位限制。":
+  "<strong>All at once</strong>: everyone chooses at the same time and places their bid face down; the table turns them up together once the last one is in. You can see who has decided, never by how much — nobody holds an information advantage, so there is no last-bidder limit.",
+"<strong>依序公開叫</strong>：由本局起始玩家開始，一位一位往下，後面的人看得到前面叫了多少。":
+  "<strong>In turn, face up</strong>: starting with this round's first player and going round the table, so everyone hears the bids before theirs.",
+"<br><strong>the hook</strong>：最後一位叫的人，不得讓全桌的總叫墩數剛好等於總墩數——每一局一定有人要叫不中。那個數字在按鈕上會標成「不能叫」。":
+  "<br><strong>the hook</strong>: the last bidder may not make the table's bids add up to exactly the number of tricks — so somebody has to miss every round. That number is marked “can't bid” on the button.",
+"<br>沒有末位限制：最後一位想叫幾就叫幾，全桌有機會皆大歡喜。":
+  "<br>No last-bidder limit: the last player bids whatever they like, and the whole table can go home happy.",
+"<strong>鬼牌</strong>（整桌兩張）：不屬於任何花色。手上有跟牌花色也可以改出鬼牌，而且它比王牌還大。兩張鬼牌撞在同一墩時先出的贏。鬼牌領出時沒有花色要跟，大家自由出牌。翻開的王牌是鬼牌時本局無王，但鬼牌照樣最大。":
+  "<strong>Jokers</strong> (two in the deck, however many decks): they belong to no suit. You may play one even when you could follow suit, and it beats every trump. If both meet in one trick, the one played first wins. A joker led sets no suit to follow — everyone plays freely. If the card turned up for trump is a joker the round has no trump, and the jokers are still the highest cards in it.",
+"叫 %1 拿 %2":"Bid %1, took %2",
+"<code>10 × 叫的墩數</code>":"<code>10 × the bid</code>",
+"<code>10 + 叫的墩數²</code>":"<code>10 + the bid²</code>",
+"<code>10 + 叫的墩數</code>":"<code>10 + the bid</code>",
+"<code>5 + 本局張數</code>":"<code>5 + cards this round</code>",
+"<code>5</code> 分":"<code>5</code> points",
+"扣 <code>10 × |實際 − 叫的|</code> 分":"lose <code>10 × |taken − bid|</code> points",
+"扣 <code>(實際 − 叫的)²</code> 分":"lose <code>(taken − bid)²</code> points",
+"扣 <code>|實際 − 叫的|</code> 分":"lose <code>|taken − bid|</code> points",
+"<p><strong>叫中</strong>：叫 0 得 %1；叫 1 以上得 %2。</p>":
+  "<p><strong>Bid hit</strong>: a bid of 0 scores %1; a bid of 1 or more scores %2.</p>",
+"<p><strong>沒叫中</strong>：%1。多吃跟少吃一樣罰。</p>":
+  "<p><strong>Bid missed</strong>: %1. Taking too many costs exactly as much as taking too few.</p>",
+"<p class=\"sub\">上面這幾格是用目前這一桌的計分規則實際算出來的%1。</p>":
+  "<p class=\"sub\">Those cells are worked out with this table's own scoring rules%1.</p>",
+"（叫 0 那格按本局 %1 張算）":" (the bid-0 cell assumes %1 %1{card|cards} this round)",
+"<p>階梯走完後總分最高者獲勝。</p>":"<p>Highest total at the bottom of the ladder wins.</p>",
+"這一桌是<strong>%1</strong> <code>%2</code>%3，共 <strong>%4 張</strong>。":
+  "This table plays <strong>%1</strong> of <code>%2</code>%3 — <strong>%4 cards</strong> in all. ",
+"兩副":"two decks",
+"一副":"one deck",
+" 外加 <strong>2 張鬼牌</strong>":", plus <strong>2 jokers</strong>",
+"牌數必須不少於「人數 × 最大張數 + 1」（多的那一張是翻王牌用的），不夠的話階梯頂點會自動下修。":
+  "The deck must hold at least players × biggest hand + 1 — the spare card is the one turned up for trump. If it can't, the top of the ladder drops until it can.",
+
+/* ---------------- 收桌 ---------------- */
+"看計分表":"Scoreboard",
+"再來一局":"Play again",
+"返回房間":"Back to room",
+"牌局結束 · %1 局":"Game over · %1 %1{round|rounds}",
+" · 房號 %1":" · room %1",
+" · 對 AI，不記戰績":" · vs AI, not recorded",
+"%1 平手":"%1 tie",
+"你贏了這一桌":"You won this table",
+"%1 贏了這一桌":"%1 won this table",
+"你第 <b>%1</b> / %2 · <b>%3</b> 分":"You placed <b>%1</b> of %2 · <b>%3</b> points",
+"發牌中…":"Dealing…",
+
+/* ---------------- 錯誤訊息 ----------------
+   前面幾條是客端自己的，後面那一段是伺服器回來的原文（edge function 不動，
+   在這裡對照翻掉就好，不必重新 deploy）。 */
+"連不上伺服器，檢查一下網路":"Can't reach the server — check your connection",
+"開房失敗":"Couldn't open a room",
+"找不到房號 %1":"No room called %1",
+"操作失敗，請再試一次":"That didn't go through — try again",
+"這一桌回不到等待狀態，再試一次":"Couldn't take the table back to the waiting room — try again",
+"發不了牌，先回房間看看":"Couldn't deal — go back to the room and take a look",
+"開不了下一場，再試一次":"Couldn't start the next game — try again",
+"這一桌的規則改不動，再試一次":"Couldn't change this table's rules — try again",
+
+"請先登入":"Please sign in first",
+"房號格式不對":"That room code doesn't look right",
+"身分建立失敗，請重新整理":"Couldn't set up your identity — please refresh",
+"房號產生失敗，請再試一次":"Couldn't generate a room code — try again",
+"這一步沒有寫進去，再試一次":"That move didn't save — try again",
+"牌局已經開始，等這局結束再進來":"The game has already started — come in when it finishes",
+"牌局已經開始":"The game has already started",
+"這桌滿了（最多 10 人）":"This table is full (10 players max)",
+"只有房主能加人":"Only the host can add players",
+"只有房主能移除座位":"Only the host can remove a seat",
+"沒有這個座位":"There's no such seat",
+"房主不能把自己移掉":"The host can't remove themselves",
+"開打之後不能改規則":"The rules are locked once the game starts",
+"只有房主能改規則":"Only the host can change the rules",
+"已經開始了":"It's already started",
+"只有房主能開始":"Only the host can start",
+"至少要兩個人，可以加 AI 湊":"Two players at least — add an AI to fill the table",
+"你不在座位上":"You're not seated",
+"現在不能叫墩":"You can't bid right now",
+"這張牌不能出":"You can't play that card",
+"這局還沒結束":"This round isn't over yet",
+"這一場還沒打完":"This game isn't over yet"
+};
+</script>
+
+<!-- ================= 語言 =================
+     整份介面兩種語言。做法是「中文原文當 key」的字典：原始碼裡留下來的還是看得懂的中文，
+     不另造一套 t("lobby.join") 那樣的語意 key——那種 key 讀 diff 的時候什麼都看不出來。
+
+     三個零件：
+       · T(zh, …args)   給 JS 組出來的句子。英文模式查字典，查不到就原樣把中文送回去。
+                        %1 %2 依序代入 args——英文語序跟中文不同，所以不能用字串相接。
+       · i18nDOM(root)  走一遍 DOM，把文字節點與 placeholder／aria-label／title 換掉。
+                        靜態 HTML 因此完全不用加標記；paint*() 畫完呼叫一次就好。
+       · setLang(v)     切換：寫 localStorage、換 <html lang>、重掃 DOM、請上層重畫。
+
+     一個節點第一次被翻譯時，中文原文記進 WeakMap，之後永遠拿原文去查字典——
+     所以中↔英來回切幾次都不會走味（英文再去查一次字典會查不到，那才是會壞掉的做法）。
+
+     長一點、中間夾著 <b>/<strong> 的句子，文字節點會被切碎，一段一段查字典翻出來的英文
+     會很難看。那種元素改掛 data-i18n="slug"，整塊 innerHTML 一次換掉，字典值可以帶標籤。 -->
+<script>
+(function(){
+"use strict";
+
+/* ---------------- 字典 ----------------
+   key 是中文原文（或 data-i18n 的 slug），value 是英文。
+   帶變數的句子用 %1 %2；順序照 T() 傳進來的 args，英文要換語序就換。
+
+   有些字短到會撞車——「中」是速度的中，也可能是別處的一個字；「計分」在頂列是那張表，
+   在規則頁是計分方式。那種就不用中文當 key，改用 slug，值寫成 {zh:…, en:…}。 */
+var EN = window.I18N_EN || (window.I18N_EN = {});
+window.I18N = {en:EN};
+
+/* ---------------- 目前語言 ---------------- */
+/* 預設跟著瀏覽器：zh 開頭給中文，其餘一律英文。使用者選過之後以他選的為準。
+   ?lang=en 只在這一次有效，不寫進 localStorage——截圖與測試用。 */
+var LANG = (function(){
+  var q = null;
+  try{ q = new URLSearchParams(location.search).get("lang"); }catch(e){}
+  if(q === "en" || q === "zh") return q;
+  var saved = null;
+  try{ saved = localStorage.getItem("ud.lang"); }catch(e){}
+  if(saved === "en" || saved === "zh") return saved;
+  var nav = "";
+  try{ nav = (navigator.language || (navigator.languages || [])[0] || "").toLowerCase(); }catch(e){}
+  return /^zh/.test(nav) ? "zh" : "en";
+})();
+function lang(){ return LANG; }
+
+/* ---------------- T() ---------------- */
+function T(zh){
+  var s = zh, hit = EN[zh];
+  if(hit && typeof hit === "object") s = hit[LANG] || zh;      /* slug：兩種語言都在字典裡 */
+  else if(LANG === "en" && typeof hit === "string") s = hit;
+  if(arguments.length > 1){
+    var args = arguments;
+    /* 英文要分單複數，中文不用。%1{card|cards}：看第 1 個參數是不是 1。
+       要先跑這一輪，不然下面那個 %(\d) 會先把數字吃掉。 */
+    s = s.replace(/%(\d)\{([^{}|]*)\|([^{}]*)\}/g, function(m, i, one, many){
+      return +args[+i] === 1 ? one : many;
+    });
+    s = s.replace(/%(\d)/g, function(m, i){
+      var v = args[+i];
+      return v === undefined || v === null ? "" : String(v);
+    });
+  }
+  return s;
+}
+/* 伺服器回來的錯誤訊息也是中文字串，同一份字典查得到就換掉。
+   「找不到房號 ABCD」這種後面帶房號的，把變數的部分抽出來再查。 */
+var ERR_VAR = [
+  [/^找不到房號 (.+)$/, "找不到房號 %1"]
+];
+function TErr(msg){
+  if(!msg) return msg;
+  msg = String(msg);
+  if(LANG !== "en") return msg;
+  if(typeof EN[msg] === "string") return EN[msg];
+  if(EN[msg] && typeof EN[msg] === "object") return EN[msg].en || msg;
+  for(var i = 0; i < ERR_VAR.length; i++){
+    var m = msg.match(ERR_VAR[i][0]);
+    if(m) return T(ERR_VAR[i][1], m[1]);
+  }
+  return msg;
+}
+
+/* ---------------- i18nDOM() ---------------- */
+var ORIG_TEXT = new WeakMap();   /* 文字節點 → 中文原文 */
+var ORIG_HTML = new WeakMap();   /* data-i18n 元素 → 中文原文 innerHTML */
+var ATTRS = ["placeholder", "aria-label", "title", "alt", "content"];
+var ORIG_ATTR = new WeakMap();   /* 元素 → {屬性名: 中文原文} */
+/* 這幾種節點底下沒有給人看的字 */
+var SKIP = {SCRIPT:1, STYLE:1, CANVAS:1, SVG:1, TEXTAREA:1, CODE:0};
+
+function pick(raw){
+  var hit = EN[raw];
+  if(hit && typeof hit === "object") return hit[LANG] || raw;
+  if(LANG !== "en") return raw;
+  return typeof hit === "string" ? hit : raw;
+}
+/* 文字節點常常前後帶著排版留下的空白，字典裡不放那些，翻完再補回去 */
+function pickText(raw){
+  var m = raw.match(/^(\s*)([\s\S]*?)(\s*)$/);
+  var core = m[2];
+  if(!core) return raw;
+  var out = pick(core);
+  return out === core ? raw : m[1] + out + m[3];
+}
+
+function i18nDOM(root){
+  root = root || document.body;
+  if(!root) return;
+  /* data-i18n：整塊 innerHTML 換掉，不再往下鑽 */
+  var marked = root.querySelectorAll ? root.querySelectorAll("[data-i18n]") : [];
+  for(var i = 0; i < marked.length; i++){
+    var el = marked[i], key = el.getAttribute("data-i18n");
+    if(!ORIG_HTML.has(el)) ORIG_HTML.set(el, el.innerHTML);
+    var zh = ORIG_HTML.get(el);
+    var en = EN[key];
+    if(en && typeof en === "object") en = en[LANG];
+    var want = (LANG === "en" && typeof en === "string") ? en : zh;
+    if(el.innerHTML !== want) el.innerHTML = want;
+  }
+  if(root.nodeType === 1 && root.hasAttribute && root.hasAttribute("data-i18n")) return;
+
+  var walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+    acceptNode:function(n){
+      if(n.nodeType === 1){
+        if(SKIP[n.nodeName]) return NodeFilter.FILTER_REJECT;
+        if(n.hasAttribute && n.hasAttribute("data-i18n")) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+      return n.nodeValue && n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  var n;
+  while((n = walk.nextNode())){
+    if(n.nodeType === 3){
+      var raw = ORIG_TEXT.has(n) ? ORIG_TEXT.get(n) : n.nodeValue;
+      var out = pickText(raw);
+      if(out !== raw && !ORIG_TEXT.has(n)) ORIG_TEXT.set(n, raw);
+      if(n.nodeValue !== out) n.nodeValue = out;
+    }else{
+      var keep = ORIG_ATTR.get(n);
+      for(var a = 0; a < ATTRS.length; a++){
+        var name = ATTRS[a];
+        if(!n.hasAttribute(name)) continue;
+        var cur = (keep && keep[name] !== undefined) ? keep[name] : n.getAttribute(name);
+        var to = pick(cur);
+        if(to !== cur){
+          if(!keep){ keep = {}; ORIG_ATTR.set(n, keep); }
+          if(keep[name] === undefined) keep[name] = cur;
+        }
+        if(n.getAttribute(name) !== to) n.setAttribute(name, to);
+      }
+    }
+  }
+}
+
+/* ---------------- 切換 ---------------- */
+/* 靜態 HTML 掃一遍就換好了；動態畫出來的那些由上層自己重畫（onLang）。 */
+var listeners = [];
+function onLang(fn){ listeners.push(fn); }
+function applyLang(){
+  try{ document.documentElement.lang = LANG === "en" ? "en" : "zh-Hant"; }catch(e){}
+  i18nDOM(document.head);
+  i18nDOM(document.body);
+  for(var i = 0; i < listeners.length; i++){
+    try{ listeners[i](LANG); }catch(e){}
+  }
+}
+function setLang(v){
+  v = (v === "en") ? "en" : "zh";
+  if(v === LANG) return;
+  LANG = v;
+  try{ localStorage.setItem("ud.lang", v); }catch(e){}
+  applyLang();
+}
+
+/* 這支 script 排在整份 <body> 標記後面，所以這時候頁面已經解析完，直接掃就行 */
+applyLang();
+
+window.T = T;
+window.TErr = TErr;
+window.i18nDOM = i18nDOM;
+window.setLang = setLang;
+window.uiLang = lang;
+window.onLang = onLang;
+window.applyLang = applyLang;
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 
 <script>
@@ -2769,7 +3334,11 @@ const suitOf = s => (s === JS ? JOKER : SUITS[s]);
 const isJoker = c => !!c && c.s === JS;
 const FACE = {11:"J",12:"Q",13:"K",14:"A"};
 const rankLabel = r => FACE[r] || String(r);
-const cardName = c => isJoker(c) ? JOKER.name : SUITS[c.s].name + rankLabel(c.r);
+/* 牌名只給讀螢幕的人聽。中文是「黑桃A」，英文是「Ace of spades」——語序相反，
+   所以不能用 + 接；A/K/Q/J 在英文裡也要念成整個字，不是一個字母。 */
+const RANK_SAY = {14:"Ace", 13:"King", 12:"Queen", 11:"Jack"};
+const cardName = c => isJoker(c) ? T("card.joker")
+  : T("%1%2", T(SUITS[c.s].name), uiLang() === "en" ? (RANK_SAY[c.r] || c.r) : rankLabel(c.r));
 
 /* ---- 這一桌的規則 ----
    每一項都是一個獨立的旋鈕，預設就是我們原本玩的那套；房主在等待房間裡改，
@@ -3195,7 +3764,7 @@ async function call(action, args){
       method:"POST",
       headers:{"Content-Type":"application/json", apikey:SB_KEY, Authorization:"Bearer " + jwt},
       body:JSON.stringify(Object.assign(
-        {action:action, token:MY.token, name:MY.name || "玩家"}, args || {}))
+        {action:action, token:MY.token, name:MY.name || T("玩家")}, args || {}))
     });
     const d = await res.json().catch(function(){ return {}; });
     if(d.pid) MY.pid = d.pid;
@@ -3203,14 +3772,14 @@ async function call(action, args){
        在函式跑起來之前就擋掉的（回的 body 不是我們寫的）。兩者都是「這張身分不算數」。 */
     if(d.signin || res.status === 401){ gotoLogin(true); return null; }
     if(d.error){
-      if(action !== "tick" && action !== "state"){ NET.err = d.error; render(); }
+      if(action !== "tick" && action !== "state"){ NET.err = TErr(d.error); render(); }
       return null;
     }
     NET.err = "";
     if(d.room) applyRow(d.room, d.hand);
     return d;
   }catch(e){
-    if(action !== "tick"){ NET.err = "連不上伺服器，檢查一下網路"; render(); }
+    if(action !== "tick"){ NET.err = T("連不上伺服器，檢查一下網路"); render(); }
     return null;
   }finally{ NET.busy = false; }
 }
@@ -3529,14 +4098,14 @@ async function offerReturn(){
 
 async function createRoom(cfg){
   const d = await api("create", {cfg:cfg});
-  if(!d) throw new Error(NET.err || "開房失敗");
+  if(!d) throw new Error(NET.err || T("開房失敗"));
   subscribe(d.room.code);
   return d;
 }
 async function joinRoom(code){
   /* 進來就有位子，不必挑——人數由誰在桌上決定 */
   const d = await api("join", {code:code});
-  if(!d) throw new Error(NET.err || ("找不到房號 " + code));
+  if(!d) throw new Error(NET.err || T("找不到房號 %1", code));
   subscribe(code);
   return d;
 }
@@ -3601,9 +4170,14 @@ function doPlay(cardId, el){
 
 /* ================= 畫面 ================= */
 /* 內容沒變就不重寫 DOM——這是動畫不被打斷的前提 */
+/* 動態畫出來的 HTML 全部經過這裡，所以翻譯也掛在這裡：innerHTML 寫完立刻掃一遍。
+   __lang 要一起比對——切了語言之後 html 這個字串沒變（原文永遠是中文），
+   少了它就會被上一行的快取擋掉，畫面停在舊語言。 */
 function setHTML(el, html){
-  if(!el || el.__h === html) return false;
-  el.__h = html; el.innerHTML = html;
+  const L = window.uiLang ? uiLang() : "zh";
+  if(!el || (el.__h === html && el.__lang === L)) return false;
+  el.__h = html; el.__lang = L; el.innerHTML = html;
+  if(window.i18nDOM) i18nDOM(el);
   return true;
 }
 /* 真實撲克牌的花色排列。x：0 左 / .5 中 / 1 右；y：0 上 → 1 下。
@@ -3658,7 +4232,8 @@ function pipPath(i, x, y, rot, scale, fill, op){
   return '<g transform="translate(' + x + ' ' + y + ') rotate(' + rot + ') scale(' + scale + ') translate(-12 -12)">' +
     '<path d="' + SUIT_D[i] + '" fill="' + fill + '"' + (op != null ? ' opacity="' + op + '"' : '') + '/></g>';
 }
-function T(str, x, y, size, o){ return Object.assign({str:str, x:x, y:y, size:size}, o || {}); }
+/* 牌面上的一段字（字標、JOKER、角標）。名字不能叫 T——那是 i18n 的 */
+function TXT(str, x, y, size, o){ return Object.assign({str:str, x:x, y:y, size:size}, o || {}); }
 
 /* ---- 宮廷牌人像 ----
    docs/cards/{J,Q,K}{S,H,D,C}.svg（CC0，Dmitry Fomin，英式雙頭人像），原檔只用五個顏色：
@@ -3734,8 +4309,8 @@ DECKS.gilt = {
           pipUse("p-s", 50, 64, 40, false) +
           '<path d="' + ACE.ribbon + '" fill="' + g + '"/><path d="' + ACE.tails + '" fill="' + g + '" opacity=".8"/>' +
           '<path d="' + ACE.ribbon + '" fill="none" stroke="currentColor" stroke-width=".35"/>',
-      texts:[T("11", 50, 67.8, 11.5, {fill:o.paper}),
-             T("UP & DOWN", 50, 97.85, 3.8, {fill:this.ink, family:"Archivo,sans-serif", weight:600, ls:.2})]
+      texts:[TXT("11", 50, 67.8, 11.5, {fill:o.paper}),
+             TXT("UP & DOWN", 50, 97.85, 3.8, {fill:this.ink, family:"Archivo,sans-serif", weight:600, ls:.2})]
     };
     if(card.r === 14) return {art:'<circle cx="50" cy="70" r="24" fill="none" stroke="' + g + '" stroke-width=".45"/>' + pipUse(o.sym, 50, 70, 34, false)};
     if(card.r >= 11) return {art:courtUse(o.key, o.standalone) + courtFrame('stroke="' + g + '" stroke-width=".9"') +
@@ -3776,7 +4351,7 @@ DECKS.casino = {
   mid:function(card, o){
     if(card.r === 14 && card.s === 0) return {
       art:pipUse("p-s", 50, 66, 48, false),
-      texts:[T("11", 50, 71, 15, {fill:"#FFFFFF"}), T("UP & DOWN", 50, 100, 3.8, {family:"Archivo,sans-serif", weight:600, ls:.22})]
+      texts:[TXT("11", 50, 71, 15, {fill:"#FFFFFF"}), TXT("UP & DOWN", 50, 100, 3.8, {family:"Archivo,sans-serif", weight:600, ls:.22})]
     };
     if(card.r === 14) return {art:pipUse(o.sym, 50, 70, 42, false)};
     if(card.r >= 11) return {art:courtUse(o.key, o.standalone) + courtFrame('stroke="' + this.ink + '" stroke-width=".9" opacity=".55"')};
@@ -3817,8 +4392,8 @@ DECKS.four = {
     if(card.r === 14 && card.s === 0) return {
       art:pipUse("p-s", 50, 64, 46, false) +
           '<path d="' + ACE.ribbon + '" fill="currentColor"/><path d="' + ACE.tails + '" fill="currentColor" opacity=".75"/>',
-      texts:[T("11", 50, 68.6, 12.5, {fill:"#FFFFFF"}),
-             T("UP & DOWN", 50, 97.85, 3.8, {fill:"#FFFFFF", family:"Archivo,sans-serif", weight:600, ls:.2})]
+      texts:[TXT("11", 50, 68.6, 12.5, {fill:"#FFFFFF"}),
+             TXT("UP & DOWN", 50, 97.85, 3.8, {fill:"#FFFFFF", family:"Archivo,sans-serif", weight:600, ls:.2})]
     };
     if(card.r === 14) return {art:pipUse(o.sym, 50, 70, 38, false)};
     if(card.r >= 11) return {art:courtUse(o.key, o.standalone) + courtFrame('stroke="currentColor" stroke-width=".8" opacity=".55"')};
@@ -3870,14 +4445,14 @@ DECKS.note = {
   mid:function(card, o){
     if(card.r === 14 && card.s === 0) return {
       art:this.rosette(27) + pipUse("p-s", 50, 68, 38, false) + '<rect x="36" y="97" width="28" height="6" fill="currentColor"/>',
-      texts:[T("11", 50, 71.5, 10.5, {fill:o.paper}),
-             T("UP & DOWN", 50, 101.6, 3.8, {fill:o.paper, family:"Archivo,sans-serif", weight:600, ls:.22})]
+      texts:[TXT("11", 50, 71.5, 10.5, {fill:o.paper}),
+             TXT("UP & DOWN", 50, 101.6, 3.8, {fill:o.paper, family:"Archivo,sans-serif", weight:600, ls:.22})]
     };
     if(card.r === 14) return {art:this.rosette(26) + pipUse(o.sym, 50, 70, 30, false)};
     if(card.r >= 11) return {
       art:courtUse(o.key, o.standalone) + courtFrame('stroke="currentColor" stroke-width=".6"') +
           '<rect x="33" y="109.2" width="34" height="6.6" fill="' + o.paper + '" stroke="currentColor" stroke-width=".4"/>',
-      texts:[T(NAME_OF[card.r], 50, 114.3, 4.1, {ls:.24})]
+      texts:[TXT(NAME_OF[card.r], 50, 114.3, 4.1, {ls:.24})]
     };
     return {art:pipsSVG(o.sym, card.r, 15, 28, 44)};
   },
@@ -3933,8 +4508,8 @@ DECKS.blue = {
   mid:function(card, o){
     if(card.r === 14 && card.s === 0) return {
       art:this.rings + pipUse("p-s", 50, 69, 36, false),
-      texts:[T("11", 50, 71.5, 10.5, {fill:o.paper}),
-             T("UP & DOWN", 50, 102, 3.8, {family:"Archivo,sans-serif", weight:600, ls:.22})]
+      texts:[TXT("11", 50, 71.5, 10.5, {fill:o.paper}),
+             TXT("UP & DOWN", 50, 102, 3.8, {family:"Archivo,sans-serif", weight:600, ls:.22})]
     };
     if(card.r === 14) return {art:this.rings + pipUse(o.sym, 50, 70, 30, false)};
     if(card.r >= 11) return {art:courtUse(o.key, o.standalone) + courtFrame('stroke="currentColor" stroke-width=".7" opacity=".85"')};
@@ -4045,7 +4620,7 @@ loadCourts().then(function(ok){
    但不屬於任何花色，所以顏色取這副牌的裝飾色而不是花色色。 */
 function jokerMid(d, col){
   const g = d.gold || d.ink;
-  const w = T("JOKER", 50, 105, 5, {fill:d.ink, family:"Archivo,sans-serif", weight:600, ls:.22});
+  const w = TXT("JOKER", 50, 105, 5, {fill:d.ink, family:"Archivo,sans-serif", weight:600, ls:.22});
   return {
     art:'<circle cx="50" cy="70" r="23.5" fill="none" stroke="' + g + '" stroke-width=".55"/>' +
         '<circle cx="50" cy="70" r="21.2" fill="none" stroke="' + col + '" stroke-width=".3" opacity=".55"/>' +
@@ -4068,7 +4643,7 @@ function faceSpec(card, standalone){
   const cp = pipUse(su.sym, c.x, c.pipY + c.pw/2, c.pw, false);
   art += cp + R180 + cp + '</g>';
   const fs = lab.length > 1 ? c.size2 : c.size;
-  const texts = [T(lab, c.x, c.base, fs), T(lab, c.x, c.base, fs, {rot:1})];
+  const texts = [TXT(lab, c.x, c.base, fs), TXT(lab, c.x, c.base, fs, {rot:1})];
   const m = d.mid(card, {col:col, paper:paper, sym:su.sym, lab:lab, key:lab + su.k, standalone:!!standalone});
   art += m.art;
   if(m.texts) texts.push.apply(texts, m.texts);
@@ -4124,15 +4699,29 @@ function dieHTML(v, seat){
     '<span class="pip" style="grid-row:' + Math.ceil(i/3) + ';grid-column:' + (((i-1)%3)+1) + '"></span>'
   ).join("");
   /* 叫 7 以上：兩顆骰子，一顆 6 加一顆餘數——桌上的立體骰子也是這樣擺 */
-  if(v > 6) return '<span class="dice"' + a + ' role="img" aria-label="叫 ' + v + ' 墩">' +
+  if(v > 6) return '<span class="dice"' + a + ' role="img" aria-label="' + T("叫 %1 墩", v) + '">' +
     '<div class="die">' + pips(6) + '</div><div class="die">' + pips(v - 6) + '</div></span>';
-  return '<div class="die"' + a + ' aria-label="叫 ' + v + ' 墩">' + pips(v) + '</div>';
+  return '<div class="die"' + a + ' aria-label="' + T("叫 %1 墩", v) + '">' + pips(v) + '</div>';
+}
+/* 引擎給空位的預設名是「座位 N」。引擎那一段是純計算、不認得 i18n（測試會把它
+   切出來在沙箱裡跑），所以在畫面這一層才把它換成當下的語言。真人的名字長不成這樣。 */
+const OPEN_SEAT = /^座位 (\d+)$/;
+function seatName(s, i){
+  const m = s && s.name && String(s.name).match(OPEN_SEAT);
+  if(m) return T("座位 %1", m[1]);
+  return (s && s.name) || T("座位 %1", i+1);
 }
 function seatLabel(i){
   const s = G.seats[i];
-  if(MODE === "solo") return i === 0 ? "你" : esc(s.name);
-  if(s.cid && s.cid === MY.pid) return esc(s.name || "你") + "（你）";
-  return esc(s.name) || ("座位 " + (i+1));
+  if(MODE === "solo") return i === 0 ? T("你") : esc(s.name);
+  if(s.cid && s.cid === MY.pid) return T("%1（你）", esc(s.name || T("你")));
+  return esc(seatName(s, i));
+}
+/* 計分表的表頭放不下「（你）」那三個字，英文的 " (you)" 更長——兩邊都要拿掉 */
+function seatBare(i){
+  const s = G.seats[i];
+  if(MODE === "solo") return i === 0 ? T("你") : esc(s.name);
+  return esc(seatName(s, i));
 }
 function seatTag(i){
   const s = G.seats[i];
@@ -4172,10 +4761,10 @@ function bidPips(i){
   /* 「還差幾／剛好／超了」不寫成字：那正是這排墩位在說的事（空格＝還欠、
      金色＝拿到、整排轉綠＝剛好、紅格＝超了）。叫 0 沒有墩位，骰子上那個 0 就是答案。
      但格子只有眼睛數得到——讀螢幕的人數不到，所以那句話完整寫在 aria-label 裡。 */
-  const said = over ? "，超了 " + over + " 墩" : d > 0 ? "，還差 " + d + " 墩" : "，剛好";
+  const said = over ? T("，超了 %1 墩", over) : d > 0 ? T("，還差 %1 墩", d) : T("，剛好");
   return bid || over
-    ? '<span class="slots' + (d === 0 && !over ? " done" : "") + '" role="img" aria-label="叫 ' +
-        bid + ' 墩，已贏 ' + got + ' 墩' + said + '">' + h + '</span>'
+    ? '<span class="slots' + (d === 0 && !over ? " done" : "") + '" role="img" aria-label="' +
+        T("叫 %1 墩，已贏 %2 墩", bid, got) + said + '">' + h + '</span>'
     : '';
 }
 /* 桌面顏色：王牌花色決定色相，局數階梯決定深度 */
@@ -4236,7 +4825,8 @@ function render(){
     (MODE === "net" ? '<span class="mi"><span class="k">房號</span><span class="v code">' + NET.code + '</span></span>' : "") +
     '<span class="mi"><span class="k">局</span><span class="v">' + Math.max(0, G.ri+1) +
       '<span class="sub">/' + G.ladder.length + '</span></span></span>' +
-    '<span class="mi"><span class="k">每人</span><span class="v">' + G.hs + '<span class="sub"> 張</span></span></span>' +
+    '<span class="mi"><span class="k">每人</span><span class="v">' + G.hs +
+      '<span class="sub"> ' + T("unit.cards", G.hs) + '</span></span></span>' +
     '<span class="mi"><span class="k">王牌</span><span class="v">' +
       (G.trumpCard ? pip(G.trump, "suit") + " " + rankLabel(G.trumpCard.r) : "無") + '</span></span>' +
     '<span class="mi"><span class="k">墩</span><span class="v">' + G.played +
@@ -4259,7 +4849,7 @@ function render(){
   setHTML($("deckwrap"), G.trumpCard
     ? '<div class="deck">' + backs(decks - 1) +
       '<div class="trumpcard">' + cardHTML(G.trumpCard, {trumpMark:true}) + '</div></div>' +
-      '<div class="label">' + (G.trump === null ? '翻到<b>鬼牌</b> · 本局無王'
+      '<div class="label">' + (G.trump === null ? T('翻到<b>鬼牌</b> · 本局無王')
                                                  : '王牌 <b>' + SUITS[G.trump].name + '</b>') + '</div>'
     : '<div class="deck">' + backs(decks) + '</div>' +
       '<div class="label">' + (G.phase === "lobby" ? "等待開始" : "本局無王") + '</div>');
@@ -4281,7 +4871,7 @@ function render(){
   const handChanged = renderHand(me);
   const pileGrew = renderTricks(me);
   renderLedger();
-  $("btnRoom").textContent = MODE === "net" ? "房間 " + NET.code : "房間";
+  $("btnRoom").textContent = MODE === "net" ? T("房間 %1", NET.code) : T("房間");
 
   /* ---- 一次性動畫：全部在 DOM 寫完之後才補上 ---- */
   if(freshRound && G.phase !== "lobby"){
@@ -4323,7 +4913,7 @@ function renderTricks(me){
 
   const got = G.won[me] || 0;
   const per = G.cfg.n;   /* 一墩就是每人各一張 */
-  let h = '<div class="pile' + (got ? "" : " empty") + '" role="img" aria-label="我贏得 ' + got + ' 墩">';
+  let h = '<div class="pile' + (got ? "" : " empty") + '" role="img" aria-label="' + T("我贏得 %1 墩", got) + '">';
   for(let i=0;i<got;i++){
     /* 每一墩明顯錯開一格，數得出來；疊到第 7 墩之後步距減半，免得爬進狀態列 */
     const k = i < 6 ? i : 6 + (i - 6) * .5;
@@ -4335,7 +4925,7 @@ function renderTricks(me){
     h += '</div>';
   }
   h += '</div>';
-  setHTML(el, '<div class="label">本局 <b>' + got + '</b> 墩</div>' + h);
+  setHTML(el, '<div class="label">' + T('本局 <b>%1</b> 墩', got) + '</div>' + h);
 
   const grew = got === SEEN.won + 1;
   SEEN.won = got;
@@ -4482,7 +5072,7 @@ function renderStatus(me){
   if(G.phase === "lobby"){
     /* 大廳那張空桌也是 phase:"lobby"，但它沒有房號——不要對著沒開的房間報房號 */
     setHTML(el, NET.code
-      ? '<span class="msg">房間已開好，房號 <b class="code">' + NET.code + '</b></span>' +
+      ? '<span class="msg">' + T('房間已開好，房號 <b class="code">%1</b>', NET.code) + '</span>' +
         '<span class="bidrow"><button class="btn primary" id="btnLobby">看座位</button></span>'
       : '<span class="msg">還沒開局</span>' +
         '<span class="bidrow"><button class="btn primary" id="btnLobby">回大廳</button></span>');
@@ -4517,7 +5107,7 @@ function renderStatus(me){
           ? '<button class="bidbtn fc no" data-bid="' + v + '" disabled><b>' + v + '</b><i>不能叫</i></button>'
           : last
           ? '<button class="bidbtn fc ' + (d === 0 ? "ex" : d < 0 ? "un" : "ov") + '" data-bid="' + v + '"><b>' + v + '</b><i>' +
-            (d === 0 ? "剛好" : d < 0 ? "欠 " + (-d) : "超 " + d) + '</i></button>'
+            (d === 0 ? T("剛好") : d < 0 ? T("欠 %1", -d) : T("超 %1", d)) + '</i></button>'
           : '<button class="bidbtn" data-bid="' + v + '">' + v + '</button>';
       }
       setHTML(el, '<span class="msg">' + (sim ? "全桌同時叫，選好先蓋著" : "你要叫幾墩？") + '</span>' +
@@ -4531,15 +5121,16 @@ function renderStatus(me){
   if(G.phase === "play"){
     /* 出牌階段只留一句「輪到誰」。跟牌花色、這局在搶還是在讓，牌桌上本來就看得到：
        不能出的牌會壓暗，叫了幾墩就放在誰面前——再多寫兩行提示反而把畫面弄雜 */
-    if(G.turn === me) setHTML(el, '<span class="msg">輪到<b>你</b>出牌</span>');
+    if(G.turn === me) setHTML(el, '<span class="msg">' + T('輪到<b>你</b>出牌') + '</span>');
     else setHTML(el, '<span class="msg"><b>' + who + '</b> 出牌中…</span>');
     return;
   }
 
   if(G.phase === "trickend"){
     const w = G.trick[trickBest(G)];
-    setHTML(el, '<span class="msg"><b>' + seatLabel(w.p) + '</b> 用 ' + pip(w.card.s) +
-      (isJoker(w.card) ? " 鬼牌" : " " + rankLabel(w.card.r)) + ' 贏得這墩</span>');
+    setHTML(el, '<span class="msg">' +
+      T('<b>%1</b> 用 %2 贏得這墩', seatLabel(w.p),
+        pip(w.card.s) + (isJoker(w.card) ? T("card.jokerSuffix") : " " + rankLabel(w.card.r))) + '</span>');
     return;
   }
 
@@ -4547,11 +5138,11 @@ function renderStatus(me){
     const more = G.ri + 1 < G.ladder.length;
     /* 那一局誰叫幾、拿幾、幾分，右邊的計分表整場都寫在那裡，狀態列不再重講一次 */
     /* 下一局會自己開始，按鈕只是給想快轉的人。伺服器允許任何在座的人開下一局 */
-    setHTML(el, '<span class="msg">第 ' + (G.ri+1) + ' 局結束</span>' +
+    setHTML(el, '<span class="msg">' + T("第 %1 局結束", G.ri+1) + '</span>' +
       '<span class="bidrow">' +
         '<span class="autonext" style="--d:' + roundGap() + 'ms"><i></i></span>' +
         '<span class="hint">' +
-          (more ? '下一局 · 每人 ' + G.ladder[G.ri+1] + ' 張' : '準備收桌') + '</span>' +
+          (more ? T("下一局 · 每人 %1 張", G.ladder[G.ri+1]) : T("準備收桌")) + '</span>' +
         (me >= 0 ? '<button class="btn primary" id="btnNext">馬上開始</button>' : "") +
       '</span>');
     return;
@@ -4578,7 +5169,9 @@ function renderHand(me){
      click 根本不會產生——牌還是亮的、狀態列還寫著「輪到你出牌」，點下去卻完全
      沒反應，而且要狂點才偶爾中一次（剛好那一下中間沒有重畫）。
      人越多列來得越密，中的機率越低，所以六個人比四個人難打得多。 */
-  const keys = hand.map(c => c.id).join(",");
+  /* 語言也算進 key：aria-label 上的牌名跟著語言走，換了語言就得真的重建一次。
+     語言只有使用者自己在設定裡按才會變，不會落在按下與放開之間。 */
+  const keys = hand.map(c => c.id).join(",") + "|" + uiLang();
   if(el.__keys === keys && el.querySelector("[data-card]")){
     for(const c of hand){
       const b = el.querySelector('[data-card="' + c.id + '"]');
@@ -4617,7 +5210,7 @@ function renderLedger(){
     '<thead><tr><th class="gut"><span class="nm">局</span></th>';
   for(let i=0;i<n;i++)
     h += '<th' + (i === me ? ' class="me"' : '') + '><span class="nm">' +
-      seatLabel(i).replace("（你）", "") + '</span><span class="tot' +
+      seatBare(i) + '</span><span class="tot' +
       (G.log.length && (G.score[i]||0) === top ? " lead" : "") + '">' + (G.score[i]||0) + '</span></th>';
   h += '</tr></thead><tbody>';
   G.ladder.forEach(function(size, i){
@@ -4626,7 +5219,7 @@ function renderLedger(){
     const tr = row ? row.trump : (now && G.trumpCard ? G.trump : undefined);
     /* 一局裡賺最多的那個人，數字提亮一階 */
     const best = row ? Math.max.apply(null, row.cells.map(c => c.pts)) : null;
-    h += '<tr class="' + (now ? "now" : row ? "" : "ahead") + '" title="第 ' + (i+1) + ' 局">' +
+    h += '<tr class="' + (now ? "now" : row ? "" : "ahead") + '" title="' + T("第 %1 局", i+1) + '">' +
       '<td class="gut"><span class="szbar" style="--w:' + (6 + Math.round(size/maxSize*30)) + '"></span>' +
       '<span class="sz">' + size + '</span>' +
       (tr === undefined ? "" : tr === null ? '<span class="nt">無王</span>' : pip(tr, "tsuit")) + '</td>';
@@ -4639,7 +5232,7 @@ function renderLedger(){
     h += '</tr>';
   });
   if(setHTML($("score"), h + '</tbody>')) centerLedger();
-  $("ledgerOf").textContent = G.cfg.decks + " 副 · " + G.deckSize + " 張 · " + G.cfg.n + " 人";
+  $("ledgerOf").textContent = T("%1 副 · %2 張 · %3 人", G.cfg.decks, G.deckSize, G.cfg.n);
 }
 
 /* 改名字要讓同桌的人看到。伺服器只在大廳收座位變更，牌局進行中就先留在本機。
@@ -4659,14 +5252,14 @@ function paintMeChip(){
   if(!btn) return;
   if(MY.av){ av.src = MY.av; av.hidden = false; btn.classList.remove("bare"); }
   else { av.hidden = true; btn.classList.add("bare"); }
-  nm.textContent = MY.name || MY.gname || "帳號";
-  btn.setAttribute("aria-label", "你的帳號：" + (MY.gname || MY.email || ""));
+  nm.textContent = MY.name || MY.gname || T("帳號");
+  btn.setAttribute("aria-label", T("你的帳號：%1", MY.gname || MY.email || ""));
 }
 function paintMe(){
   const av = $("meAv"), disc = $("meDisc");
   /* Google 沒給照片就寫名字的第一個字，跟開房頁的座位牌同一套 */
   if(MY.av){ av.src = MY.av; av.hidden = false; disc.hidden = true; }
-  else{ av.hidden = true; disc.hidden = false; disc.textContent = (MY.name || MY.gname || "你").slice(0, 1); }
+  else{ av.hidden = true; disc.hidden = false; disc.textContent = (MY.name || MY.gname || T("你")).slice(0, 1); }
   $("meName").textContent = MY.gname || MY.name || "—";
   $("meEmail").textContent = MY.email || "";
   $("inNameMe").value = MY.name || "";
@@ -4678,9 +5271,9 @@ let histOnce = null;
 async function loadHistory(force){
   const box = $("histBody");
   if(!box) return;
-  if(!NET.sb){ box.innerHTML = '<div class="fair">連線元件沒載入成功，看不到戰績。</div>'; return; }
+  if(!NET.sb){ setHTML(box, '<div class="fair">連線元件沒載入成功，看不到戰績。</div>'); return; }
   if(histOnce && !force) return;
-  box.innerHTML = '<div class="fair">讀取中…</div>';
+  setHTML(box, '<div class="fair">讀取中…</div>');
   let rows = null, err = null;
   try{
     const r = await NET.sb.from("results").select("*")
@@ -4689,11 +5282,11 @@ async function loadHistory(force){
   }catch(e){ err = e; }
   histOnce = true;
   if(err){
-    box.innerHTML = '<div class="fair">戰績還沒開通——資料表 <b>results</b> 建好之後這裡就會有東西。</div>';
+    setHTML(box, '<div class="fair">' + T('戰績還沒開通——資料表 <b>results</b> 建好之後這裡就會有東西。') + '</div>');
     return;
   }
   if(!rows || !rows.length){
-    box.innerHTML = '<div class="fair">還沒有打完的紀錄。</div>';
+    setHTML(box, '<div class="fair">還沒有打完的紀錄。</div>');
     return;
   }
   const games = rows.length;
@@ -4705,19 +5298,19 @@ async function loadHistory(force){
     const d = new Date(t);
     return isNaN(d) ? "—" : (d.getMonth()+1) + "/" + d.getDate();
   };
-  box.innerHTML =
+  setHTML(box,
     '<div class="recap">' +
       '<div><div class="k">場數</div><div class="v">' + games + '</div></div>' +
       '<div><div class="k">拿第一</div><div class="v">' + wins + '<span class="sub"> / ' + games + '</span></div></div>' +
       '<div><div class="k">叫中率</div><div class="v">' + pct + '<span class="sub">%</span></div></div>' +
     '</div>' +
     '<ul class="hist">' + rows.map(function(r){
-      const vs = (r.opponents || []).map(esc).join("、");
+      const vs = (r.opponents || []).map(esc).join(T("sep.comma"));
       return '<li><span class="when">' + fmt(r.finished_at) + '</span>' +
-        '<span class="rank' + (r.rank === 1 ? " win" : "") + '">第 ' + r.rank + ' / ' + r.players + '</span>' +
+        '<span class="rank' + (r.rank === 1 ? " win" : "") + '">' + T("第 %1 / %2", r.rank, r.players) + '</span>' +
         '<span class="vs">' + (vs || "—") + '</span>' +
         '<span class="pts">' + (r.score > 0 ? "+" : "") + r.score + '</span></li>';
-    }).join("") + '</ul>';
+    }).join("") + '</ul>');
 }
 
 /* ================= 開房頁 =================
@@ -4773,7 +5366,7 @@ function roomRing(n){
 function roomFace(name, av){
   return av
     ? '<img src="' + esc(av) + '" alt="" referrerpolicy="no-referrer" onerror="this.hidden=true">'
-    : '<span class="disc">' + esc(String(name || "？").slice(0,1)) + '</span>';
+    : '<span class="disc">' + esc(String(name || T("？")).slice(0,1)) + '</span>';
 }
 
 function paintRoom(){
@@ -4797,7 +5390,7 @@ function paintRoom(){
   /* 桌子中央：連線局放房號（要貼給朋友的東西），單人局放這一桌會打幾局
      ——那是調人數、換牌組時唯一會動的數字。 */
   h += solo
-    ? '<div class="rm-mid"><span class="cap">一個人打</span>' +
+    ? '<div class="rm-mid"><span class="cap">' + T("room.solo") + '</span>' +
       '<span class="rm-code">' + roomNumbers(rules(G.cfg)).rounds + '</span>' +
       '<span class="rm-midn">局 · 對 AI，不記戰績</span></div>'
     : '<div class="rm-mid"><span class="cap">房號</span>' +
@@ -4809,17 +5402,17 @@ function paintRoom(){
     if(!p) return;
     const isMe = solo ? i === 0 : (s.cid && s.cid === MY.pid), ai = s.kind !== "human";
     /* 單人局的座位名只是「你 / B / C」，房間這一頁跟連線局一樣要顯示真名 */
-    const who = (solo && isMe) ? (MY.name || MY.gname || "你") : s.name;
+    const who = (solo && isMe) ? (MY.name || MY.gname || T("你")) : seatName(s, i);
     const tag = [];
-    if(!solo && G.host === s.cid) tag.push("房主");
-    if(isMe) tag.push("你");
+    if(!solo && G.host === s.cid) tag.push(T("房主"));
+    if(isMe) tag.push(T("你"));
     if(ai) tag.push("AI");
-    else if(!solo && !live[s.cid]) tag.push("離線");
-    else if(!tag.length) tag.push("在線上");
+    else if(!solo && !live[s.cid]) tag.push(T("離線"));
+    else if(!tag.length) tag.push(T("在線上"));
     h += '<div class="rm-p' + (isMe ? " is-me" : "") + (p.left ? " l" : "") +
       '" style="--x:' + p.x + 'px;--y:' + p.y + 'px">' +
       roomFace(who, !ai && s.av) +
-      '<span class="t"><b>' + (esc(who) || ("座位 " + (i+1))) + '</b><span>' + tag.join(" · ") +
+      '<span class="t"><b>' + esc(who) + '</b><span>' + tag.join(" · ") +
       ((host && lobby && (solo ? ai && n > 2 : s.cid !== G.host))
         ? '<button class="rm-kick" data-unseat="' + i + '">移除</button>' : "") +
       '</span></span></div>';
@@ -4836,7 +5429,7 @@ function paintRoom(){
   }
 
   setHTML($("rmDia"), h);
-  $("rmLeave").textContent = solo ? "回大廳" : "離開房間";
+  $("rmLeave").textContent = solo ? T("回大廳") : T("離開房間");
   paintRoomMe();
   paintRoomSheet();
   paintRoomEdit();
@@ -4846,15 +5439,15 @@ function paintRoom(){
   document.body.classList.toggle("rm-set", set);
 }
 function paintRoomMe(){
-  setHTML($("rmMe"), '<span class="nm">' + esc(MY.name || MY.gname || "你") + '</span>' +
+  setHTML($("rmMe"), '<span class="nm">' + esc(MY.name || MY.gname || T("你")) + '</span>' +
     roomFace(MY.name || MY.gname, MY.av));
 }
 
 /* 規則欄跟設定頁都從 RULE_UI 長出來，桌上這一份 cfg 是唯一的事實 */
 const RM_ROW = {bidMode:"方式"};                 /* 群組已經叫「叫墩」了，列名就不要再重複 */
-const RM_GROUPS = [["叫墩", ["bidMode","hook"]],
-                   ["牌",   ["decks","minRank","jokers"]],
-                   ["計分", ["hit","zero","miss"]]];
+const RM_GROUPS = [["rm.g.bid",   ["bidMode","hook"]],
+                   ["rm.g.cards", ["decks","minRank","jokers"]],
+                   ["rm.g.score", ["hit","zero","miss"]]];
 const ruleField = k => RULE_UI.filter(f => f.k === k)[0];
 function ruleNow(f, C){
   const cur = String(C[f.k]);
@@ -4873,11 +5466,11 @@ function paintRoomSheet(){
   const N = roomNumbers(C), hs = G.hs || 5;
   let h = '<div class="rm-hd"><h2>這一桌的規則</h2>' +
     (host && lobby
-      ? '<button class="rm-lnk" data-room="rules">設定</button>'
+      ? '<button class="rm-lnk" data-room="rules">' + T("rm.edit") + '</button>'
       : '<span class="rm-by">' + (lobby ? "房主決定" : "開打了，鎖住") + '</span>') +
     '</div>';
   RM_GROUPS.forEach(function(g){
-    h += '<div class="rm-sect"><span class="cap">' + g[0] + '</span>' +
+    h += '<div class="rm-sect"><span class="cap">' + T(g[0]) + '</span>' +
       g[1].map(function(k){
         const f = ruleField(k);
         return f ? '<div class="rm-r"><span class="k">' + (RM_ROW[k] || f.label) +
@@ -4888,11 +5481,11 @@ function paintRoomSheet(){
   h += '<div class="rm-sect"><span class="cap">這樣算</span>' +
     [[3,3],[0,0],[3,4]].map(function(e){
       const p = roundPoints(e[0], e[1], hs, C);
-      return '<div class="rm-r"><span class="k">叫 ' + e[0] + '，拿 ' + e[1] + '</span>' +
-        '<i class="d"></i><span class="v">' + (p >= 0 ? "＋" : "−") + Math.abs(p) + '</span></div>';
+      return '<div class="rm-r"><span class="k">' + T("叫 %1，拿 %2", e[0], e[1]) + '</span>' +
+        '<i class="d"></i><span class="v">' + (p >= 0 ? T("＋") : "−") + Math.abs(p) + '</span></div>';
     }).join("") + '</div>' +
-    '<div class="rm-tot"><span>' + N.size + ' 張牌 · ' + G.seats.length + ' 個人</span>' +
-    '<span><b>' + N.peak + '</b> 張到頂 · <b>' + N.rounds + '</b> 局</span></div>';
+    '<div class="rm-tot"><span>' + T("%1 張牌 · %2 個人", N.size, G.seats.length) + '</span>' +
+    '<span>' + T('<b>%1</b> 張到頂 · <b>%2</b> 局', N.peak, N.rounds) + '</span></div>';
 
   if(lobby && host)
     h += '<button class="rm-go" data-net="begin"' + (G.seats.length < 2 ? " disabled" : "") + '>開始</button>' +
@@ -4917,7 +5510,7 @@ function paintRoomEdit(){
       f.opts.map(function(o){
         return '<button class="rm-ch" data-rule="' + f.k + '" data-v="' + o.v + '" aria-pressed="' +
           (String(o.v) === cur ? "true" : "false") + '">' + o.t + '</button>';
-      }).join('<i class="rm-sep">／</i>') + '</div></div>';
+      }).join('<i class="rm-sep">' + T("／") + '</i>') + '</div></div>';
   };
   setHTML($("rmEdit"),
     '<header class="rm-ehd"><h2>這一桌的規則</h2>' +
@@ -4925,30 +5518,30 @@ function paintRoomEdit(){
     '<div class="rm-ebd">' +
       /* 右欄整條被視窗頂掉了，改規則沒送成的那句話要印在這裡才看得到 */
       (roomErr ? '<p class="rm-err">' + esc(roomErr) + '</p>' : "") +
-      '<span class="cap">叫墩</span>' + field("bidMode") + field("hook", 1) +
-      '<span class="cap">牌</span>' + field("decks") + field("minRank") + field("jokers", 1) +
-      '<span class="cap">計分</span>' + field("hit") + field("zero") + field("miss", 1) +
+      '<span class="cap">' + T("rm.g.bid") + '</span>' + field("bidMode") + field("hook", 1) +
+      '<span class="cap">' + T("rm.g.cards") + '</span>' + field("decks") + field("minRank") + field("jokers", 1) +
+      '<span class="cap">' + T("rm.g.score") + '</span>' + field("hit") + field("zero") + field("miss", 1) +
       '<span class="cap">這樣算</span><div class="rm-egs">' +
       [[3,3],[0,0],[3,4]].map(function(e){
         const p = roundPoints(e[0], e[1], hs, C);
-        return '<div class="rm-r"><span class="k">叫 ' + e[0] + '，拿 ' + e[1] + '</span>' +
-          '<i class="d"></i><span class="v">' + (p >= 0 ? "＋" : "−") + Math.abs(p) + '</span></div>';
+        return '<div class="rm-r"><span class="k">' + T("叫 %1，拿 %2", e[0], e[1]) + '</span>' +
+          '<i class="d"></i><span class="v">' + (p >= 0 ? T("＋") : "−") + Math.abs(p) + '</span></div>';
       }).join("") + '</div></div>' +
     '<footer class="rm-eft"><div class="rm-nums">' +
       '<div><div class="k">牌數</div><div class="v">' + N.size + '</div></div>' +
       '<div><div class="k">最多每人</div><div class="v">' + N.peak + '</div></div>' +
       '<div><div class="k">總局數</div><div class="v">' + N.rounds + '</div></div></div>' +
-      '<span class="rm-emeta">' + (solo ? "一個人打" : "房號 " + esc(NET.code)) + ' · ' +
-      G.seats.length + ' 人就座</span></footer>');
+      '<span class="rm-emeta">' + (solo ? T("room.solo") : T("房號 %1", esc(NET.code))) + ' · ' +
+      T("%1 人就座", G.seats.length) + '</span></footer>');
 }
 /* 房號要能一鍵貼給朋友；沒有 clipboard API（http、舊瀏覽器）就退回 execCommand */
 function copyRoomCode(){
   const say = function(t){ const el = $("rmCopy"); if(el) el.textContent = t; };
   const ok = function(){
-    say("複製好了");
-    setTimeout(function(){ say("按一下複製"); }, 1800);
+    say(T("複製好了"));
+    setTimeout(function(){ say(T("按一下複製")); }, 1800);
   };
-  const fail = function(){ say("複製不了"); };
+  const fail = function(){ say(T("複製不了")); };
   try{
     if(navigator.clipboard && navigator.clipboard.writeText)
       navigator.clipboard.writeText(NET.code).then(ok, fail);
@@ -5084,7 +5677,7 @@ async function handleNet(a){
       await leaveTable();
     }
   }catch(ex){
-    roomErr = (ex && ex.message) || "操作失敗，請再試一次";
+    roomErr = (ex && ex.message) || T("操作失敗，請再試一次");
     paintRoom();
   }
 }
@@ -5128,13 +5721,13 @@ function showFinal(){
     else if(board.length < 3) board.push({pos:e.pos, sc:e.sc, who:[e]});
   });
   /* 標題寫的是誰贏了，不是「牌局結束」四個字；單人局不進戰績——收桌這一刻是唯一還說得上這句話的地方 */
-  $("endSub").textContent = "牌局結束 · " + G.log.length + " 局" +
-    (MODE === "net" ? (NET.code ? " · 房號 " + NET.code : "") : " · 對 AI，不記戰績");
-  const nick = function(e){ return e.i === me ? "你" : (esc(G.seats[e.i].name) || ("座位 " + (e.i+1))); };
+  $("endSub").textContent = T("牌局結束 · %1 局", G.log.length) +
+    (MODE === "net" ? (NET.code ? T(" · 房號 %1", NET.code) : "") : T(" · 對 AI，不記戰績"));
+  const nick = function(e){ return e.i === me ? T("你") : esc(seatName(G.seats[e.i], e.i)); };
   const first = board[0];
-  $("endAsk").textContent = !first ? "牌局結束"
-    : first.who.length > 1 ? first.who.map(nick).join("、") + " 平手"
-    : first.who[0].i === me ? "你贏了這一桌" : nick(first.who[0]) + " 贏了這一桌";
+  $("endAsk").textContent = !first ? T("牌局結束")
+    : first.who.length > 1 ? T("%1 平手", first.who.map(nick).join(T("sep.comma")))
+    : first.who[0].i === me ? T("你贏了這一桌") : T("%1 贏了這一桌", nick(first.who[0]));
 
   /* 台上三疊牌：第一名 7 張、第二 4、第三 2。發法是一輪一輪繞（三、二、一、三、二、一…），
      誰的疊滿了就跳過——所以第一名那疊最後還在收牌，高度是看著長出來的。排法 2・1・3。 */
@@ -5159,8 +5752,8 @@ function showFinal(){
     }
     return '<div class="stack p' + (k + 1) + '">' +
       '<div class="who" style="--dw:' + ((ds[cnt - 1] + 380) / 1000).toFixed(3) + 's"><div class="faces">' +
-        r.who.map(function(e){ const s = G.seats[e.i]; return roomFace(e.i === me ? "你" : s.name, s.kind === "human" && s.av); }).join("") +
-      '</div><span class="nm">' + r.who.map(nick).join("、") + '</span>' +
+        r.who.map(function(e){ const s = G.seats[e.i]; return roomFace(e.i === me ? T("你") : s.name, s.kind === "human" && s.av); }).join("") +
+      '</div><span class="nm">' + r.who.map(nick).join(T("sep.comma")) + '</span>' +
       '<span class="sc">' + (r.sc > 0 ? "+" : "") + r.sc + '</span></div>' +
       '<div class="pile" style="--n:' + (cnt - 1) + '">' + cards + '</div></div>';
   }).join(""));
@@ -5169,13 +5762,13 @@ function showFinal(){
   const mine = me >= 0 ? rank.filter(function(e){ return e.i === me; })[0] : null;
   const outside = !!mine && !board.some(function(r){ return r.pos === mine.pos; });
   $("endMine").hidden = !outside;
-  if(outside) setHTML($("endMine"), '你第 <b>' + mine.pos + '</b> / ' + G.seats.length +
-    ' · <b>' + (mine.sc > 0 ? "+" : "") + mine.sc + '</b> 分');
+  if(outside) setHTML($("endMine"), T('你第 <b>%1</b> / %2 · <b>%3</b> 分',
+    mine.pos, G.seats.length, (mine.sc > 0 ? "+" : "") + mine.sc));
   /* 再來一局＝直接發牌，所以只有按得動「開始」的人看得到：單人局永遠是你，
      連線局是房主（房主離線時伺服器讓在座的任何人接手，這裡照同一個條件）。 */
   const ag = $("endAgain");
   ag.hidden = !(MODE !== "net" || (me >= 0 && (amHost() || !liveCids()[G.host])));
-  ag.disabled = false; ag.textContent = "再來一局";
+  ag.disabled = false; ag.textContent = T("再來一局");
   $("endErr").hidden = true;
   $("endOv").hidden = false;
 }
@@ -5194,41 +5787,42 @@ $("scoreClose").onclick = function(){ setScore(false); };
 function paintRules(){
   const C = rules(G && G.cfg), hs = (G && G.hs) || 5;
   setHTML($("ruBid"),
-    (C.bidMode === "sim"
+    T(C.bidMode === "sim"
       ? '<strong>同時叫墩</strong>：全桌同時選，選好先蓋著，等所有人都放好才一起翻開——桌上看得到誰決定了，看不到幾墩。沒有人有資訊優勢，也就沒有末位限制。'
       : '<strong>依序公開叫</strong>：由本局起始玩家開始，一位一位往下，後面的人看得到前面叫了多少。') +
     (C.bidMode !== "seq" ? ""
-      : C.hook
+      : T(C.hook
         ? '<br><strong>the hook</strong>：最後一位叫的人，不得讓全桌的總叫墩數剛好等於總墩數——每一局一定有人要叫不中。那個數字在按鈕上會標成「不能叫」。'
-        : '<br>沒有末位限制：最後一位想叫幾就叫幾，全桌有機會皆大歡喜。'));
+        : '<br>沒有末位限制：最後一位想叫幾就叫幾，全桌有機會皆大歡喜。')));
   setHTML($("ruJoker"), C.jokers
-    ? '<strong>鬼牌</strong>（整桌兩張）：不屬於任何花色。手上有跟牌花色也可以改出鬼牌，而且它比王牌還大。兩張鬼牌撞在同一墩時先出的贏。鬼牌領出時沒有花色要跟，大家自由出牌。翻開的王牌是鬼牌時本局無王，但鬼牌照樣最大。'
+    ? T('<strong>鬼牌</strong>（整桌兩張）：不屬於任何花色。手上有跟牌花色也可以改出鬼牌，而且它比王牌還大。兩張鬼牌撞在同一墩時先出的贏。鬼牌領出時沒有花色要跟，大家自由出牌。翻開的王牌是鬼牌時本局無王，但鬼牌照樣最大。')
     : "");
 
   const ex = [[0,0],[2,0],[1,1],[3,4],[2,2],[0,3],[3,3],[5,1]];
-  const cell = e => '<td class="nm">叫 ' + e[0] + ' 拿 ' + e[1] + '</td><td class="pv" style="color:var(--' +
+  const cell = e => '<td class="nm">' + T("叫 %1 拿 %2", e[0], e[1]) + '</td><td class="pv" style="color:var(--' +
     (e[0] === e[1] ? "good" : "bad") + ')">' + (roundPoints(e[0], e[1], hs, C) >= 0 ? "+" : "−") +
     Math.abs(roundPoints(e[0], e[1], hs, C)) + '</td>';
-  const hitTxt = C.hit === "x10" ? '<code>10 × 叫的墩數</code>' : C.hit === "sq" ? '<code>10 + 叫的墩數²</code>' : '<code>10 + 叫的墩數</code>';
-  const zeroTxt = C.zero === "hand" ? '<code>5 + 本局張數</code>' : '<code>5</code> 分';
-  const missTxt = C.miss === "x10" ? '扣 <code>10 × |實際 − 叫的|</code> 分' : C.miss === "sq" ? '扣 <code>(實際 − 叫的)²</code> 分' : '扣 <code>|實際 − 叫的|</code> 分';
+  const hitTxt = T(C.hit === "x10" ? '<code>10 × 叫的墩數</code>' : C.hit === "sq" ? '<code>10 + 叫的墩數²</code>' : '<code>10 + 叫的墩數</code>');
+  const zeroTxt = T(C.zero === "hand" ? '<code>5 + 本局張數</code>' : '<code>5</code> 分');
+  const missTxt = T(C.miss === "x10" ? '扣 <code>10 × |實際 − 叫的|</code> 分' : C.miss === "sq" ? '扣 <code>(實際 − 叫的)²</code> 分' : '扣 <code>|實際 − 叫的|</code> 分');
   setHTML($("ruScore"),
-    '<p><strong>叫中</strong>：叫 0 得 ' + zeroTxt + '；叫 1 以上得 ' + hitTxt + '。</p>' +
-    '<p><strong>沒叫中</strong>：' + missTxt + '。多吃跟少吃一樣罰。</p>' +
+    T('<p><strong>叫中</strong>：叫 0 得 %1；叫 1 以上得 %2。</p>', zeroTxt, hitTxt) +
+    T('<p><strong>沒叫中</strong>：%1。多吃跟少吃一樣罰。</p>', missTxt) +
     '<table class="final" style="margin-top:12px">' +
       [0,1,2,3].map(i => '<tr>' + cell(ex[i*2]) + cell(ex[i*2+1]) + '</tr>').join("") +
     '</table>' +
-    '<p class="sub">上面這幾格是用目前這一桌的計分規則實際算出來的' +
-      (C.zero === "hand" ? '（叫 0 那格按本局 ' + hs + ' 張算）' : '') + '。</p>' +
-    '<p>階梯走完後總分最高者獲勝。</p>');
+    T('<p class="sub">上面這幾格是用目前這一桌的計分規則實際算出來的%1。</p>',
+      C.zero === "hand" ? T('（叫 0 那格按本局 %1 張算）', hs) : '') +
+    T('<p>階梯走完後總分最高者獲勝。</p>'));
 
   const size = deckSizeOf(C.decks, C.minRank, C.jokers);
   const ranks = [];
   for(let r = C.minRank; r <= 14; r++) ranks.push(rankLabel(r));
   setHTML($("ruDeck"),
-    '這一桌是<strong>' + (C.decks === 2 ? "兩副" : "一副") + '</strong> <code>' + ranks.join(" ") + '</code>' +
-    (C.jokers ? ' 外加 <strong>2 張鬼牌</strong>' : '') + '，共 <strong>' + size + ' 張</strong>。' +
-    '牌數必須不少於「人數 × 最大張數 + 1」（多的那一張是翻王牌用的），不夠的話階梯頂點會自動下修。');
+    T('這一桌是<strong>%1</strong> <code>%2</code>%3，共 <strong>%4 張</strong>。',
+      T(C.decks === 2 ? "兩副" : "一副"), ranks.join(" "),
+      C.jokers ? T(' 外加 <strong>2 張鬼牌</strong>') : '', size) +
+    T('牌數必須不少於「人數 × 最大張數 + 1」（多的那一張是翻王牌用的），不夠的話階梯頂點會自動下修。'));
 }
 /* ================= 帳號 · 設定 · 規則 =================
    三頁共用一個外框：上面那排章節名就是標題，切換只換底下那一疊內容，
@@ -5267,7 +5861,7 @@ $("btnMe").onclick = function(){ openPg("me"); };
 $("rmMe").onclick = function(){ openPg("me"); };
 $("btnSignOut").onclick = async function(){
   const b = $("btnSignOut");
-  b.disabled = true; b.textContent = "登出中…";
+  b.disabled = true; b.textContent = T("登出中…");
   try{ if(NET.code) await api("leave", {code:NET.code}); }catch(e){}
   forgetRoom();
   try{ if(NET.sb) await NET.sb.auth.signOut(); }catch(e){}
@@ -5288,19 +5882,19 @@ $("endClose").onclick = $("endClose2").onclick = function(){
 $("endAgain").onclick = async function(){
   if(MODE !== "net"){ startSolo(); return; }
   const b = $("endAgain"), err = $("endErr");
-  b.disabled = true; b.textContent = "發牌中…"; err.hidden = true;
+  b.disabled = true; b.textContent = T("發牌中…"); err.hidden = true;
   restarting = true;
   let bad = "";
   try{
     /* 上一次按失敗的話這一桌已經退回等待狀態了，again 那一趟就不用再跑一次 */
     if(G.phase === "over" && !await api("again", {code:NET.code}))
-      bad = NET.err || "這一桌回不到等待狀態，再試一次";
+      bad = NET.err || T("這一桌回不到等待狀態，再試一次");
     else if(!await api("start", {code:NET.code}))
-      bad = NET.err || "發不了牌，先回房間看看";
+      bad = NET.err || T("發不了牌，先回房間看看");
   }catch(ex){ bad = (ex && ex.message) || "開不了下一場，再試一次"; }
   restarting = false;
   if(!bad){ $("endOv").hidden = true; loadLobbyStats(true); return; }
-  b.disabled = false; b.textContent = "再來一局";
+  b.disabled = false; b.textContent = T("再來一局");
   err.textContent = bad; err.hidden = false;
 };
 /* 返回房間＝回到原本那間房間——座位、規則、房主都還在，再按一次「開始」就是下一場。
@@ -5312,7 +5906,7 @@ $("endBack").onclick = function(){
     openRoom(false);
     loadLobbyStats(true);   /* 剛打完一場，大廳那三個數字要重讀 */
     api("again", {code:NET.code}).then(function(d){
-      if(!d) roomErr = NET.err || "這一桌回不到等待狀態，再試一次";
+      if(!d) roomErr = NET.err || T("這一桌回不到等待狀態，再試一次");
       paintRoom();
     });
     return;
@@ -5335,7 +5929,7 @@ const RULE_UI = [
   {k:"hook", label:"末位限制", opts:[{v:1, t:"the hook"}, {v:0, t:"不限制"}]},
   {k:"jokers", label:"鬼牌", opts:[{v:0, t:"不放"}, {v:1, t:"放兩張"}]},
   {k:"decks", label:"牌組", opts:[{v:1, t:"單副"}, {v:2, t:"雙副"}]},
-  {k:"minRank", label:"最小點數", opts:[9,7,6,5,4,3,2].map(v => ({v:v, t:v + " 以上"}))},
+  {k:"minRank", label:"最小點數", opts:[9,7,6,5,4,3,2].map(v => ({v:v, t:T("%1 以上", v)}))},
   {k:"hit", label:"叫中得分", opts:[{v:"plus", t:"10＋叫"}, {v:"x10", t:"10×叫"}, {v:"sq", t:"10＋叫²"}]},
   {k:"zero", label:"叫 0 中了", opts:[{v:"flat", t:"5 分"}, {v:"hand", t:"5＋該局張數"}]},
   {k:"miss", label:"沒叫中", opts:[{v:"diff", t:"扣差額"}, {v:"x10", t:"扣 10×差"}, {v:"sq", t:"扣差額²"}]}
@@ -5364,7 +5958,7 @@ function onRulePick(el, k, v){
          一條根本沒生效的規則，要等下一列進來才回正。G 被 applyRow 換掉就不用管了。 */
       if(!d && G && G.cfg === cfg){
         G.cfg = was;
-        roomErr = NET.err || "這一桌的規則改不動，再試一次";
+        roomErr = NET.err || T("這一桌的規則改不動，再試一次");
         paintRoom();
       }
     });
@@ -5377,6 +5971,7 @@ function optRow(host, items, current, onPick){
     return '<button class="opt" data-v="' + it.v + '" aria-pressed="' +
       (String(it.v) === String(current) ? "true" : "false") + '">' + it.t + '</button>';
   }).join("");
+  if(window.i18nDOM) i18nDOM(host);
   host.onclick = function(e){
     const b = e.target.closest(".opt");
     if(!b) return;
@@ -5394,6 +5989,9 @@ function dimOn(){ return !!(UD.dim && UD.dim()); }
 function can3d(){ return !!(UD.webglOK && UD.webglOK()); }
 
 function paintPref(){
+  /* 兩個選項各自寫自己的語言：不會中文的人看不懂「中文」兩個字 */
+  optRow($("optLang"), [{v:"zh", t:"中文"}, {v:"en", t:"English"}], uiLang(),
+    function(v){ setLang(v); });
   optRow($("optDeck"), DECK_ORDER.map(id => ({v:id, t:DECKS[id].name})), DECK.id, function(v){ setDeck(v); paintPref(); });
 
   optRow($("optDim"), [{v:"2", t:"平面"}, {v:"3", t:"立體"}], dimOn() ? "3" : "2",
@@ -5403,12 +6001,12 @@ function paintPref(){
     if(b3) b3.disabled = true;
   }
   /* 這一排唯一留下的字：立體選不動的時候要說為什麼 */
-  $("dimNote").textContent = can3d() ? "" : "這個裝置沒有 WebGL，只有平面牌桌。";
+  $("dimNote").textContent = can3d() ? "" : T("這個裝置沒有 WebGL，只有平面牌桌。");
 
   optRow($("optCam"), [{v:"game", t:"牌局"}, {v:"study", t:"書房"}], camPref(), function(v){ setCam(v); paintPref(); });
-  optRow($("optSpeed"), [{v:"slow", t:"慢"}, {v:"mid", t:"中"}, {v:"fast", t:"快"}], SPEED_KEY,
+  optRow($("optSpeed"), [{v:"slow", t:T("spd.slow")}, {v:"mid", t:T("spd.mid")}, {v:"fast", t:T("spd.fast")}], SPEED_KEY,
     function(v){ setSpeed(v); paintPref(); });
-  optRow($("optSfx"), [{v:"1", t:"開"}, {v:"0", t:"關"}],
+  optRow($("optSfx"), [{v:"1", t:T("sfx.on")}, {v:"0", t:T("sfx.off")}],
     (window.SFX && SFX.enabled()) ? "1" : "0",
     function(v){ if(window.SFX) SFX.set(v === "1"); paintPref(); });
   $("deckPreview").innerHTML =
@@ -5432,8 +6030,18 @@ function paintQuit(){
   $("quitNo").hidden = !quitAsk;
   /* 安靜到最後一刻：紅色留給「確定離開」，平常那顆跟登出一樣是灰的 */
   $("btnQuit").classList.toggle("warn", quitAsk);
-  $("btnQuit").textContent = quitAsk ? "確定離開" : "離開遊戲";
+  $("btnQuit").textContent = quitAsk ? T("確定離開") : T("離開遊戲");
 }
+/* 換語言：靜態 HTML 由 i18nDOM 就地換掉，動態畫出來的那幾塊各自重畫一次。
+   收桌那一頁不在名單裡——它蓋住整個頂列，切不到設定頁。 */
+onLang(function(){
+  paintMeChip();
+  if(G) render();
+  if(!$("room").hidden) paintRoom();
+  if(!$("pg").hidden) paintPg();
+  if(!$("lobby").hidden){ paintLobbyMe(); paintLobbyStat(); paintResumeText(); }
+});
+
 $("quitNo").onclick = function(){ quitAsk = false; paintQuit(); };
 /* 第一下長出那句話，第二下才真的走。中間按到別的地方（關掉這一頁）就當作沒按過。 */
 $("btnQuit").onclick = function(){
@@ -5445,7 +6053,7 @@ $("btnQuit").onclick = function(){
 function startSolo(){
   $("endOv").hidden = true;
   G = newGame(Object.assign(rules(draft), {n:draft.n}));
-  G.seats[0] = {name:"你", kind:"human", cid:"me", av:MY.av};
+  G.seats[0] = {name:T("你"), kind:"human", cid:"me", av:MY.av};
   for(let i=1;i<G.cfg.n;i++) G.seats[i] = {name:String.fromCharCode(65+i), kind:"ai", cid:null};
   G.host = "me";
   SEEN.round = -1; SEEN.phase = ""; SEEN.flip = -1; SEEN.bids = {}; SEEN.keys = {}; SEEN.won = 0;
@@ -5499,7 +6107,7 @@ let lbBusy = false;
 /* 跟 startSolo 一樣把桌子擺好，但不呼叫 startRound——牌不發 */
 function buildIdleTable(){
   G = newGame(Object.assign(rules(draft), {n:draft.n}));
-  G.seats[0] = {name:"你", kind:"human", cid:"me", av:MY.av};
+  G.seats[0] = {name:T("你"), kind:"human", cid:"me", av:MY.av};
   for(let i=1;i<G.cfg.n;i++) G.seats[i] = {name:String.fromCharCode(65+i), kind:"ai", cid:null};
   G.host = "me";
   render();
@@ -5532,7 +6140,7 @@ function paintLobbyMe(){
   const av = $("lbAv");
   if(!av) return;
   if(MY.av){ av.src = MY.av; av.hidden = false; } else av.hidden = true;
-  $("lbName").textContent = MY.name || MY.gname || "你";
+  $("lbName").textContent = MY.name || MY.gname || T("你");
 }
 /* 戰績那一行。跟 loadHistory 讀同一張表，但只要三個數字，所以只抓需要的欄位。 */
 async function loadLobbyStats(force){
@@ -5556,9 +6164,9 @@ async function loadLobbyStats(force){
 function paintLobbyStat(){
   const s = lbStats, line = $("lbStat");
   if(!s || !line) return;
-  line.innerHTML = s.games
-    ? '<b>' + s.games + '</b> 場 · <b>' + s.wins + '</b> 次第一 · 叫中 <b>' + s.pct + '%</b>'
-    : '還沒有打完的紀錄';
+  setHTML(line, s.games
+    ? T('<b>%1</b> 場 · <b>%2</b> 次第一 · 叫中 <b>%3%</b>', s.games, s.wins, s.pct)
+    : T('還沒有打完的紀錄'));
 }
 
 /* ---- 四張空牌位。收鍵盤的是蓋在上面那個透明 input，
@@ -5595,11 +6203,16 @@ function lbLock(on){
 /* 「要不要回剛才那一桌」不另外開一個面板：大廳本來就是問你要去哪的那一頁，
    換掉標題、把房號填進那四張牌位、進去變回去，或者底下只剩「不回去了」。 */
 let lbBack = "";
+/* 標題與那顆按鈕的字。換語言時只要重寫這兩句，不要把正在打的房號一起清掉 */
+function paintResumeText(){
+  const on = !!lbBack;
+  $("lbAsk").textContent = on ? T("回剛才那一桌？") : T("加入誰的桌？");
+  $("lbGo").textContent = on ? T("回去") : T("進去");
+}
 function setResume(code, phase){
   lbBack = code || "";
   const on = !!lbBack, inp = $("lcIn");
-  $("lbAsk").textContent = on ? "回剛才那一桌？" : "加入誰的桌？";
-  $("lbGo").textContent = on ? "回去" : "進去";
+  paintResumeText();
   inp.value = on ? lbBack : "";
   inp.disabled = on;            /* 這時候四張牌位只是在報房號，不收鍵盤 */
   $("lbDrop").hidden = !on;
@@ -5614,7 +6227,7 @@ $("lbGo").onclick = async function(){
   lbLock(true); lbErr("");
   try{ await joinRoom(code); enterRoom(); }
   catch(e){
-    const msg = NET.err || ("找不到房號 " + code);
+    const msg = NET.err || T("找不到房號 %1", code);
     /* 回不去的那一桌（散了、位子讓出去了、又開打了）不要再問第二次 */
     if(lbBack){ forgetRoom(); setResume(""); }
     lbErr(msg);
@@ -5625,7 +6238,7 @@ $("lbHost").onclick = async function(){
   if(lbBusy) return;
   lbLock(true); lbErr("");
   try{ await createRoom(rules(draft)); enterRoom(); }
-  catch(e){ lbErr(NET.err || "開房失敗"); }
+  catch(e){ lbErr(NET.err || T("開房失敗")); }
   lbLock(false);
 };
 /* 一個人打也先進房間：人數與規則在那裡調，按「開始」才發牌。
@@ -6303,6 +6916,81 @@ function ringTex(){
   g.putImageData(im, 0, 0);
   const t = new THREE.CanvasTexture(cv); t.anisotropy = 4;
   return t;
+}
+
+/* ================= 微結構 =================
+   「像真的」不是靠更大的貼圖，是靠這幾層肉眼幾乎看不見的起伏：
+   紙有亞麻壓紋、絨布有毛的方向、木頭有導管孔、一疊牌的側面是一層一層的紙緣。
+   全部都是「先畫一張灰階高度圖，再轉成法線圖」——bumpMap 是算繪時每格取一次差分、會糊，
+   normalMap 是預先算好的，同一張圖細節多很多。
+   （比較與取值的過程見 design/fidelity/） */
+function heightToNormal(cv, strength){
+  const w = cv.width, h = cv.height;
+  const src = cv.getContext("2d").getImageData(0, 0, w, h).data;
+  const out = document.createElement("canvas"); out.width = w; out.height = h;
+  const og = out.getContext("2d"), im = og.createImageData(w, h), d = im.data;
+  const at = (x, y) => src[(((y + h) % h) * w + ((x + w) % w)) * 4] / 255;
+  for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){
+    const dx = (at(x - 1, y) - at(x + 1, y)) * strength;
+    const dy = (at(x, y - 1) - at(x, y + 1)) * strength;
+    const L = Math.hypot(dx, dy, 1), i = (y * w + x) * 4;
+    d[i] = (dx / L * .5 + .5) * 255; d[i+1] = (dy / L * .5 + .5) * 255; d[i+2] = (1 / L * .5 + .5) * 255; d[i+3] = 255;
+  }
+  og.putImageData(im, 0, 0);
+  const t = new THREE.CanvasTexture(out);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+const hcv = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return [c, c.getContext("2d")]; };
+/* 亞麻壓紋（cambric finish）：真牌表面一層交叉的細凸紋。
+   節距要挑過——一張牌寬 200 格時近拍剛好一格兩個畫素，正好落在取樣極限上，
+   會冒出摩爾紋（看起來像數位髒污，不像布）。收到約 100 格就乾淨了。 */
+function linenHeight(){
+  const n = 512, [cv, g] = hcv(n, n);
+  g.fillStyle = "#808080"; g.fillRect(0, 0, n, n);
+  g.lineWidth = 1.6;
+  for(let i = 0; i < n; i += 4){
+    g.strokeStyle = "rgba(255,255,255,.55)"; g.beginPath(); g.moveTo(i, 0); g.lineTo(i, n); g.stroke();
+    g.strokeStyle = "rgba(0,0,0,.42)";       g.beginPath(); g.moveTo(i + 2, 0); g.lineTo(i + 2, n); g.stroke();
+  }
+  for(let i = 0; i < n; i += 4){
+    g.strokeStyle = "rgba(255,255,255,.30)"; g.beginPath(); g.moveTo(0, i); g.lineTo(n, i); g.stroke();
+    g.strokeStyle = "rgba(0,0,0,.24)";       g.beginPath(); g.moveTo(0, i + 2); g.lineTo(n, i + 2); g.stroke();
+  }
+  return cv;
+}
+/* 絨毛：一根一根短毛、方向大致一致——絨布的高光會沿著毛拉成一道，不是一個點 */
+function napHeight(){
+  const n = 512, [cv, g] = hcv(n, n), rnd = mulberry32(77);
+  g.fillStyle = "#808080"; g.fillRect(0, 0, n, n);
+  g.lineWidth = 1;
+  for(let i = 0; i < 26000; i++){
+    const x = rnd() * n, y = rnd() * n, a = (rnd() - .5) * .5, L = 3 + rnd() * 5;
+    g.strokeStyle = rnd() > .5 ? "rgba(255,255,255,.16)" : "rgba(0,0,0,.16)";
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.sin(a) * L, y + Math.cos(a) * L); g.stroke();
+  }
+  return cv;
+}
+/* 胡桃木的導管孔：一顆一顆細長的凹孔，順著年輪方向 */
+function poreHeight(){
+  const w = 1024, h = 256, [cv, g] = hcv(w, h), rnd = mulberry32(91);
+  g.fillStyle = "#808080"; g.fillRect(0, 0, w, h);
+  g.fillStyle = "rgba(0,0,0,.34)";
+  for(let i = 0; i < 5200; i++){
+    const x = rnd() * w, y = rnd() * h, L = 2 + rnd() * 9;
+    g.beginPath(); g.ellipse(x, y, L, .8, 0, 0, 7); g.fill();
+  }
+  return cv;
+}
+/* 牌的側邊：一疊牌的側面是一層一層的紙緣，不是一片象牙白 */
+function edgeStripes(){
+  const w = 8, h = 256, [cv, g] = hcv(w, h);
+  for(let y = 0; y < h; y++){
+    const k = y % 4;
+    g.fillStyle = k === 0 ? "#d8d8d8" : k === 2 ? "#6a6a6a" : "#9a9a9a";
+    g.fillRect(0, y, w, 1);
+  }
+  return cv;
 }
 
 const TABLE_H = 2.3;      /* 桌面到地板的高度（牌寬單位） */
@@ -7148,7 +7836,7 @@ function bidVerdict(){
   els.hub.hidden = true;
   els.ver.className = "bidverdict " + kind; els.ver.hidden = false;
   els.ver.innerHTML = '<span class="big"><span class="sg">' + (d > 0 ? "+" : d < 0 ? "−" : "") + '</span>' + Math.abs(d) + '</span>' +
-    '<span class="word">' + (kind === "exact" ? "剛好" : kind === "under" ? "保守局" : "搶墩局") + '</span>';
+    '<span class="word">' + T(kind === "exact" ? "剛好" : kind === "under" ? "保守局" : "搶墩局") + '</span>';
   for(let i = 0; i < Math.min(hs, sum); i++) B.seg[i].st.lit = 1;   /* 最後幾格可能還在亮，先定住 */
   for(const s of B.seg){
     if(kind === "exact"){ s.st.fl = 1; tween(s.st, {fl:0}, {dur:1000}); }
@@ -8016,7 +8704,7 @@ function mark(on){
   if(UD.onDim) UD.onDim(dim3);
 }
 async function setDim(on){
-  if(on && !webglOK()){ note("這個裝置沒有 WebGL"); mark(false); return; }
+  if(on && !webglOK()){ note(T("這個裝置沒有 WebGL")); mark(false); return; }
   mark(on);
   try{ localStorage.setItem("ud.dim", on ? "3" : "2"); }catch(e){}
   if(!on){
@@ -8032,11 +8720,11 @@ async function setDim(on){
   }
   document.body.classList.add("is3d");
   CANVAS.hidden = false;
-  note("正在鋪桌…");
+  note(T("正在鋪桌…"));
   try{
     await boot();
   }catch(e){
-    note("立體牌桌載入失敗");
+    note(T("立體牌桌載入失敗"));
     document.body.classList.remove("is3d");
     CANVAS.hidden = true; mark(false);
     return;

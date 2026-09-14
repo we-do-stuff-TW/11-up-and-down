@@ -11,6 +11,8 @@
 - **規則**：叫墩方式、末位限制、鬼牌、牌組、三段計分都在等待房間裡調，只有房主按得動、全桌都看得到，
   開打就鎖住。見下面「房間規則」。
 - **登入**：用 Google 帳號。名字與頭像自動帶入座位牌，換裝置還是同一個人，每場的戰績留著。
+- **語言**：中文／English，在「設定」裡切。預設跟著瀏覽器（`navigator.language` 是 zh 開頭給中文，
+  其餘一律英文），選過之後記在 localStorage。網址加 `?lang=en` 可以只影響這一次，不寫進設定。
 - **牌桌**：右上角可切「平面／立體」，選擇記在 localStorage。
 - **音效**：右上角「音效」可關；關掉的狀態（和音量）也記在 localStorage。
 - **分數的圖示**：座位牌下方一排「叫中的軌跡」，每局一格——綠＝叫中、紅＝沒中、框起來的是這一局。
@@ -66,6 +68,7 @@ deno run --allow-read scripts/rules_test.ts      # 兩份規則對照：畫面 v
 deno run -A          scripts/ui_test.ts         # 出牌的入口：無頭 Chrome 開真的牌桌
 deno run -A          scripts/net_test.ts        # 連線那一段：假伺服器重演各種時序
 deno run -A          scripts/end_test.ts        # 一場牌的兩個出口：收桌、再來一局、離開遊戲
+deno run -A          scripts/i18n_scan.ts      # 英文版有沒有殘留中文（加 zh 反過來掃；DIM=3 走立體；SHOT=1 順手截圖）
 deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗證
 ```
 
@@ -92,6 +95,10 @@ deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗
 - **`net_test.ts`** 重演那些真的網路重現不了的時序：樂觀先走、遲到的同一格（realtime 慢一秒的那條）、
   伺服器蓋章不重演動畫、過期的那一列、六秒保險絲、送不出去要退回、對手廣播、有人亂喊。
   伺服器換成假的（接縫 `window.__call`），每一列什麼時候到、內容是什麼都由測試決定。
+- **`i18n_scan.ts`** 不是斷言式的測試，是掃描：開 `?lang=en` 把 12 站走一遍（大廳、設定、帳號、規則、
+  開房、規則設定、叫墩、出牌、來回切語言、牌局中的設定、收桌），每一站掃看得到的文字節點與
+  `aria-label`／`placeholder`／`title`／`alt`，還有中文就印出來是哪一段字、掛在哪個元素上——那就是字典漏掉的 key。
+  `zh` 反過來掃中文版有沒有跑出字典裡的英文。**改完介面順手跑一次**，漏翻不會讓頁面壞掉，所以不跑就看不出來。
 - 入口是 `window.UD.engine`（`docs/index.html`）。**在那份名單上加東西，`engine_test.ts` 會要求它也被測到。**
 - **測試自己也要驗**：故意把規則或判斷改壞，看它抓不抓得到（這四支都這樣驗過，每一條都當場被抓）。
   改壞之前先 commit——還原時 `git checkout` 會把還沒存的修改一起帶走。
