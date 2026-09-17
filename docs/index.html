@@ -3781,6 +3781,7 @@ function api(action, args){
 }
 async function call(action, args){
   NET.busy = true;
+  const t0 = Date.now();
   try{
     /* Authorization 帶的是「你」，不是 anon key——anon key 誰都有，那不叫身分 */
     const jwt = await accessToken();
@@ -3792,6 +3793,7 @@ async function call(action, args){
         {action:action, token:MY.token, name:MY.name || T("玩家")}, args || {}))
     });
     const d = await res.json().catch(function(){ return {}; });
+    if(TRACE.on && action !== "tick") TRACE.log("api", action + " " + res.status + " " + (Date.now() - t0) + "ms" + (d.room ? " rev=" + d.room.rev : "") + (d.error ? " err=" + d.error : ""));
     if(d.pid) MY.pid = d.pid;
     /* 401 有兩個來源：我們自己回的（帶 signin），以及 token 過期時 Supabase 平台
        在函式跑起來之前就擋掉的（回的 body 不是我們寫的）。兩者都是「這張身分不算數」。 */
@@ -3804,10 +3806,27 @@ async function call(action, args){
     if(d.room) applyRow(d.room, d.hand);
     return d;
   }catch(e){
+    if(TRACE.on) TRACE.log("api!", action + " " + (Date.now() - t0) + "ms " + String(e && e.message));
     if(action !== "tick"){ NET.err = T("連不上伺服器，檢查一下網路"); render(); }
     return null;
   }finally{ NET.busy = false; }
 }
+
+/* 畫面可能舊了的時候去問一次伺服器：點了暗的牌、doPlay 說不是我的回合、
+   手機回到前景、網路回來。去抖 1.5 秒，狂點不會變成狂問。
+   state 是背景呼叫，通道上有東西在跑就讓它跳過——反正那一趟回來也帶著整列。 */
+let resyncAt = 0;
+function resync(why){
+  if(MODE !== "net" || !NET.code) return;
+  const now = Date.now();
+  if(now - resyncAt < 1500) return;
+  resyncAt = now;
+  if(TRACE.on) TRACE.log("resync", why);
+  api("state", {code:NET.code});
+}
+document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "visible") resync("visible"); });
+window.addEventListener("online", function(){ resync("online"); });
+window.addEventListener("pageshow", function(e){ if(e.persisted) resync("pageshow"); });
 
 /* ================= 樂觀先走 =================
    自己按下去的那一手，先用本機引擎演完、先畫出來，再送去伺服器。
@@ -3884,7 +3903,12 @@ function sameBeat(g, row){
 
 /* 伺服器的一列 → 畫面要的形狀。唯一的差別：手牌只有自己那份。 */
 function applyRow(row, hand){
-  if(!INBOX.fresher(row)) return;         /* 收不收，只有這一句說了算 */
+  if(!INBOX.fresher(row)){                /* 收不收，只有這一句說了算 */
+    if(TRACE.on) TRACE.log("row!", "drop rev=" + (row && row.rev) + " ph=" + (row && row.phase) + " turn=" + (row && row.turn));
+    return;
+  }
+  if(TRACE.on && (!G || (G.rev || 0) !== (row.rev || 0) || G.phase !== row.phase || G.turn !== row.turn))
+    TRACE.log("row", "rev=" + row.rev + " ph=" + row.phase + " turn=" + row.turn + " trick=" + (row.trick || []).length + (hand ? " +hand" : ""));
   INBOX.settled();                        /* 伺服器講話了，本機那份預測就作廢 */
 
   let needHand = false;
@@ -3946,6 +3970,7 @@ function sendMove(m){
    「現在本來就輪到他、桌上還沒有那張牌」的那一手；對不上就當沒聽見。
    最壞的情況是有人亂喊，讓你多看一秒不存在的牌，隨後那一列到了就蓋掉。 */
 function peerMove(m){
+  if(TRACE.on) TRACE.log("peer", (m ? m.t + " seat=" + m.seat : "-") + (INBOX.peerOk(m) ? "" : " ignored"));
   if(!INBOX.peerOk(m)) return;
   const s = m.seat;
   if(m.t === "bid"){
@@ -4172,14 +4197,22 @@ function nextRound(){
 }
 function doPlay(cardId, el){
   const s = mySeat();
-  if(s < 0 || !G || G.phase !== "play" || G.turn !== s) return;
+  if(s < 0 || !G || G.phase !== "play" || G.turn !== s){
+    if(TRACE.on) TRACE.log("doPlay!", cardId + " " + (s < 0 ? "noseat" : !G ? "noG" : G.phase !== "play" ? "phase" : "notmyturn"));
+    resync("doPlay");   /* 畫面說輪到我、狀態說不是：畫面舊了，去問一次伺服器 */
+    return;
+  }
   /* 先問本機引擎這一手出不出得掉，出得掉才讓牌離開手上。
      以前是不管送不送得出去都先把牌淡掉，送不出去的時候牌就這樣消失在半空中。 */
   const snap = MODE === "net" ? snapshot() : null;
   applying = true;
   const ok = applyPlay(G, s, cardId);
   applying = false;
-  if(!ok) return;
+  if(!ok){
+    if(TRACE.on) TRACE.log("doPlay!", cardId + " " + (G.hands[s].some(c => c.id === cardId) ? "illegal" : "notinhand"));
+    return;
+  }
+  if(TRACE.on) TRACE.log("doPlay", cardId + " ok");
   /* 起飛點要在重畫之前量——重畫會把這張牌的 DOM 換掉 */
   if(el && !REDUCED){
     const r = el.getBoundingClientRect();
@@ -5609,6 +5642,87 @@ document.addEventListener("input", function(e){
    為什麼在 pointerup 決定而不是 click：按下與放開之間只要那顆按鈕被重畫過，
    瀏覽器就**完全不發 click**（實測放開時只剩 mouseup 打在 #hand 上）。
    click 留給鍵盤與螢幕閱讀器——它們送出來的 click 沒有滑鼠座標（detail 是 0）。 */
+/* ================= 追蹤：?trace=1 =================
+   2026-09-16 五人局全桌「牌是亮的、點了完全沒反應、狂點約七秒才出去」，伺服器、realtime、
+   記憶體、點牌路徑在這邊全部重現不出來。只能在裝置上量：每一指按下／放開／取消落在哪、
+   按多久、移多遠、射線撞到誰、doPlay 在哪一行被擋、當時的回合與版本、主執行緒有沒有卡。
+   環狀緩衝留最近 120 行，畫在左上角，按 copy 整段進剪貼簿。沒帶 ?trace=1 時整層不存在。 */
+const TRACE = (function(){
+  /* ?trace=1 開、?trace=0 關；開過就記在這台裝置上，之後換頁、重新整理、從房號連結進來都還在 */
+  let on = false;
+  try{
+    const q = new URLSearchParams(location.search).get("trace");
+    if(q === "1" || q === "0") localStorage.setItem("ud.trace", q);
+    on = (q || localStorage.getItem("ud.trace")) === "1";
+  }catch(e){}
+  const buf = [], MAX = 200;
+  let stalls = null;   /* 連續的 stall 併成一行：x次 最長幾毫秒，不然慢機器上幾秒就把緩衝洗光 */
+  let box = null, pre = null, dirty = false;
+  const stamp = () => { const d = new Date(); return d.toTimeString().slice(0, 8) + "." + String(d.getMilliseconds()).padStart(3, "0"); };
+  const ctx = () => !G ? "G=null" :
+    "ri=" + G.ri + " ph=" + G.phase + " turn=" + G.turn + " me=" + mySeat() + " rev=" + (G.rev || 0) +
+    " trick=" + G.trick.length + " inbox=" + (INBOX.opt ? "opt" : INBOX.isAhead() ? "ahead" : "-") +
+    " net=" + (NET.busy ? "busy" : "idle") + "/" + (NET.queued || 0);
+  const tag = el => !el ? "-" : (el.nodeType !== 1 ? el.nodeName : (el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") +
+    (el.classList && el.classList.length ? "." + el.classList[0] : "")));
+  function paint(){
+    if(!dirty || !pre) return;
+    dirty = false;
+    pre.textContent = buf.join("\n");
+    pre.scrollTop = pre.scrollHeight;
+  }
+  function log(kind, info){
+    if(!on) return;
+    if(kind === "stall"){
+      const ms = parseInt(info, 10) || 0;
+      if(stalls && buf[buf.length - 1] === stalls.line){
+        stalls.n++; stalls.max = Math.max(stalls.max, ms);
+        stalls.line = stalls.at + " stall x" + stalls.n + " max=" + stalls.max + "ms";
+        buf[buf.length - 1] = stalls.line;
+        dirty = true; requestAnimationFrame(paint); return;
+      }
+      stalls = {at:stamp(), n:1, max:ms, line:null};
+      stalls.line = stalls.at + " stall x1 max=" + ms + "ms";
+      buf.push(stalls.line);
+    }else buf.push(stamp() + " " + kind + " " + (info || "") + " | " + ctx());
+    if(buf.length > MAX) buf.shift();
+    dirty = true;
+    requestAnimationFrame(paint);
+  }
+  if(on){
+    document.addEventListener("DOMContentLoaded", function(){
+      box = document.createElement("div");
+      box.id = "trace";
+      box.style.cssText = "position:fixed;left:0;top:0;z-index:99999;max-width:96vw;font:10px/1.35 ui-monospace,Menlo,monospace;" +
+        "color:#e8e0c8;pointer-events:none";
+      pre = document.createElement("pre");
+      pre.style.cssText = "margin:0;max-height:34vh;overflow:auto;background:rgba(0,0,0,.72);padding:4px 6px;white-space:pre-wrap;word-break:break-all";
+      const bar = document.createElement("div");
+      bar.style.cssText = "pointer-events:auto;display:flex;gap:6px;background:rgba(0,0,0,.72);padding:3px 6px";
+      const mk = (label, fn) => { const b = document.createElement("button"); b.type = "button"; b.textContent = label;
+        b.style.cssText = "font:11px ui-monospace,Menlo,monospace;padding:2px 8px;border:1px solid #9a8a60;background:#2a2620;color:#e8e0c8;border-radius:4px";
+        b.addEventListener("click", fn); bar.appendChild(b); return b; };
+      mk("copy", function(){
+        const txt = buf.join("\n");
+        const done = ok => { this.textContent = ok ? "copied" : "select+copy"; setTimeout(() => { this.textContent = "copy"; }, 1500); };
+        if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => done(true), () => done(false));
+        else{ const r = document.createRange(); r.selectNodeContents(pre); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); done(false); }
+      });
+      mk("clear", function(){ buf.length = 0; dirty = true; paint(); });
+      mk("hide", function(){ pre.hidden = !pre.hidden; this.textContent = pre.hidden ? "show" : "hide"; });
+      box.appendChild(bar); box.appendChild(pre);
+      document.body.appendChild(box);
+      log("start", navigator.userAgent.slice(0, 80));
+    });
+    /* 主執行緒卡住：兩格之間超過 120ms 就記一筆——按下與放開之間要是隔了這種洞，HOLD 就會超過 */
+    let last = performance.now();
+    (function tick(t){ if(t - last > 120) log("stall", Math.round(t - last) + "ms"); last = t; requestAnimationFrame(tick); })(last);
+    window.addEventListener("error", e => log("error", String(e.message)));
+    document.addEventListener("visibilitychange", () => log("vis", document.visibilityState));
+  }
+  return {on:on, log:log, tag:tag};
+})();
+
 const TAP = {
   R:14,        /* 手指有寬度：立體那層射不中時，在這個半徑內再找一圈 */
   MOVE:14,     /* 按下與放開之間移超過這麼多像素：手指改變主意了 */
@@ -5621,28 +5735,44 @@ const TAP = {
   /* 手指落在哪張牌上：先問 DOM 那顆按鈕（平面，也是鍵盤的入口），再問立體那層 */
   at:function(ev){
     const c = ev.target && ev.target.closest && ev.target.closest("[data-card]");
-    if(c) return c.disabled ? null : c.dataset.card;
-    return this.hit ? this.hit(ev) : null;
+    if(c){ if(TRACE.on) TRACE.log("at", "dom " + c.dataset.card + (c.disabled ? " disabled" : "")); return c.disabled ? null : c.dataset.card; }
+    const id = this.hit ? this.hit(ev) : null;
+    if(TRACE.on) TRACE.log("at", (this.hit ? "ray " : "nohit ") + (id || "miss") + (id && !this.playable(id) ? " disabled" : ""));
+    return id;
   },
   begin:function(ev){
     this.saw = true;
-    const id = this.at(ev);
+    let id = null;
+    try{ id = this.at(ev); }
+    catch(e){ if(TRACE.on) TRACE.log("at!", String(e && e.message)); }
+    if(TRACE.on) TRACE.log("down", ev.pointerType + " " + Math.round(ev.clientX) + "," + Math.round(ev.clientY) + " on " + TRACE.tag(ev.target) + " → " + (id || "-"));
     this.down = id ? {id:id, x:ev.clientX, y:ev.clientY, t:Date.now()} : null;
+  },
+  cancel:function(ev){
+    if(TRACE.on) TRACE.log("cancel", ev.pointerType + " " + (this.down ? this.down.id : "-"));
+    this.down = null;
   },
   end:function(ev){
     const d = this.down; this.down = null;
     if(!d) return;
-    if(Date.now() - d.t > this.HOLD) return;
-    if(Math.abs(ev.clientX - d.x) > this.MOVE || Math.abs(ev.clientY - d.y) > this.MOVE) return;
+    const held = Date.now() - d.t, dx = Math.abs(ev.clientX - d.x), dy = Math.abs(ev.clientY - d.y);
+    const why = held > this.HOLD ? "hold" : (dx > this.MOVE || dy > this.MOVE) ? "moved" : "";
+    if(TRACE.on) TRACE.log("up", d.id + " held=" + held + "ms moved=" + Math.round(dx) + "," + Math.round(dy) + (why ? " DROP:" + why : " play"));
+    if(why) return;
     this.play(d.id);        /* 以按下去那一張為準——那是人的本意，畫面後來變了不算 */
   },
   play:function(id){
     const b = this.btn(id);
     if(b && !b.disabled) doPlay(id, b);
+    else{
+      if(TRACE.on) TRACE.log("play!", id + (b ? " disabled" : " nobtn"));
+      resync("tap");   /* 牌暗著卻被點：畫面可能舊了，去問一次伺服器 */
+    }
   }
 };
 document.addEventListener("pointerdown", function(e){ TAP.begin(e); }, true);
 document.addEventListener("pointerup", function(e){ TAP.end(e); }, true);
+document.addEventListener("pointercancel", function(e){ TAP.cancel(e); }, true);
 
 document.addEventListener("click", function(e){
   const bid = e.target.closest("[data-bid]");
