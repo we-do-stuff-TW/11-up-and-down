@@ -3653,7 +3653,7 @@ function setSpeed(k){
   try{ localStorage.setItem("ud.speed", SPEED_KEY); }catch(e){}
 }
 try{ setSpeed(localStorage.getItem("ud.speed") || "mid"); }catch(e){}
-let MYHAND = [], MYHAND_RI = -1;
+let MYHAND = [], MYHAND_KEY = "";
 
 const SEEN = {round:-1, phase:"", bids:{}, keys:{}, scores:[], flip:-1, won:0};
 
@@ -3771,8 +3771,9 @@ setInterval(function(){
    現在改成排隊：玩家的動作一定會送出去，只是可能晚一點輪到（畫面早就先演了）。
    tick 與 state 是背景噪音，有東西在排隊就跳過這一次，反正下一輪馬上又來。 */
 const BG = {tick:1, state:1};
-function api(action, args){
-  if(BG[action] && (NET.busy || NET.queued)) return Promise.resolve(null);
+function api(action, args, force){
+  /* force：這一趟不是背景噪音（畫面上的手牌是錯的，不抓回來就一直錯），不讓 BG 那道門擋 */
+  if(!force && BG[action] && (NET.busy || NET.queued)) return Promise.resolve(null);
   NET.queued++;
   const run = function(){ return call(action, args); };
   const done = function(d){ NET.queued--; return d; };
@@ -3901,10 +3902,59 @@ function sameBeat(g, row){
   return true;
 }
 
+/* ── 手牌的真相 ──
+   房間那一列是公開的那一份，手牌是私有的那一份，兩者的新舊不是同一回事：
+   rev 排得出「同一局裡誰先出牌」，排不出「這是不是同一副牌」。
+   所以手牌自己帶身分：哪一桌、第幾場、第幾局。 */
+const handFP = h => (h || []).map(c => c.id).join(",") || "-";
+function handKey(row){ return row ? (row.code || "") + ":" + (row.match || 1) + ":" + row.ri : ""; }
+/* row 那一副牌，比畫面上這一副新嗎？（同一副也回 true——同局的先後交給 fresher 判） */
+function dealAhead(row){
+  if(!G || MODE !== "net" || NET.code !== row.code) return true;
+  const m = row.match || 1, gm = G.match || 1;
+  return m !== gm ? m > gm : row.ri >= G.ri;
+}
+/* 我手上該有幾張，是算得出來的——跟別人那幾疊同一個公式（handCount），
+   而且完全不需要看牌面。這是整份手牌唯一不必相信任何一條傳輸路徑的東西。
+   -1 ＝ 現在沒有可對的帳（還在等待房間、還沒入座、還沒發牌）。 */
+function handWant(){
+  const s = mySeat();
+  if(MODE !== "net" || !G || s < 0 || G.ri < 0 || G.phase === "lobby") return -1;
+  return Math.max(0, G.hs - G.played - (G.trick.some(t => t.p === s) ? 1 : 0));
+}
+/* 對帳。對不上就是這份手牌不是這一局的——不管它是從哪一條路歪掉的，這裡都攔得到。
+   這道檢查的意義在於：不必靠「每一條路徑都別出錯」，錯了會自己被抓到、自己修回來。
+   退避是必要的，伺服器真的給不出正確的那一份時，不能變成每一列催一趟。 */
+let auditAt = 0, auditN = 0;
+function auditHand(){
+  const want = handWant();
+  if(want < 0 || MYHAND.length === want){ auditN = 0; return; }
+  if(TRACE.on) TRACE.log("hand!", "want=" + want + " got=" + MYHAND.length + " " + handFP(MYHAND));
+  const now = Date.now();
+  if(now - auditAt < Math.min(8000, 700 * (1 << Math.min(auditN, 3)))) return;
+  auditAt = now; auditN++;
+  api("state", {code:NET.code}, true);
+}
+
 /* 伺服器的一列 → 畫面要的形狀。唯一的差別：手牌只有自己那份。 */
 function applyRow(row, hand){
-  if(!INBOX.fresher(row)){                /* 收不收，只有這一句說了算 */
-    if(TRACE.on) TRACE.log("row!", "drop rev=" + (row && row.rev) + " ph=" + (row && row.phase) + " turn=" + (row && row.turn));
+  const hk = row && row.cfg ? handKey(row) : "";
+  const has = hand !== undefined && hand !== null;
+  /* 換局、換場、換桌的那一副手牌先收下，不受 fresher 管——那一列就算過期了，
+     它帶回來的手牌也不會是別副牌（伺服器是照那一列自己的 ri 讀出來的）。
+     這一段以前寫在下面那個 return 後面：一列被擋掉，手牌就跟著陪葬，
+     畫面停在錯的（或空的）那一副，直到某一趟剛好最新的回應把它帶回來——
+     自己按叫墩的那一趟 rev 必定最新、必定通得過，所以看起來像「出完骰子牌就變了」。 */
+  const took = has && hk && hk !== MYHAND_KEY && dealAhead(row);
+  if(took){
+    if(TRACE.on) TRACE.log("hand", hk + " " + MYHAND.length + "→" + hand.length + " " + handFP(hand));
+    MYHAND = hand; MYHAND_KEY = hk;
+  }
+  if(!INBOX.fresher(row)){                /* 那一列收不收，只有這一句說了算 */
+    if(TRACE.on) TRACE.log("row!", "drop rev=" + (row && row.rev) + " ph=" + (row && row.phase) +
+      " turn=" + (row && row.turn) + (has ? " +hand" + (took ? " kept" : " same") : ""));
+    /* 列不收、手牌收了：畫面要跟著換，不然這一副牌得等下一列才看得到 */
+    if(took){ const s = mySeat(); if(s >= 0) G.hands[s] = MYHAND; render(); }
     return;
   }
   if(TRACE.on && (!G || (G.rev || 0) !== (row.rev || 0) || G.phase !== row.phase || G.turn !== row.turn))
@@ -3912,8 +3962,8 @@ function applyRow(row, hand){
   INBOX.settled();                        /* 伺服器講話了，本機那份預測就作廢 */
 
   let needHand = false;
-  if(hand !== undefined && hand !== null){ MYHAND = hand; MYHAND_RI = row.ri; }
-  else if(MYHAND_RI !== row.ri){ MYHAND = []; needHand = true; }
+  if(has){ MYHAND = hand; MYHAND_KEY = hk; }
+  else if(hk !== MYHAND_KEY){ MYHAND = []; needHand = true; }
 
   const g = {
     cfg:row.cfg, ladder:row.ladder,
@@ -3923,7 +3973,7 @@ function applyRow(row, hand){
     leader:row.leader, turn:row.turn, led:row.led, played:row.played,
     trick:row.trick || [], bids:row.bids || [], won:row.won || [],
     score:row.score || [], log:row.log || [],
-    host:row.host_pid, rev:row.rev, seen:row.seen || {},
+    host:row.host_pid, rev:row.rev, seen:row.seen || {}, match:row.match || 1,
     deckSize:deckSizeOf(row.cfg.decks, row.cfg.minRank, row.cfg.jokers),
     at:(G && MODE === "net" && NET.code === row.code &&
         (((G.rev||0) === (row.rev||0) && G.phase === row.phase) || sameBeat(G, row)))
@@ -3934,6 +3984,7 @@ function applyRow(row, hand){
   G = g; MODE = "net"; NET.code = row.code;
   const s = mySeat();
   if(s >= 0) G.hands[s] = MYHAND;
+  auditHand();                            /* 張數對不上就去把真的那一份抓回來 */
   /* 只記「我還坐在裡面」的那一桌。被移除、或牌局中把位子交給 AI 之後，
      伺服器回的那一列裡就沒有我了——那一桌不該再問「要不要回去」。 */
   if(s >= 0) rememberRoom(row.code); else forgetRoom();
@@ -3943,7 +3994,7 @@ function applyRow(row, hand){
     if(G.phase !== "lobby" && roomAuto) closeRoom();
     else paintRoom();
   }
-  if(needHand && row.phase !== "lobby") api("state", {code:row.code});
+  if(needHand && row.phase !== "lobby") api("state", {code:row.code}, true);
 }
 
 /* Realtime：伺服器一改狀態就推過來，不用輪詢 */
@@ -5852,7 +5903,7 @@ async function leaveTable(){
   if(NET.code) await api("leave", {code:NET.code});
   forgetRoom();
   unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
-  MYHAND = []; MYHAND_RI = -1;
+  MYHAND = []; MYHAND_KEY = "";
   closeRoom();
   buildIdleTable(); openLobby(); loadLobbyStats(true);
 }
@@ -6436,7 +6487,7 @@ $("lbDrop").onclick = async function(){
   setResume(""); forgetRoom();          /* 畫面先回到一般大廳，不等伺服器 */
   try{ if(code) await api("leave", {code:code}); }catch(e){}
   unsubscribe(); NET.code = null; NET.err = ""; MODE = "solo";
-  MYHAND = []; MYHAND_RI = -1;
+  MYHAND = []; MYHAND_KEY = "";
   buildIdleTable();
   lbLock(false);
   try{ $("lcIn").focus({preventScroll:true}); }catch(e){}

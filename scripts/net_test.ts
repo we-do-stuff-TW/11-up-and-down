@@ -176,6 +176,67 @@ try {
     I.ranAhead({x:1}); const c = I.isAhead() && !!I.opt;
     I.settled(); return !a && c`),
     "記號與退路沒有綁在一起——會再出現「有人只做了一半」");
+
+  /* ── 十、手牌是私有的那一份，不歸 rev 管 ──
+     真實時序：realtime 先推來新一局（不帶手牌），接著又一列把 rev 拉高，
+     最後那趟帶著正確手牌的回應才到、而它的 rev 已經是舊的。
+     以前整列被 fresher 丟掉、手牌跟著陪葬，畫面就停在空的那一副，
+     直到自己按叫墩那一趟（rev 必定最新、必定通得過）才被校正——
+     這就是「為何出完骰子，牌就變了」。 */
+  await b.eval(`
+    UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false;
+    __T.reply = null;
+    const g3 = __T.clone(__T.g);
+    UD.engine.startRound(g3);                      /* 下一局：換一副牌 */
+    __T.g3 = g3;
+    __T.want = g3.hands[0].length;
+    __T.fp = g3.hands[0].map(function(c){ return c.id; }).join(",");
+    UD.__t.applyRow(__T.row(g3, 30));              /* realtime 推來的新局，不帶手牌 */
+    UD.__t.applyRow(__T.row(g3, 31));              /* 又一列，rev 被拉高 */
+    return 1`);
+  ok((await view()).rev === 31, "新一局那兩列沒有被接受");
+  await b.eval(`UD.__t.applyRow(__T.row(__T.g3, 30), __T.clone(__T.g3.hands[0])); return 1`);
+  v = await view();
+  const want10 = await b.eval<number>(`return __T.want`);
+  ok(v.hand === want10, `遲到的那一列帶回來的手牌被丟掉了（手牌=${v.hand}，該有 ${want10} 張）`);
+  ok(await b.eval<boolean>(`return UD.G.hands[0].map(function(c){ return c.id; }).join(",") === __T.fp`),
+    "手牌是收下了，但不是這一局的那一副");
+  ok(v.rev === 31, "收手牌的同時把那一列過期的公開狀態也一起套進來了");
+
+  /* ── 十一、同一局裡，遲到的那一列帶的舊手牌不准蓋回去 ──
+     （不然出掉的牌會被加回手上，那是另一種「牌憑空出現」） */
+  await b.eval(`
+    UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false;
+    const g4 = __T.clone(__T.g3);
+    let guard = 0;
+    while(g4.phase === "bid" && guard++ < 30){ const s = g4.turn; UD.engine.applyBid(g4, s, UD.engine.aiBid(g4, s)); }
+    g4.leader = 0; g4.turn = 0;
+    __T.g4 = g4;
+    UD.__t.applyRow(__T.row(g4, 50), __T.clone(g4.hands[0]));
+    __T.full = __T.clone(g4.hands[0]);
+    __T.reply = "pending";
+    UD.doPlay(__T.mine());                         /* 樂觀出一張 */
+    return 1`);
+  v = await view();
+  const afterPlay = v.hand, full = await b.eval<number>(`return __T.full.length`);
+  ok(afterPlay === full - 1, `樂觀出牌沒有把牌拿掉（手牌=${afterPlay}）`);
+  await b.eval(`UD.__t.applyRow(__T.row(__T.g4, 50), __T.clone(__T.full)); return 1`);
+  ok((await view()).hand === afterPlay, "遲到的那一列把出掉的牌加回手上了");
+
+  /* ── 十二、對帳：張數對不上就自己去抓，而且那一趟不准被背景那道門丟掉 ── */
+  await new Promise((r) => setTimeout(r, 900));    /* 等對帳的退避過去 */
+  await b.eval(`
+    UD.__t.NET.tail = null; UD.__t.NET.busy = false;
+    __T.reply = null;
+    UD.G.hands[UD.mySeat()].pop();     /* 不管從哪條路歪掉，長出來都是這個形狀：張數對不上 */
+    UD.__t.NET.queued = 5;             /* 通道塞住：BG 那道門本來會把這趟 state 丟掉 */
+    __T.calls.length = 0;
+    UD.__t.applyRow(__T.row(__T.g4, 60));
+    return 1`);
+  await new Promise((r) => setTimeout(r, 150));
+  ok(await b.eval<boolean>(`return __T.calls.indexOf("state") >= 0`),
+    "手牌張數對不上，卻沒有去把真的那一份抓回來（或那一趟被 BG 那道門丟掉了）");
+  await b.eval(`UD.__t.NET.queued = 0; UD.__t.NET.tail = null; return 1`);
 } catch (e) {
   fails.push("測試中途爆掉：" + (e as Error).message);
 } finally {
@@ -184,7 +245,7 @@ try {
 
 const ms = Math.round(performance.now() - t0);
 console.log("11 Up & Down — 連線那一段的測試（無頭 Chrome ＋ 假伺服器）");
-console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點");
+console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點、手牌對帳");
 console.log(`  ${checks} 項，${ms} 毫秒`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);
