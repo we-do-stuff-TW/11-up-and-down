@@ -1749,13 +1749,6 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
         </div>
 
         <div class="pg-f">
-          <label>立體鏡頭</label>
-          <div class="bd">
-            <div class="opts" id="optCam"></div>
-          </div>
-        </div>
-
-        <div class="pg-f">
           <label>畫質</label>
           <div class="bd">
             <div class="opts" id="optFx"></div>
@@ -2073,13 +2066,10 @@ window.I18N_EN = {
 "pref.lang":"Language",
 "牌面":"Card face",
 "牌桌":"Table",
-"立體鏡頭":"3D camera",
 "出牌速度":"Pace",
 "音效":"Sound",
 "平面":"2D",
 "立體":"3D",
-"牌局":"The game",
-"書房":"The study",
 "畫質":"Detail",
 "fx.auto":{zh:"自動", en:"Auto"},
 "fx.high":{zh:"高", en:"High"},
@@ -4163,6 +4153,74 @@ function adoptUser(u){
   loadLobbyStats();
   /* 單人局在驗身分之前就開好了，那時候還不知道你長什麼樣 */
   if(MODE === "solo" && G && G.seats[0]){ G.seats[0].av = MY.av; render(); }
+  acctApply(u);
+}
+
+/* ================= 設定跟著帳號走 =================
+   設定頁上選的東西（語言、牌面、平面／立體、速度、音效）跟桌上的名字存兩份：
+   畫質不跟——那是這台機器跑得動什麼的事，桌機選「高」不該讓手機也吃「高」。
+   localStorage 一份，這台裝置立刻有反應、離線也在；帳號的 user_metadata 一份，
+   換裝置或重新登入時帳號那份蓋回來。寫回帳號走 supabase.auth.updateUser——
+   不用開表、不用改伺服器；Google 再登入時 metadata 是合併不是覆蓋，這幾個鍵不會被洗掉。
+   網址帶了 ?lang= / ?dim= 的那一次（截圖、測試）不讓帳號蓋。 */
+const ACCT = {keys:["lang", "deck", "dim", "speed", "sfx", "name"], applied:null, timer:0, hold:false};
+function acctSnapshot(){
+  const p = {};
+  ACCT.keys.forEach(function(k){
+    let v = null;
+    try{ v = localStorage.getItem("ud." + k); }catch(e){}
+    if(v !== null && v !== "") p[k] = v;
+  });
+  return p;
+}
+/* 設定頁每按一下都會叫；去抖 0.8 秒，連按不會連敲 */
+function acctPush(){
+  if(!MY.uid || !NET.sb || ACCT.hold) return;
+  clearTimeout(ACCT.timer);
+  ACCT.timer = setTimeout(async function(){
+    const p = acctSnapshot();
+    p.at = Date.now();
+    try{ await NET.sb.auth.updateUser({data:{prefs:p}}); }catch(e){}
+  }, 800);
+}
+/* 同一個帳號只套一次：updateUser 之後 onAuthStateChange 會再送一次 user，不能又套回來 */
+function acctApply(u){
+  if(!u || !u.id || ACCT.applied === u.id) return;
+  ACCT.applied = u.id;
+  const p = u.user_metadata && u.user_metadata.prefs;
+  /* 帳號裡還沒有設定：這台裝置現在的選擇就成為帳號的設定 */
+  if(!p || typeof p !== "object"){ acctPush(); return; }
+  let q = null;
+  try{ q = new URLSearchParams(location.search); }catch(e){}
+  ACCT.hold = true;
+  try{
+    /* 語言要先落地再切：setLang 遇到「跟現在一樣」會直接回去，不寫 localStorage，
+       下次開頁就又變回跟著瀏覽器語系走 */
+    if((p.lang === "zh" || p.lang === "en") && !(q && q.get("lang"))){
+      try{ localStorage.setItem("ud.lang", p.lang); }catch(e){}
+      setLang(p.lang);
+    }
+    if(p.deck && DECKS[p.deck] && DECK.id !== p.deck) setDeck(p.deck);
+    if(p.speed && TUNE.speeds[p.speed]) setSpeed(p.speed);
+    if((p.sfx === "1" || p.sfx === "0") && window.SFX && SFX.set){
+      if(SFX.enabled() !== (p.sfx === "1")) SFX.set(p.sfx === "1");
+    }
+    if(typeof p.name === "string" && p.name && p.name !== MY.name){
+      MY.name = p.name.slice(0, 10);
+      try{ localStorage.setItem("ud.name", MY.name); }catch(e){}
+      paintMeChip();
+      if(!$("pg").hidden && pgTab === "me") paintMe();
+      pushName();
+    }
+    /* 平面／立體：3D 那層是 module script，可能還沒跑到。先把值放進 localStorage，
+       它起來時自己會讀；已經起來了就直接切 */
+    if((p.dim === "2" || p.dim === "3") && !(q && q.get("dim"))){
+      try{ localStorage.setItem("ud.dim", p.dim); }catch(e){}
+      if(UD.setDim && dimOn() !== (p.dim === "3")) UD.setDim(p.dim === "3");
+    }
+  }catch(e){}
+  ACCT.hold = false;
+  if(!$("pg").hidden && pgTab === "pref") paintPref();
 }
 async function authBoot(){
   if(!NET.sb){
@@ -5718,6 +5776,7 @@ document.addEventListener("input", function(e){
     try{ localStorage.setItem("ud.name", MY.name); }catch(err){}
     paintMeChip();
     pushName();
+    acctPush();
   }
 });
 /* ---- 這一指點到哪張牌 ----
@@ -6221,9 +6280,6 @@ function optRow(host, items, current, onPick){
 }
 
 /* ================= 設定 ================= */
-/* 立體牌桌的鏡頭：牌局＝俯角 42° 桌子填滿；書房＝放低到 28°、桌子縮一成、頂上露出房間。只有立體版在看 */
-function camPref(){ let v = "game"; try{ v = localStorage.getItem("ud.cam") || "game"; }catch(e){} return v === "study" ? "study" : "game"; }
-function setCam(v){ try{ localStorage.setItem("ud.cam", v); }catch(e){} if(UD.onCam) UD.onCam(v); }
 /* 平面／立體：狀態住在底下那層 3D 呈現層（它才知道 WebGL 行不行、桌子鋪好了沒），
    這裡只是它的開關。沒有那一層（載入失敗）就只剩平面。 */
 function dimOn(){ return !!(UD.dim && UD.dim()); }
@@ -6244,11 +6300,11 @@ function setFx(v){
 function paintPref(){
   /* 兩個選項各自寫自己的語言：不會中文的人看不懂「中文」兩個字 */
   optRow($("optLang"), [{v:"zh", t:"中文"}, {v:"en", t:"English"}], uiLang(),
-    function(v){ setLang(v); });
-  optRow($("optDeck"), DECK_ORDER.map(id => ({v:id, t:DECKS[id].name})), DECK.id, function(v){ setDeck(v); paintPref(); });
+    function(v){ setLang(v); acctPush(); });
+  optRow($("optDeck"), DECK_ORDER.map(id => ({v:id, t:DECKS[id].name})), DECK.id, function(v){ setDeck(v); acctPush(); paintPref(); });
 
   optRow($("optDim"), [{v:"2", t:"平面"}, {v:"3", t:"立體"}], dimOn() ? "3" : "2",
-    function(v){ if(UD.setDim) UD.setDim(v === "3"); paintPref(); });
+    function(v){ if(UD.setDim) UD.setDim(v === "3"); acctPush(); paintPref(); });
   if(!can3d()){
     const b3 = $("optDim").querySelector('[data-v="3"]');
     if(b3) b3.disabled = true;
@@ -6256,7 +6312,6 @@ function paintPref(){
   /* 這一排唯一留下的字：立體選不動的時候要說為什麼 */
   $("dimNote").textContent = can3d() ? "" : T("這個裝置沒有 WebGL，只有平面牌桌。");
 
-  optRow($("optCam"), [{v:"game", t:"牌局"}, {v:"study", t:"書房"}], camPref(), function(v){ setCam(v); paintPref(); });
   /* 畫質：預設「自動」——照這台機器量到的速度決定，慢了自己往下降。
      選了其他三檔就鎖住不再自己動（有人就是要看細節，寧可慢）。
      說明那一句寫「現在實際在跑哪一檔」，不是寫使用者選了什麼——自動的時候兩者不一樣 */
@@ -6268,10 +6323,10 @@ function paintPref(){
     : fxOn ? T("fx.note.auto", T("fx." + fxOn.tier))
     : T("fx.note.autoWait");
   optRow($("optSpeed"), [{v:"slow", t:T("spd.slow")}, {v:"mid", t:T("spd.mid")}, {v:"fast", t:T("spd.fast")}], SPEED_KEY,
-    function(v){ setSpeed(v); paintPref(); });
+    function(v){ setSpeed(v); acctPush(); paintPref(); });
   optRow($("optSfx"), [{v:"1", t:T("sfx.on")}, {v:"0", t:T("sfx.off")}],
     (window.SFX && SFX.enabled()) ? "1" : "0",
-    function(v){ if(window.SFX) SFX.set(v === "1"); paintPref(); });
+    function(v){ if(window.SFX) SFX.set(v === "1"); acctPush(); paintPref(); });
   $("deckPreview").innerHTML =
     [[14,0],[13,1],[12,0],[7,2]].map(p => cardHTML({r:p[0], s:p[1], id:"pv" + p[0] + p[1]})).join("") +
     '<div class="pvback"><div class="back"></div></div>';
@@ -9032,7 +9087,7 @@ function placeOverlays(){
   });
   const top = handTop(w, h);
 
-  /* 狀態列停在手牌上緣。書房視角把桌子壓得扁，手牌上緣離中央的計數環很近：
+  /* 狀態列停在手牌上緣。直式畫面桌子壓得扁，手牌上緣離中央的計數環很近：
      狀態列頂端不能蓋到環中間的數字，往下讓，但最多讓到蓋住手牌上緣 24px（牌的點數在更下面） */
   let b = top === null ? h * .26 : Math.min(h * .46, Math.max(h * .13, h - top + 6));
   if(top !== null){
@@ -9152,21 +9207,18 @@ function resize(){
   /* 自己的名牌擺右手邊：左手邊那塊留給牌庫 */
   S.mePlate  = [3.15, .50, 2.85];
   S.table.scale.x = S.xs;
-  /* 兩種鏡頭（設定裡切）：牌局＝俯角 42° 桌子填滿；書房＝放低到 28°、鏡頭退一成，
-     取好景後再把鏡頭往上抬到手牌下緣貼著畫面底，頂上就空出一截給書櫃與火光 */
-  const study = camView() === "study";
-  const fov = portrait ? (study ? 50 : 48) : (study ? 42 : 40);
-  const el = (portrait ? (study ? 36 : 50) : (study ? 28 : 42)) * Math.PI / 180;
+  /* 鏡頭只有一種：俯角 42°（直式 50°）、桌子填滿畫面。以前還有一個放低的「書房」鏡頭，拆掉了 */
+  const fov = portrait ? 48 : 40;
+  const el = (portrait ? 50 : 42) * Math.PI / 180;
   const m = 1 / 1.05;                              /* 四邊留一點餘白 */
   const vy = Math.tan(fov * Math.PI / 360) * m, vx = vy * asp;
   const f = fitCamera(vx, vy, el, portrait);
-  const d = f.d * (study ? 1.12 : 1);
+  const d = f.d;
   S.camera.fov = fov;
   S.camera.aspect = asp;
   S.camera.position.set(f.lx, f.ly + d * f.se, f.lz + d * f.ce);
   S.camera.lookAt(f.lx, f.ly, f.lz);
   S.camera.updateProjectionMatrix();
-  if(study) pitchToBottom(m);
   S.r.setSize(w, h, false);
   S.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, w > 1400 ? 1.75 : 2));
   S.lamp.shadow.mapSize.set(w > 900 ? 2048 : 1024, w > 900 ? 2048 : 1024);
@@ -9177,26 +9229,6 @@ function resize(){
   relayout();
   sync();
   placeOverlays();
-}
-/* 設定裡選的鏡頭；網址 ?cam=study 可以直接指定（截圖用） */
-function camView(){
-  let v = null;
-  try{ v = new URLSearchParams(location.search).get("cam") || localStorage.getItem("ud.cam"); }catch(e){}
-  return v === "study" ? "study" : "game";
-}
-/* 用二分法找一個抬頭角度，讓所有取景點投影後最低的那個剛好落在畫面底的餘白線上 */
-function pitchToBottom(m){
-  S.camera.updateMatrixWorld();
-  const pts = fitPoints(), base = S.camera.quaternion.clone(), v = _v();
-  const minY = function(a){
-    S.camera.quaternion.copy(base); S.camera.rotateX(a); S.camera.updateMatrixWorld();
-    let mn = 1e9;
-    for(const q of pts){ v.set(q[0], q[1], q[2]).project(S.camera); if(v.y < mn) mn = v.y; }
-    return mn;
-  };
-  let lo = 0, hi = 30 * Math.PI / 180;
-  for(let i = 0; i < 16; i++){ const mid = (lo + hi) / 2; if(minY(mid) < -m) hi = mid; else lo = mid; }
-  S.camera.quaternion.copy(base); S.camera.rotateX(lo); S.camera.updateMatrixWorld();
 }
 window.addEventListener("resize", function(){ if(S) resize(); });
 /* 畫布的框不只在視窗改變時會變：字型載好讓頂列換行、計分表開關、開發者工具……
@@ -9292,7 +9324,6 @@ async function boot(){
     S.r.setAnimationLoop(frame);
     UD.sync3d = sync;
     UD.onDeck = redeck;
-    UD.onCam = function(){ if(S && !CANVAS.hidden) resize(); };
   })();
   return booting;
 }
@@ -9381,10 +9412,11 @@ UD.onShow = function(){
   if(!dim3 || !S) return;
   requestAnimationFrame(start3d);
 };
+/* 預設就是立體：沒選過、也沒帶 ?dim= 的人直接鋪桌。選過平面的（本機或帳號裡記著 "2"）才留在平面 */
 if(webglOK()){
-  let saved = "2";
-  try{ saved = new URLSearchParams(location.search).get("dim") || localStorage.getItem("ud.dim") || "2"; }catch(e){}
-  if(saved === "3") setDim(true);
+  let saved = "3";
+  try{ saved = new URLSearchParams(location.search).get("dim") || localStorage.getItem("ud.dim") || "3"; }catch(e){}
+  if(saved !== "2") setDim(true);
 }
 
 </script>

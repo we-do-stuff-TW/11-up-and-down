@@ -83,7 +83,7 @@ const view = () => b.eval<{ trick: number; hand: number; rev: number; at: number
 );
 
 try {
-  await b.open("?lang=zh&pace=1&hold=1");
+  await b.open("?lang=zh&dim=2&pace=1&hold=1");
   await b.eval(SETUP);
   const st0 = await b.eval<{ mode: string; seat: number; hand: number; rev: number }>(`return __T.enter()`);
   ok(st0.mode === "net" && st0.seat === 0, `進不了連線模式：${JSON.stringify(st0)}`);

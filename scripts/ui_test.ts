@@ -49,7 +49,7 @@ const anyCard = () => b.eval<{ id: string; x: number; y: number } | null>(
 );
 
 try {
-  await b.open("?lang=zh&pace=1&hold=1");
+  await b.open("?lang=zh&dim=2&pace=1&hold=1");
   await b.eval(`TUNE.roundGap = 150; return 1`);   /* 局與局之間不必等 2.2 秒 */
 
   /* ── 開一桌自己打 ── */
