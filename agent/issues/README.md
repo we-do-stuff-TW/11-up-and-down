@@ -8,4 +8,5 @@
 
 ## 已解決
 
+- [0002 — 線上多人：一輪結束卡著不動；換局後手牌背面躺在桌上](0002-online-stall-and-facedown-hand.md)（2026-09-22，report 0003）
 - [0001 — 線上多人：叫完墩手牌就換了一副](0001-hand-swapped-after-bid.md)（2026-09-22，plan 0004）

@@ -1,0 +1,22 @@
+ri=0 hs=1 heap=18.4MB tweens=0 cards=22 dead=0 scene=35 dom=3034 geo=135 tex=43 progs=28 apply=3x avg 3.27ms max 9.1ms long=3/6 busy=false q=0
+ri=1 hs=1 heap=14.9MB tweens=3 cards=25 dead=0 scene=40 dom=3094 geo=138 tex=45 progs=30 apply=38x avg 1.49ms max 9.9ms long=16/18 busy=false q=0
+ri=2 hs=1 heap=14.7MB tweens=9 cards=26 dead=2 scene=46 dom=3050 geo=140 tex=46 progs=31 apply=37x avg 1.54ms max 10.7ms long=25/33 busy=false q=0
+ri=3 hs=3 heap=17.1MB tweens=0 cards=31 dead=0 scene=43 dom=3144 geo=135 tex=44 progs=44 apply=42x avg 1.46ms max 9.6ms long=38/44 busy=false q=0
+ri=4 hs=3 heap=16.8MB tweens=0 cards=32 dead=0 scene=43 dom=3115 geo=135 tex=44 progs=43 apply=58x avg 1.43ms max 9.1ms long=61/69 busy=false q=0
+ri=5 hs=5 heap=15.9MB tweens=11 cards=35 dead=2 scene=61 dom=3126 geo=143 tex=44 progs=43 apply=63x avg 1.22ms max 10.2ms long=66/76 busy=false q=0
+ri=6 hs=6 heap=16.4MB tweens=6 cards=38 dead=0 scene=49 dom=3167 geo=135 tex=44 progs=43 apply=77x avg 1.22ms max 9.9ms long=76/88 busy=false q=0
+ri=7 hs=6 heap=16.8MB tweens=7 cards=41 dead=0 scene=52 dom=3197 geo=135 tex=44 progs=43 apply=86x avg 1.39ms max 10.8ms long=78/92 busy=false q=1
+ri=8 hs=7 heap=16.6MB tweens=21 cards=44 dead=2 scene=76 dom=3230 geo=145 tex=44 progs=43 apply=94x avg 1.21ms max 9.3ms long=91/107 busy=false q=1
+ri=9 hs=8 heap=17.7MB tweens=18 cards=47 dead=0 scene=58 dom=3262 geo=135 tex=44 progs=43 apply=107x avg 1.25ms max 9.2ms long=104/122 busy=false q=0
+ri=10 hs=10 heap=22.4MB tweens=16 cards=50 dead=2 scene=87 dom=3279 geo=148 tex=44 progs=43 apply=111x avg 1.2ms max 9.8ms long=95/115 busy=false q=0
+ri=11 hs=9 heap=22.6MB tweens=14 cards=47 dead=2 scene=81 dom=3233 geo=146 tex=44 progs=43 apply=125x avg 1.12ms max 9.5ms long=116/138 busy=false q=0
+ri=12 hs=7 heap=16.5MB tweens=0 cards=44 dead=0 scene=74 dom=3237 geo=145 tex=44 progs=43 apply=116x avg 1.16ms max 10.4ms long=105/125 busy=false q=0
+ri=13 hs=6 heap=16.8MB tweens=8 cards=41 dead=0 scene=52 dom=3222 geo=135 tex=44 progs=43 apply=108x avg 1.24ms max 10.7ms long=97/115 busy=false q=0
+ri=14 hs=6 heap=16.8MB tweens=12 cards=38 dead=2 scene=66 dom=3180 geo=144 tex=44 progs=43 apply=92x avg 1.17ms max 9.5ms long=83/99 busy=false q=0
+ri=15 hs=4 heap=18.8MB tweens=10 cards=35 dead=0 scene=46 dom=3176 geo=135 tex=44 progs=43 apply=86x avg 1.22ms max 13.1ms long=75/89 busy=false q=1
+ri=16 hs=3 heap=18.4MB tweens=8 cards=32 dead=0 scene=54 dom=3175 geo=141 tex=44 progs=43 apply=74x avg 1.14ms max 9.4ms long=67/79 busy=false q=1
+ri=17 hs=3 heap=16.5MB tweens=9 cards=29 dead=2 scene=51 dom=3129 geo=141 tex=44 progs=43 apply=62x avg 1.18ms max 9ms long=54/64 busy=false q=0
+ri=18 hs=2 heap=16.6MB tweens=8 cards=26 dead=2 scene=47 dom=3095 geo=140 tex=44 progs=43 apply=54x avg 1.36ms max 9.2ms long=36/44 busy=false q=0
+ri=19 hs=0 heap=17.6MB tweens=0 cards=23 dead=0 scene=33 dom=3072 geo=135 tex=44 progs=43 apply=42x avg 1.44ms max 8.7ms long=42/48 busy=false q=0
+ri=20 hs=0 heap=16.5MB tweens=3 cards=20 dead=2 scene=31 dom=3056 geo=135 tex=44 progs=43 apply=34x avg 1.25ms max 8.8ms long=38/42 busy=false q=0
+完成 21 局，561s

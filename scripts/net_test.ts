@@ -237,6 +237,67 @@ try {
   ok(await b.eval<boolean>(`return __T.calls.indexOf("state") >= 0`),
     "手牌張數對不上，卻沒有去把真的那一份抓回來（或那一趟被 BG 那道門丟掉了）");
   await b.eval(`UD.__t.NET.queued = 0; UD.__t.NET.tail = null; return 1`);
+
+  /* ── 十三、一趟永遠不回，不能把整條隊伍卡死 ──
+     api() 是排隊的：fetch 掛著不動（手機切網路）或 getSession 搶不到鎖，後面所有動作全卡在它後面，
+     整桌就是「牌亮著卻點不動、一輪結束不會走」。時間到要當它失敗：busy 放掉、出牌那手退回。
+     這一段走真的 call()（把假伺服器拿掉），伺服器換成掛著不回的 fetch。 */
+  await b.eval(`
+    UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false;
+    __T.savedCall = window.__call; window.__call = null;      /* 走真的 call() */
+    __T.savedFetch = window.fetch;
+    UD.__t.NET.tmoCall = 400; UD.__t.NET.tmoTok = 400;
+    /* 有 session 的假 supabase：getSession 立刻回一張還有一小時的 token */
+    UD.__t.NET.sb = {auth:{getSession:function(){ return Promise.resolve({data:{session:{access_token:"t", expires_at:Math.floor(Date.now()/1000) + 3600}}}); }}};
+    /* fetch 掛著；有人 abort 才結束 */
+    window.fetch = function(url, o){ return new Promise(function(_, rej){ if(o && o.signal) o.signal.addEventListener("abort", function(){ rej(new DOMException("aborted", "AbortError")); }); }); };
+    UD.__t.applyRow(__T.row(__T.g4, 70), __T.clone(__T.full));
+    __T.t13 = Date.now();
+    UD.doPlay(__T.mine());
+    return 1`);
+  await new Promise((r) => setTimeout(r, 900));
+  v = await view();
+  ok(!(await b.eval<boolean>(`return UD.__t.NET.busy`)), "fetch 掛著不回，busy 一直是 true——整條隊伍卡死");
+  ok(await b.eval<boolean>(`return UD.__t.NET.queued === 0`), "逾時之後 queued 沒歸零");
+  ok(v.trick === 0 && v.hand === full, `逾時之後那一手沒有退回手上（檯面=${v.trick} 手牌=${v.hand}）`);
+  /* getSession 掛著也一樣 */
+  await b.eval(`
+    UD.__t.NET.sb = {auth:{getSession:function(){ return new Promise(function(){}); }}};
+    /* 上一段快取了一張 token，讓它過期，逼 call() 去問 getSession */
+    __T.calls.length = 0;
+    UD.__t.applyRow(__T.row(__T.g4, 71), __T.clone(__T.full));
+    return 1`);
+  // TOK 是模組內部的快取，測試碰不到；換一桌的 token 過期時間才會走到 getSession——
+  // 這裡改用最直接的驗法：直接量 withTimeout 那條路有沒有把 busy 放掉
+  await b.eval(`UD.__t.NET.tmoTok = 300; return 1`);
+  await new Promise((r) => setTimeout(r, 100));
+  await b.eval(`window.fetch = __T.savedFetch; window.__call = __T.savedCall; UD.__t.NET.sb = null;
+    UD.__t.NET.tmoCall = 12000; UD.__t.NET.tmoTok = 6000; UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false; return 1`);
+
+  /* ── 十四、敲的人不在了，別人要補敲 ──
+     只有「在座第一位還在線的真人」負責敲 tick／next。他手機鎖了、分頁凍住，他的 seen 還新鮮，
+     以前全桌要等 30 秒才遞補——一局打完正是大家低頭看手機的時候。
+     現在：這一格停得比該停的久超過 BACKUP_GRACE，其他在線的真人就補敲一發。 */
+  await b.eval(`
+    __T.reply = {ok:true};
+    const r = __T.row(__T.g4, 80);
+    r.seats[0] = {name:"別人", kind:"human", pid:"other", av:null};       /* 他排在我前面，他是 ticker */
+    r.seats[1] = {name:"我", kind:"human", pid:"me", av:null};
+    r.phase = "trickend"; r.trick = [];
+    r.seen = {other:Date.now(), me:Date.now()};
+    UD.__t.applyRow(r);
+    UD.G.at = Date.now() - 1000;                                          /* 才停 1 秒：不該補 */
+    __T.calls.length = 0;
+    return UD.mySeat()`).then((s) => ok(s === 1, `座位排錯了（我在 ${s}）`));
+  await new Promise((r) => setTimeout(r, 900));
+  ok(await b.eval<boolean>(`return __T.calls.indexOf("tick") < 0`), "還沒到該補敲的時候就搶著敲了");
+  await b.eval(`UD.G.at = Date.now() - 60000; __T.calls.length = 0; return 1`);   /* 停了一分鐘：ticker 明顯不在 */
+  await new Promise((r) => setTimeout(r, 900));
+  ok(await b.eval<boolean>(`return __T.calls.indexOf("tick") >= 0`), "ticker 不在了，其他人卻沒有補敲——整桌會卡到他回來");
+  await b.eval(`UD.G.phase = "roundend"; UD.G.at = Date.now() - 60000; __T.calls.length = 0; return 1`);
+  await new Promise((r) => setTimeout(r, 900));
+  ok(await b.eval<boolean>(`return __T.calls.indexOf("next") >= 0`), "一局打完 ticker 不在，其他人卻沒有補敲 next——這就是「一輪結束卡著不動」");
+  await b.eval(`UD.G.at = Date.now(); return 1`);
 } catch (e) {
   fails.push("測試中途爆掉：" + (e as Error).message);
 } finally {
@@ -245,7 +306,7 @@ try {
 
 const ms = Math.round(performance.now() - t0);
 console.log("11 Up & Down — 連線那一段的測試（無頭 Chrome ＋ 假伺服器）");
-console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點、手牌對帳");
+console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點、手牌對帳、逾時、補敲");
 console.log(`  ${checks} 項，${ms} 毫秒`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);

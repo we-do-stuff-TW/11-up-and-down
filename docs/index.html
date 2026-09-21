@@ -3740,21 +3740,39 @@ setInterval(function(){
 
 /* 連線模式：AI 的節奏要有人去敲伺服器。只讓「在座第一位還在線的真人」敲，
    其他人不敲——四個人都敲的話呼叫次數會是四倍，而且沒有任何好處。
-   敲的人關掉分頁，他的 seen 會過期，下一位自動遞補。 */
+   敲的人關掉分頁，他的 seen 會過期，下一位自動遞補。
+
+   但「遞補」要等 30 秒，而敲的人敲不到的情形比關分頁常見得多：手機鎖了、切去看訊息、
+   分頁被瀏覽器凍住、或那一趟請求卡在半路——他自己的 seen 還新鮮，別人都乖乖等他。
+   一局打完正是大家低頭看手機的時候，所以最常卡在「一輪結束就不動了」（2026-09-22 Francis 的截圖）。
+   補救：這一格停得比該停的久超過 BACKUP_GRACE，其他還在線的真人就補敲一發。
+   伺服器有樂觀鎖（rev）與 phase 檢查，多敲只會落空，不會多走一步。 */
+const BACKUP_GRACE = 4000;
 setInterval(function(){
   /* 通道上有東西（在跑的、排隊的）就等下一輪。420ms 後還是會再來一次，
      這裡搶進去只會多一個沒必要的呼叫——「next」尤其不能連放兩發 */
   if(MODE !== "net" || !G || NET.busy || NET.queued || !NET.code) return;
   const rounding = G.phase === "roundend";
+  const idle = Date.now() - G.at;                    /* 這一格已經停了多久 */
   if(!rounding){
     if(G.phase !== "bid" && G.phase !== "play" && G.phase !== "trickend") return;
     if(G.phase !== "trickend" && !seatPlayable(G.turn)) return;
   /* 每局自動開始：停頓夠久了才敲，讓大家看得完這局的結算 */
-  }else if(Date.now() - G.at < roundGap()) return;
+  }else if(idle < roundGap()) return;
+  const me = mySeat();
+  if(me < 0) return;
   let ticker = -1;
   for(let i=0;i<G.seats.length;i++)
     if(G.seats[i].kind === "human" && isLive(G.seats[i].cid)){ ticker = i; break; }
-  if(ticker < 0 || G.seats[ticker].cid !== MY.pid) return;
+  if(ticker !== me){
+    /* 不是我該敲。這一格照理該停多久：局末 roundGap、一墩打完 trickGap、
+       AI 出牌 SPEED（一局第一張多等到 2.8 秒，跟伺服器同一個數）——超過太多就是敲的人不在了 */
+    const firstPlay = G.phase === "play" && G.played === 0 && !G.trick.length;
+    const due = rounding ? roundGap() : G.phase === "trickend" ? trickGap()
+      : firstPlay ? Math.max(SPEED * .9, 2800) : SPEED;
+    if(idle < due + BACKUP_GRACE) return;
+    if(TRACE.on) TRACE.log("tick", "backup " + G.phase + " idle=" + idle + " ticker=" + ticker);
+  }
   if(rounding) api("next", {code:NET.code});
   else api("tick", {code:NET.code, speed:SPEED, gap:trickGap()});
 }, 420);
@@ -3780,18 +3798,34 @@ function api(action, args, force){
   NET.tail = (NET.tail || Promise.resolve()).then(run, run).then(done, function(){ return done(null); });
   return NET.tail;
 }
+/* 一趟最多等多久。api() 是一條隊伍：一趟永遠不回（手機切網路時 fetch 會掛著不動、
+   getSession 搶不到鎖），後面所有動作——包括玩家按下去的牌、心跳、tick——全部卡在它後面，
+   整桌就是「牌亮著卻點不動、一輪結束不會走」。時間到就當它失敗：busy 放掉、隊伍往前走，
+   出牌那一手退回手上讓人再按一次（伺服器其實收到了的話，下一列推播會把它擺回去）。
+   測試會把這兩個數字調短。 */
+NET.tmoCall = 12000;
+NET.tmoTok = 6000;
+function withTimeout(p, ms, what){
+  return new Promise(function(res, rej){
+    const t = setTimeout(function(){ rej(new Error(what + " timeout " + ms + "ms")); }, ms);
+    Promise.resolve(p).then(function(v){ clearTimeout(t); res(v); }, function(e){ clearTimeout(t); rej(e); });
+  });
+}
 async function call(action, args){
   NET.busy = true;
   const t0 = Date.now();
+  const ac = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = ac ? setTimeout(function(){ ac.abort(); }, NET.tmoCall) : 0;
   try{
     /* Authorization 帶的是「你」，不是 anon key——anon key 誰都有，那不叫身分 */
-    const jwt = await accessToken();
+    const jwt = await withTimeout(accessToken(), NET.tmoTok, "token");
     if(!jwt){ gotoLogin(); return null; }
     const res = await fetch(API, {
       method:"POST",
       headers:{"Content-Type":"application/json", apikey:SB_KEY, Authorization:"Bearer " + jwt},
       body:JSON.stringify(Object.assign(
-        {action:action, token:MY.token, name:MY.name || T("玩家")}, args || {}))
+        {action:action, token:MY.token, name:MY.name || T("玩家")}, args || {})),
+      signal: ac ? ac.signal : undefined
     });
     const d = await res.json().catch(function(){ return {}; });
     if(TRACE.on && action !== "tick") TRACE.log("api", action + " " + res.status + " " + (Date.now() - t0) + "ms" + (d.room ? " rev=" + d.room.rev : "") + (d.error ? " err=" + d.error : ""));
@@ -3800,7 +3834,8 @@ async function call(action, args){
        在函式跑起來之前就擋掉的（回的 body 不是我們寫的）。兩者都是「這張身分不算數」。 */
     if(d.signin || res.status === 401){ gotoLogin(true); return null; }
     if(d.error){
-      if(action !== "tick" && action !== "state"){ NET.err = TErr(d.error); render(); }
+      /* next 是自動敲的（可能兩個人同時補敲，晚到的那一發會被「這局還沒結束」打回），不必印出來 */
+      if(action !== "tick" && action !== "state" && action !== "next"){ NET.err = TErr(d.error); render(); }
       return null;
     }
     NET.err = "";
@@ -3808,9 +3843,9 @@ async function call(action, args){
     return d;
   }catch(e){
     if(TRACE.on) TRACE.log("api!", action + " " + (Date.now() - t0) + "ms " + String(e && e.message));
-    if(action !== "tick"){ NET.err = T("連不上伺服器，檢查一下網路"); render(); }
+    if(action !== "tick" && action !== "next"){ NET.err = T("連不上伺服器，檢查一下網路"); render(); }
     return null;
-  }finally{ NET.busy = false; }
+  }finally{ if(timer) clearTimeout(timer); NET.busy = false; }
 }
 
 /* 畫面可能舊了的時候去問一次伺服器：點了暗的牌、doPlay 說不是我的回合、
@@ -6831,10 +6866,16 @@ function jump(target, to){
     if(tweens[i].target === target) tweens.splice(i, 1);
   for(const k in to) target[k] = to[k];
 }
+/* 由舊到新處理——陣列本來就是插入順序，接力的兩段（queue）一定前段在前。
+   以前是倒著走：平常一格 16ms 看不出差別，但一格拖太久（分頁切走、GC、換局那一格著色器在編譯、
+   手機卡一下）讓接力的兩段同時到期時，後段先套到終點、前段再把它蓋回自己的終點——
+   我的手牌就永遠背面朝上躺在發牌的中繼站，直到下一次 slot 變了才動（2026-09-22 Francis 的截圖）。
+   onEnd 會動這個陣列（kill 收牌、骰子再彈一下），所以走的是複本，動手前先確認那一段還在。 */
 function stepTweens(t){
-  for(let i = tweens.length - 1; i >= 0; i--){
-    const w = tweens[i];
+  const list = tweens.slice();
+  for(const w of list){
     if(t < w.t0) continue;
+    if(tweens.indexOf(w) < 0) continue;              /* 這一格前面某個 onEnd 把它拿掉了 */
     if(!w.from) w.from = snap(w.target, w.to);
     let k = Math.min(1, (t - w.t0) / w.dur);
     const e = w.ease(k);
@@ -6843,7 +6884,11 @@ function stepTweens(t){
       w.target[p] = w.from[p] + (w.to[p] - w.from[p]) * ep;
     }
     if(w.bump){ const s = Math.sin(k * Math.PI); for(const p in w.bump) w.target[p] += s * w.bump[p]; }
-    if(k >= 1){ tweens.splice(i, 1); if(w.onEnd) w.onEnd(); }
+    if(k >= 1){
+      const i = tweens.indexOf(w);
+      if(i >= 0) tweens.splice(i, 1);
+      if(w.onEnd) w.onEnd();
+    }
   }
 }
 /* ================= 排位 ================= */
