@@ -68,6 +68,7 @@ deno run --allow-read scripts/rules_test.ts      # 兩份規則對照：畫面 v
 deno run -A          scripts/ui_test.ts         # 出牌的入口：無頭 Chrome 開真的牌桌
 deno run -A          scripts/net_test.ts        # 連線那一段：假伺服器重演各種時序
 deno run -A          scripts/end_test.ts        # 一場牌的兩個出口：收桌、再來一局、離開遊戲
+deno run -A          scripts/gag_test.ts        # 收桌頒獎（Thomas 爬講台）：真牌桌上停格截圖、關頁會停、沒捲軸（DIM=3 立體、PHONE=1 手機寬）
 deno run -A          scripts/i18n_scan.ts      # 英文版有沒有殘留中文（加 zh 反過來掃；DIM=3 走立體；SHOT=1 順手截圖）
 deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗證
 ```

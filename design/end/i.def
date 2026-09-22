@@ -1,0 +1,526 @@
+/* TITLE: I 紙偶戲 · 幕拉開 */
+/* ── I 案：收桌那一塊變成一座桌上紙偶戲台。幕拉開、燈泡依序亮，Thomas 是一隻插在竿子上的紙偶，
+   頭是照片剪成的紙片（150px，貼紙白邊），四肢是紙條、關節是銅釦，動作一格一格頓（steps），
+   竿子從舞台底下伸上來操縱他；獎盃也貼在另一根竿上。牌疊那段跟 E 一字不差，只把頂牌改成手剪紙板。 ── */
+.stacks{display:flex;align-items:flex-end;justify-content:center;gap:26px;height:310px;padding-top:100px}
+.stack{position:relative;width:110px;flex:none;display:flex;flex-direction:column;align-items:center}
+.stack .who{margin-bottom:12px}
+.pile{position:relative;width:110px;height:calc(154px + var(--n) * 7px);transform-origin:50% 100%}
+.cd{position:absolute;left:0;bottom:calc(var(--i) * 7px);width:110px;height:154px;border-radius:9px;
+  rotate:var(--rz);opacity:0;transform:translate(70px,-110px) rotate(9deg);
+  animation:deal .46s var(--e-out) forwards;animation-delay:var(--d);
+  background:
+    repeating-linear-gradient(45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
+    repeating-linear-gradient(-45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
+    linear-gradient(160deg in oklab,#8E2228,#5E1418);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.35),inset 0 0 0 5px #F1E9D6,inset 0 0 0 6px rgba(0,0,0,.18),
+    0 1px 0 rgba(0,0,0,.55),0 3px 6px rgba(0,0,0,.35)}
+@keyframes deal{to{opacity:1;transform:none}}
+.cd.face{display:grid;place-items:center;
+  background:linear-gradient(158deg in oklab,#FDFAF3,var(--stock) 46%,var(--stock-2));color:var(--stock-ink);
+  box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),0 6px 14px rgba(0,0,0,.35)}
+.cd.face::before{content:"";position:absolute;inset:5px;border-radius:6px;border:.5px solid var(--foil);opacity:.45}
+.cd.face .num{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:54px;line-height:1;
+  font-variation-settings:"opsz" 6;color:var(--stock-ink-2)}
+.cd.face .ix{position:absolute;left:9px;top:7px;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:16px;
+  font-variation-settings:"opsz" 6;color:var(--stock-ink-3)}
+.cd.face .ix.b{left:auto;right:9px;top:auto;bottom:7px;rotate:180deg}
+.stack.p1 .cd.face .num,.stack.p1 .cd.face .ix{color:var(--foil)}
+.stack.p1 .cd.face{box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),
+  0 6px 14px rgba(0,0,0,.35),0 0 60px oklch(.845 .128 84/.14)}
+.floor{width:min(560px,100%);height:1px;background:var(--hair);margin:0 auto}
+@media (prefers-reduced-motion:reduce){.cd{transform:none;animation:fadeIn .2s ease both}}
+@media (max-width:760px){
+  .stacks{gap:12px;height:250px;padding-top:88px}
+  .stack,.pile,.cd{width:88px}
+  .pile{height:calc(123px + var(--n) * 6px)}
+  .cd{height:123px;bottom:calc(var(--i) * 6px)}
+  .cd.face .num{font-size:42px}
+}
+
+
+/* 頂牌改成手剪的紙板：邊緣不直（clip-path 會吃掉外陰影，所以陰影全改 inset） */
+.cd.face{clip-path:polygon(1.2% 1.4%,53% .3%,98.6% 1.1%,100% 46%,99.1% 98.6%,47% 100%,.8% 98.4%,0 52%);
+  box-shadow:inset 0 0 0 1.5px rgba(26,23,20,.28),inset 0 1px 0 rgba(255,255,255,.9),inset 0 -6px 12px rgba(26,23,20,.12)}
+.stack.p1 .cd.face{box-shadow:inset 0 0 0 1.5px rgba(26,23,20,.28),inset 0 1px 0 rgba(255,255,255,.9),inset 0 -6px 12px rgba(26,23,20,.12)}
+/* 名字那一排要讓出台口的簾頭：整個 stacks 高一階 */
+.stacks{height:340px;padding-top:130px}
+@media (max-width:760px){.stacks{height:280px;padding-top:118px}}
+
+/* ── 戲台 ─────────────────────────────────────────────────────────────
+   .stage 是台面。台口（跑馬燈橫樑、兩根柱子、台前地板）疊在最上層，幕在台口裡面、偶的前面。
+   底邊往下多留 14px 給台前地板，再往下切掉：竿子從這塊板子底下伸上來。 */
+/* 上緣切在橫樑頂：偶被舉高時頭不會冒到標題上 */
+.stage{position:relative;isolation:isolate;clip-path:inset(-62px -400px -14px -400px);margin-top:84px}
+.theater{position:absolute;inset:-62px -24px -14px -24px;z-index:4;pointer-events:none}
+.marq{position:absolute;left:0;right:0;top:0;height:40px;border-radius:7px 7px 0 0;
+  background:linear-gradient(#F3EDDC,#E2D9C2);
+  box-shadow:inset 0 -1.5px 0 rgba(26,23,20,.28),inset 0 1px 0 #fff,0 2px 0 rgba(0,0,0,.45),0 6px 14px rgba(0,0,0,.35);
+  display:flex;justify-content:space-evenly;align-items:center}
+.bulb{position:relative;width:12px;height:12px;border-radius:99px;
+  background:radial-gradient(circle at 40% 35%,#8a7048,#5a4426 60%,#3d2e18);box-shadow:inset 0 0 0 1px rgba(26,23,20,.4)}
+.bulb i{position:absolute;inset:0;border-radius:99px;opacity:0;
+  background:radial-gradient(circle at 40% 35%,#fff9e3,#E9C36A 50%,#A9823C);
+  box-shadow:0 0 10px 3px oklch(.9 .13 84/.55),0 0 22px 6px oklch(.9 .13 84/.25)}
+.pillar{position:absolute;top:38px;bottom:0;width:24px;
+  background:linear-gradient(90deg,#D8CDB2,#F3EDDC 45%,#D1C5A8);box-shadow:inset 0 0 0 1px rgba(26,23,20,.22),0 0 12px rgba(0,0,0,.3)}
+.pillar.l{left:0}.pillar.r{right:0}
+.board{position:absolute;left:0;right:0;bottom:0;height:14px;
+  background:linear-gradient(#D8CDB2,#C9BC9C);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 0 0 1px rgba(26,23,20,.24)}
+/* 幕：線上那副牌背的深紅格紋，加一層垂直的褶。收攏＝scaleX 往兩側縮 */
+.curt{position:absolute;top:38px;bottom:14px;width:calc(50% - 24px);
+  background:
+    repeating-linear-gradient(90deg,rgba(0,0,0,.24) 0 5px,transparent 5px 12px,rgba(255,255,255,.07) 12px 16px,transparent 16px 26px),
+    repeating-linear-gradient(45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
+    repeating-linear-gradient(-45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
+    linear-gradient(160deg in oklab,#8E2228,#5E1418);
+  box-shadow:inset 0 -10px 18px rgba(0,0,0,.35),inset 0 0 0 1px rgba(0,0,0,.35);will-change:transform}
+.curt.l{left:24px;transform-origin:0 50%}
+.curt.r{right:24px;transform-origin:100% 50%}
+/* 簾頭：一條紅絨橫幅，下緣是圓弧的流蘇 */
+.valance{position:absolute;left:24px;right:24px;top:38px;height:22px;
+  background:linear-gradient(160deg in oklab,#8E2228,#5E1418);box-shadow:inset 0 -3px 6px rgba(0,0,0,.35)}
+.valance::after{content:"";position:absolute;left:0;right:0;top:100%;height:12px;
+  background:radial-gradient(circle at 50% 0,#6E1A1F 10px,transparent 11px) 0 0/22px 12px repeat-x}
+@media (max-width:760px){
+  .stage{clip-path:inset(-56px -400px -14px -400px);margin-top:70px}
+  .theater{inset:-56px 0 -14px 0}
+  .pillar{width:14px}.curt{width:calc(50% - 14px)}.curt.l{left:14px}.curt.r{right:14px}.valance{left:14px;right:14px}
+  .bulb{width:9px;height:9px}
+}
+
+/* ── 紙偶 ──────────────────────────────────────────────────────────────
+   .tom 管 x、.ty 管 y、.body 管整隻偶的傾（掛在竿上的擺盪）、.upper 管腰以上（鞠躬從腰折）。
+   原點在腳底。四肢是米色紙條、關節一顆銅釦；竿子從臀部往下伸出畫面。 */
+.tom{position:absolute;left:0;top:0;width:0;height:0;z-index:2;--k:1.5;pointer-events:none;opacity:0;will-change:transform}
+.ty{position:absolute;left:0;top:0;width:0;height:0}
+.body{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;scale:var(--k)}
+.upper{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 -34px}
+.strip{position:absolute;width:6px;border-radius:2px;background:linear-gradient(90deg,#EDE6D4,#FAF6EC 45%,#E2D9C2);
+  box-shadow:inset 0 0 0 .6px rgba(26,23,20,.35),0 1px 2px rgba(0,0,0,.35);transform-origin:50% 3px}
+.strip::before{content:"";position:absolute;left:1px;top:1px;width:4px;height:4px;border-radius:99px;
+  background:radial-gradient(circle at 35% 30%,#E9C36A,#A9823C 60%,#6b501f);box-shadow:0 0 0 .5px rgba(26,23,20,.5)}
+.leg{top:-36px;height:38px}
+.leg.l{left:-9px}.leg.r{left:3px}
+.torso{position:absolute;left:-4px;top:-58px;width:8px;height:26px;border-radius:2px;
+  background:linear-gradient(90deg,#EDE6D4,#FAF6EC 45%,#E2D9C2);box-shadow:inset 0 0 0 .6px rgba(26,23,20,.35),0 1px 2px rgba(0,0,0,.35)}
+.arm{top:-54px;height:60px}
+.arm.l{left:-12px}.arm.r{left:6px}
+/* 頭：照片剪成的紙片。100px × 1.5 ＝ 螢幕上 150px。白邊是貼紙的那一圈 */
+.head{position:absolute;left:-50px;top:-156px;width:100px;height:100px;border-radius:99px;overflow:hidden;
+  transform-origin:50% 100%;
+  box-shadow:0 0 0 3px var(--stock),0 0 0 3.6px rgba(26,23,20,.5),0 3px 6px rgba(0,0,0,.4)}
+.head img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 42%}
+/* 竿子：從臀部往下伸出畫面（被台前地板切掉），跟著偶走 */
+.rod{position:absolute;left:-.75px;top:-40px;width:1.5px;height:800px;background:linear-gradient(#3b2f22,#1a1512);opacity:.9}
+/* 獎盃：紙板剪的，貼在另一根竿上 */
+.cup{position:absolute;left:0;top:0;width:0;height:0;z-index:3;--k:1.5;pointer-events:none;opacity:0;will-change:transform}
+.cupy{position:absolute;left:0;top:0;width:0;height:0}
+.cup svg{position:absolute;left:-18px;top:-40px;width:36px;height:40px;overflow:visible;transform-origin:50% 100%;scale:var(--k);
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
+.cup .rod{top:0;height:800px;scale:var(--k);transform-origin:0 0}
+@media (max-width:760px){.tom,.cup{--k:1.1}}
+.tom.still,.cup.still{transition:opacity .3s ease}
+/*==HTML==*/
+    <div class="stage" id="stage">
+      <div class="stacks" id="stacks"></div>
+      <div class="floor" id="floor"></div>
+      <div class="tom" id="tom" aria-hidden="true"><div class="ty" id="ty"><div class="body" id="body">
+        <i class="rod"></i>
+        <i class="strip leg l" id="legL"></i><i class="strip leg r" id="legR"></i>
+        <div class="upper" id="upper">
+          <i class="torso"></i>
+          <i class="strip arm l" id="armL"></i><i class="strip arm r" id="armR"></i>
+          <div class="head" id="head"><img src="_tom.jpg" alt=""></div>
+        </div>
+      </div></div></div>
+      <div class="cup" id="cup" aria-hidden="true"><div class="cupy" id="cupy">
+        <i class="rod"></i>
+        <svg viewBox="0 0 36 40" fill="none" stroke="var(--foil)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 3h18v10a9 9 0 0 1-18 0z" fill="#EDE6D4"/>
+          <path d="M9 6H4.5a1.5 1.5 0 0 0-1.5 1.5C3 12 6 15.5 10.5 16"/>
+          <path d="M27 6h4.5a1.5 1.5 0 0 1 1.5 1.5c0 4.5-3 8-7.5 8.5"/>
+          <path d="M18 22v5"/><path d="M14 27h8"/>
+          <path d="M12 30h12l3 8H9z" fill="#EDE6D4"/>
+        </svg>
+      </div></div>
+      <div class="theater" aria-hidden="true">
+        <div class="curt l" id="curtL"></div><div class="curt r" id="curtR"></div>
+        <div class="valance"></div>
+        <div class="marq" id="marq"></div>
+        <div class="pillar l"></div><div class="pillar r"></div>
+        <div class="board"></div>
+      </div>
+    </div>
+<script>
+(function(){
+  const who = function(t){ return '<div class="who" style="--dw:' + t.dw + '"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div><span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span><span class="sc">' + sc(t.sc) + '</span></div>'; };
+  const T = END.tiers, order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  const N = {1:7, 2:4, 3:2}, sizes = T.map(function(t, i){ return N[i + 1] || 2; });
+  const delays = T.map(function(){ return []; });
+  let clock = 0, more = true;
+  while(more){
+    more = false;
+    for(let i = T.length - 1; i >= 0; i--){
+      if(delays[i].length < sizes[i]){ delays[i].push(clock); clock += 75; more = true; }
+    }
+  }
+  const wob = [-1.6, 1.1, -.7, 1.8, -1.2, .6, -1.9, 1.4];
+  document.getElementById("stacks").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1, n = sizes[k - 1], ds = delays[k - 1];
+    t.dw = ((ds[ds.length - 1] + 380) / 1000).toFixed(2) + "s";
+    let cards = "";
+    for(let i = 0; i < n; i++){
+      const last = i === n - 1;
+      cards += '<div class="cd' + (last ? " face" : "") + '" style="--i:' + i + ';--d:' + (ds[i] / 1000).toFixed(2) + 's;--rz:' + wob[i % wob.length] + 'deg">' +
+        (last ? '<span class="ix">' + t.pos + '</span><span class="ix b">' + t.pos + '</span><span class="num">' + t.pos + '</span>' : "") + '</div>';
+    }
+    return '<div class="stack p' + k + '">' + who(t) + '<div class="pile" style="--n:' + (n - 1) + '">' + cards + '</div></div>';
+  }).join("");
+  window.DEAL_END = clock / 1000 + .38;   /* 最後一張落定、名字亮起 */
+})();
+</script>
+<script>
+/*==SFX==*/
+</script>
+<script>
+/* ═══ 紙偶戲的聲音 ══════════════════════════════════════════════════════
+   木頭與紙的世界：幕拖過桿子、燈泡叮、竿子喀答、紙板啪、卡祖笛小號角。
+   全部照節拍表排在 AudioContext 時間軸上。正式版搬進音效層 IIFE，不需要 _prim。 */
+(function(){
+  if(!window.SFX || !SFX._prim) return;
+  var P = SFX._prim, grain = P.grain, thump = P.thump, rhodes = P.rhodes, cardLand = P.cardLand, pack = P.pack, sweep = P.sweep,
+      out = P.out, now = P.now, live = P.live, rnd = P.rnd, N = P.N, ctx = P.ctx;
+
+  /* 燈泡亮：很輕的叮（三個不成整數比的正弦） */
+  function ting(t, o){
+    var c = ctx(), f = (o.f || 2400) * rnd(0.97, 1.03), g0 = o.gain || 0.06;
+    [[1, 1, 0.3], [2.76, 0.4, 0.2], [5.4, 0.15, 0.1]].forEach(function(p){
+      var osc = c.createOscillator(); osc.type = "sine"; osc.frequency.value = f * p[0];
+      var g = c.createGain();
+      g.gain.setValueAtTime(0.00012, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.00012, g0 * p[1]), t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.00012, t + p[2]);
+      osc.connect(g); out(g, o.pan || 0, 0.3);
+      osc.start(t); osc.stop(t + p[2] + 0.02);
+    });
+  }
+  /* 竿子動一下：木頭喀答 */
+  function clack(t, o){
+    var k = rnd(0.94, 1.07), g = o.gain === undefined ? 1 : o.gain;
+    grain(t, {f0:1200 * k, f1:700 * k, q:2, a:0.001, dur:0.02, gain:0.5 * g, pan:o.pan || 0, verb:0.1, pink:false});
+    thump(t, {f:190 * k, dur:0.03, gain:0.1 * g, pan:(o.pan || 0) * 0.5, verb:0.06});
+  }
+  /* 紙板落地：啪 */
+  function slap(t, o){
+    cardLand(t, {gain:(o.gain === undefined ? 1 : o.gain) * 0.9, soft:0, pan:o.pan || 0, verb:0.2});
+    thump(t + 0.002, {f:140, dur:0.05, gain:0.08, pan:(o.pan || 0) * 0.5, verb:0.08});
+  }
+  /* 幕拖過桿子：長長的布聲＋高頻的鐵環聲 */
+  function curtain(t, o){
+    var d = o.dur || 0.7;
+    sweep(t, {dur:d, gain:0.7, pan:0});
+    grain(t + 0.02, {f0:4200, f1:2600, q:0.7, a:d * 0.3, hold:d * 0.3, dur:d * 0.4, gain:0.09, pan:o.pan || 0, verb:0.2, sweep:d, pink:false});
+    for(var i = 0; i < 6; i++) grain(t + 0.05 + i * (d / 6) * rnd(0.9, 1.1), {f0:5200, f1:3600, q:3, a:0.001, dur:0.03, gain:0.08, pan:(o.pan || 0) + rnd(-0.2, 0.2), verb:0.25, pink:false});
+  }
+  /* 卡祖笛：鋸齒波過兩顆帶通（1.2k 與 2.4k 的嗡嗡），一點抖音 */
+  function kazoo(t, o){
+    var c = ctx(), dur = o.dur || 0.2;
+    var osc = c.createOscillator(); osc.type = "sawtooth"; osc.frequency.value = o.f;
+    var lfo = c.createOscillator(); lfo.frequency.value = 7; var lg = c.createGain(); lg.gain.value = o.f * 0.02;
+    lfo.connect(lg); lg.connect(osc.frequency);
+    var bp1 = c.createBiquadFilter(); bp1.type = "bandpass"; bp1.frequency.value = 1200; bp1.Q.value = 4;
+    var bp2 = c.createBiquadFilter(); bp2.type = "bandpass"; bp2.frequency.value = 2400; bp2.Q.value = 3;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.00012, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.03);
+    g.gain.setValueAtTime(o.gain, t + dur * 0.75);
+    g.gain.exponentialRampToValueAtTime(0.00012, t + dur);
+    osc.connect(bp1); osc.connect(bp2); bp1.connect(g); bp2.connect(g);
+    out(g, o.pan || 0, 0.3);
+    osc.start(t); lfo.start(t); osc.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02);
+  }
+  function hm(t, o){
+    rhodes(t, {f:N.A4, dur:0.4, gain:0.04, pan:o.pan || 0, verb:0.4, index:1.8, lp:3800});
+    rhodes(t + 0.11, {f:N.D5, dur:0.5, gain:0.045, pan:o.pan || 0, verb:0.45, index:2.0, lp:4200});
+  }
+
+  SFX.gag = function(B, rate, o){
+    if(!live()) return;
+    rate = rate || 1; o = o || {};
+    var t0 = now() + 0.03, p1 = o.pan1 || 0, p3 = o.pan3 || 0.35;
+    var T = function(name, plus){ return t0 + (B[name] + (plus || 0)) / rate; };
+    var i, s;
+    /* 幕拉開、八顆燈泡依序亮 */
+    curtain(T("curtain"), {dur:0.7});
+    for(i = 0; i < 8; i++) ting(T("curtain", 0.1 + i * 0.09), {f:2200 + i * 160, gain:0.05, pan:-0.4 + i * 0.115});
+    /* 竿子把偶舉上來：一格一喀 */
+    for(i = 0, s = B.rise; s < B.walk - 0.02; s += 0.09, i++) clack(t0 + s / rate, {pan:p3, gain:0.55});
+    /* 平移：喀答喀答，腿甩來甩去拍到自己（紙條聲） */
+    for(i = 0, s = B.walk; s < B.bump - 0.02; s += 0.11, i++){
+      clack(t0 + s / rate, {pan:p3, gain:0.6});
+      if(i % 2) grain(t0 + (s + 0.04) / rate, {f0:2200, f1:1300, q:1.1, a:0.001, dur:0.035, gain:0.16, pan:p3, verb:0.12});
+    }
+    /* 撞牌：紙板牌疊啪一聲倒，再彈回來 */
+    pack(T("bump"), {gain:0.8, pan:p3});
+    slap(T("bump", 0.02), {gain:0.9, pan:p3});
+    grain(T("bump", 0.2), {f0:1800, f1:900, q:0.8, a:0.01, dur:0.18, gain:0.12, pan:p3, verb:0.15});
+    clack(T("bump", 0.12), {pan:p3, gain:0.8});
+    /* 舉起飛過去：竿子喀答、空中的擺盪（紙條互相拍） */
+    for(i = 0, s = B.lift; s < B.land1 - 0.02; s += 0.13, i++){
+      clack(t0 + s / rate, {pan:p3 + (p1 - p3) * (s - B.lift) / (B.land1 - B.lift), gain:0.5});
+      grain(t0 + (s + 0.06) / rate, {f0:2400, f1:1400, q:1.2, a:0.001, dur:0.03, gain:0.12, pan:p1, verb:0.14});
+    }
+    slap(T("land1"), {gain:1.1, pan:p1});
+    clack(T("land1", 0.1), {pan:p1, gain:0.9});
+    /* 獎盃竿升上來、接過去 */
+    for(i = 0, s = B.cuprise; s < B.take - 0.02; s += 0.1, i++) clack(t0 + s / rate, {pan:p1 + 0.2, gain:0.45});
+    grain(T("take", 0.05), {f0:1500, f1:800, q:0.9, a:0.002, dur:0.05, gain:0.22, pan:p1, verb:0.12});
+    clack(T("take", 0.2), {pan:p1, gain:0.7});
+    /* 頒獎：卡祖笛小號角 F4–A4–C5，最後一顆拉長；獎盃到位，冠軍點頭 */
+    kazoo(T("present", 0.02), {f:N.F4, dur:0.18, gain:0.2, pan:p1});
+    kazoo(T("present", 0.2),  {f:N.A4, dur:0.18, gain:0.2, pan:p1});
+    kazoo(T("present", 0.38), {f:N.C5, dur:0.42, gain:0.22, pan:p1});
+    for(i = 0, s = B.present + 0.1; s < B.bow - 0.05; s += 0.12, i++) clack(t0 + s / rate, {pan:p1 - 0.1, gain:0.4});
+    slap(T("present", 0.62), {gain:0.5, pan:p1 - 0.2});
+    rhodes(T("present", 0.66), {f:N.C6, dur:0.25, gain:0.04, pan:p1, verb:0.35, index:1.6, lp:5000});
+    /* 鞠躬：木頭喀、喀、喀三下；起來兩下 */
+    clack(T("bow", 0.02), {pan:p1, gain:0.9}); clack(T("bow", 0.2), {pan:p1, gain:0.9}); clack(T("bow", 0.38), {pan:p1, gain:0.9});
+    clack(T("unbow", 0.02), {pan:p1, gain:0.7}); clack(T("unbow", 0.16), {pan:p1, gain:0.7});
+    /* 幕合上、偷看、幕再合、最後拉開 */
+    curtain(T("close"), {dur:0.7});
+    curtain(T("peek"), {dur:0.3});
+    hm(T("peek", 0.3), {pan:0});
+    clack(T("peek", 0.25), {pan:0, gain:0.5});
+    curtain(T("hide"), {dur:0.35});
+    curtain(T("reopen"), {dur:0.7});
+    rhodes(T("reopen", 0.5), {f:N.F3, dur:1.2, gain:0.04, pan:0, verb:0.5, index:1.2, lp:1400, mallet:false});
+  };
+})();
+</script>
+<script>
+/* ═══ 紙偶戲 ═════════════════════════════════════════════════════════════
+   一條 WAAPI 主時間軸，每個零件一條軌（幕、燈泡也是）。偶的每一段都用 steps()：一秒約 11 格。
+   位置從 DOM 量（牌疊頂、地板線、冠軍 .faces）。?direct 沒用（這一案不繞路）；?slow 慢動作；?t=節拍名+秒 停格。 */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const $ = function(id){ return document.getElementById(id); };
+  const stage = $("stage"), tom = $("tom"), cup = $("cup");
+  const p1 = document.querySelector(".stack.p1 .pile"), p3 = document.querySelector(".stack.p3 .pile");
+  if(!p1 || !p3) return;
+  const S = stage.getBoundingClientRect();
+  const R = function(el){ const r = el.getBoundingClientRect(); return {l:r.left - S.left, r:r.right - S.left, t:r.top - S.top, b:r.bottom - S.top, cx:(r.left + r.right) / 2 - S.left, cy:(r.top + r.bottom) / 2 - S.top}; };
+  const F = R($("floor")).t, P1 = R(p1), P3 = R(p3), W = S.width;
+  const faces = R(document.querySelector(".stack.p1 .faces"));
+  const k = parseFloat(getComputedStyle(tom).getPropertyValue("--k")) || 1;
+  const EO = "cubic-bezier(.16,1,.3,1)", EIO = "cubic-bezier(.77,0,.175,1)", LIN = "linear";
+  const st = function(d){ return "steps(" + Math.max(1, Math.round(d * 11)) + ", end)"; };   /* 偶的動作：一秒 11 格 */
+  const HEAD = 156 * k;                                 /* 頭頂（腳底算起） */
+  const SLOW = q.has("slow");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* 燈泡 */
+  const marq = $("marq"), bulbs = [];
+  for(let i = 0; i < 8; i++){ const b = document.createElement("i"); b.className = "bulb"; const g = document.createElement("i"); b.appendChild(g); marq.appendChild(b); bulbs.push(g); }
+
+  /* ── 站位 ── */
+  const x0 = Math.min(W - 60 * k, P3.r + 40 * k);        /* 上場：第三名右邊 */
+  const on3 = {x:P3.r + 10 * k, y:F};                     /* 撞牌前站的位置（地板上，貼著第三名） */
+  const on1 = {x:P1.r + 16 * k, y:F};                      /* 落在第一名旁邊的地板上（頭 150px，站上牌疊會頂到橫樑） */
+  const cupUp = {x:Math.min(on1.x + 92 * k, W - 26 * k), y:F - 70 * k};        /* 獎盃竿升到他手邊 */
+  const cupHead = {x:on1.x, y:on1.y - HEAD - 6 * k};       /* 舉過頭 */
+  const cupGiven = {x:Math.max(faces.l - 26 * k, 20 * k), y:faces.cy + 20 * k};
+  const peek = {x:W / 2, y:F - 30 * k};                    /* 偷看：頭在幕縫中間 */
+
+  /* ── 節拍表（秒） ── */
+  const B = {}; let t = 0;
+  const at = function(name, dur){ B[name] = t; t += dur; return B[name]; };
+  at("curtain", .9);     /* 幕拉開、燈泡依序亮 */
+  at("rise", .8);        /* 竿子把偶從舞台下舉上來 */
+  at("walk", .9);        /* 平移到第三名旁 */
+  at("bump", .3);        /* 撞牌 */
+  at("lift", 1.05);      /* 被竿子舉起飛過去 */
+  at("land1", .35);      /* 落在第一名旁 */
+  at("cuprise", .6);     /* 獎盃竿升上來 */
+  at("take", .4);        /* 接過去、舉過頭 */
+  at("present", .8);     /* 卡祖笛、遞給冠軍 */
+  at("bow", .55);        /* 從腰折 90°，三格 */
+  at("hold", .3);
+  at("unbow", .3);
+  at("close", .8);       /* 幕合上 */
+  at("peek", .4);        /* 幕開一小縫，探頭 */
+  at("look", .9);
+  at("hide", .45);       /* 幕合 */
+  at("reopen", .8);      /* 幕拉開，台上只剩排行榜 */
+  at("end", .2);
+  const TOTAL = t;
+  const off = function(s){ return Math.min(1, Math.max(0, s / TOTAL)); };
+
+  /* ── 軌 ── */
+  const tracks = {tx:[], ty:[], body:[], upper:[], legL:[], legR:[], armL:[], armR:[], head:[], cx:[], cy:[], cupr:[], tomo:[], cupo:[], cl:[], cr:[]};
+  bulbs.forEach(function(_, i){ tracks["b" + i] = []; });
+  const K = function(tr, s, tf, ease, extra){ const f = {offset:off(s), easing:ease || LIN}; if(tf != null) f.transform = tf; if(extra) Object.assign(f, extra); tracks[tr].push(f); };
+  const X = function(s, x, e){ K("tx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const Y = function(s, y, e){ K("ty", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const BODY = function(s, rot, e){ K("body", s, "rotate(" + rot + "deg)", e); };
+  const UP = function(s, rot, e){ K("upper", s, "rotate(" + rot + "deg)", e); };
+  const LEG = function(s, l, r, e){ K("legL", s, "rotate(" + l + "deg)", e); K("legR", s, "rotate(" + r + "deg)", e); };
+  const ARM = function(s, l, r, e){ K("armL", s, "rotate(" + l + "deg)", e); K("armR", s, "rotate(" + r + "deg)", e); };
+  const HEADR = function(s, d, e){ K("head", s, "rotate(" + d + "deg)", e); };
+  const CX = function(s, x, e){ K("cx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const CY = function(s, y, e){ K("cy", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const CUPR = function(s, d, e){ K("cupr", s, "rotate(" + d + "deg)", e); };
+  const CURT = function(s, l, r, e){ K("cl", s, "scaleX(" + l + ")", e); K("cr", s, "scaleX(" + r + ")", e); };
+  /* 掛在竿上的擺盪：一格一格換邊，幅度慢慢小 */
+  const sway = function(t0, t1, amp, period){
+    let i = 0;
+    for(let s = t0; s < t1 - 1e-6; s += period, i++){
+      const a = amp * Math.max(0, 1 - (s - t0) / (t1 - t0) * .7);
+      BODY(s, i % 2 ? a : -a, st(period));
+    }
+  };
+  /* 腿甩：紙條腿被甩來甩去 */
+  const dangle = function(t0, t1, amp, period){
+    let i = 0;
+    for(let s = t0; s < t1 - 1e-6; s += period, i++){ const a = i % 2 ? amp : -amp; LEG(s, a, a * .6, st(period)); }
+  };
+
+  /* ── 0 幕拉開、燈泡亮 ── */
+  CURT(0, 1, 1, EO); CURT(B.curtain + .75, .14, .14, LIN); CURT(B.close, .14, .14, EIO);
+  bulbs.forEach(function(_, i){ const s = B.curtain + .1 + i * .09; K("b" + i, 0, null, LIN, {opacity:0}); K("b" + i, s, null, "steps(1,end)", {opacity:0}); K("b" + i, s + .02, null, LIN, {opacity:1}); });
+  K("tomo", 0, null, LIN, {opacity:1}); K("cupo", 0, null, LIN, {opacity:1});
+  /* 偶一開始在舞台底下 */
+  X(0, x0, LIN); Y(0, F + HEAD + 40 * k, LIN); Y(B.rise, F + HEAD + 40 * k, st(.8)); Y(B.walk, F, LIN);
+  ARM(0, 14, -14, LIN); LEG(0, 4, -4, LIN); HEADR(0, 0, LIN); UP(0, 0, LIN); BODY(0, 0, LIN); CUPR(0, 0, LIN);
+  /* ── 1 舉上來：直挺挺，微微擺 ── */
+  sway(B.rise, B.walk, 5, .18);
+  /* ── 2 平移到第三名旁：一格一格，腿甩 ── */
+  X(B.walk, x0, st(.85)); X(B.bump, on3.x, LIN);
+  Y(B.walk, F, st(.85)); Y(B.bump, F, LIN);
+  dangle(B.walk, B.bump, 22, .11);
+  sway(B.walk, B.bump, 7, .22);
+  /* ── 3 撞牌：撞進去一格，反彈回來 ── */
+  X(B.bump, on3.x, st(.1)); X(B.bump + .1, on3.x - 14 * k, st(.1)); X(B.bump + .2, on3.x + 8 * k, LIN); X(B.lift, on3.x + 8 * k, LIN);
+  BODY(B.bump, 0, st(.1)); BODY(B.bump + .1, -16, st(.1)); BODY(B.bump + .2, 12, st(.1)); BODY(B.lift, 0, LIN);
+  HEADR(B.bump, 0, st(.1)); HEADR(B.bump + .1, -22, st(.2)); HEADR(B.lift, 0, LIN);
+  ARM(B.bump, 14, -14, st(.1)); ARM(B.bump + .1, 120, -120, st(.2)); ARM(B.lift, 30, -30, LIN);
+  LEG(B.bump, 0, 0, st(.1)); LEG(B.bump + .1, -30, 30, st(.2)); LEG(B.lift, 6, -6, LIN);
+  /* ── 4 舉起飛過去：竿子抬高、擺盪著移動、落在第一名 ── */
+  const apex = P3.t - 30 * k;                              /* 舉起來越過第三名那疊 */
+  X(B.lift, on3.x + 8 * k, st(1.05)); X(B.land1, on1.x, LIN);
+  Y(B.lift, F, st(.35)); Y(B.lift + .35, apex, st(.4)); Y(B.lift + .75, apex, st(.3)); Y(B.land1, on1.y - 12 * k, st(.12)); Y(B.land1 + .12, on1.y, LIN);
+  sway(B.lift, B.land1, 10, .16);
+  dangle(B.lift, B.land1, 26, .13);
+  ARM(B.lift, 30, -30, st(1.05)); ARM(B.land1, 40, -40, LIN);
+  /* 落地：腿張開再收 */
+  LEG(B.land1, 34, -34, st(.15)); LEG(B.land1 + .15, 6, -6, LIN);
+  BODY(B.land1, 6, st(.15)); BODY(B.land1 + .15, 0, LIN);
+  X(B.land1, on1.x, LIN); Y(B.land1 + .12, on1.y, LIN);
+  /* ── 5 獎盃竿從舞台底下升上來到他手邊；他伸手接、舉過頭 ── */
+  CX(0, cupUp.x, LIN); CY(0, F + 60 * k, LIN); CY(B.cuprise, F + 60 * k, st(.55)); CY(B.take, cupUp.y, LIN);
+  CX(B.cuprise, cupUp.x, LIN);
+  HEADR(B.cuprise, 0, st(.2)); HEADR(B.cuprise + .2, 18, st(.35)); HEADR(B.take, 18, LIN);
+  ARM(B.cuprise + .3, 40, -40, st(.25)); ARM(B.take, 40, -100, st(.2));
+  ARM(B.take + .2, 165, -165, st(.2)); ARM(B.present, 165, -165, LIN);
+  CX(B.take, cupUp.x, st(.4)); CX(B.take + .4, cupHead.x, LIN);
+  CY(B.take, cupUp.y, st(.4)); CY(B.take + .4, cupHead.y, LIN);
+  HEADR(B.take + .2, 0, LIN);
+  /* ── 6 頒獎：獎盃竿伸到冠軍頭像旁；他手一直舉著 ── */
+  CX(B.present + .1, cupHead.x, st(.5)); CX(B.present + .6, cupGiven.x, LIN);
+  CY(B.present + .1, cupHead.y, st(.5)); CY(B.present + .6, cupGiven.y, LIN);
+  CUPR(B.present + .1, 0, st(.25)); CUPR(B.present + .35, -14, st(.25)); CUPR(B.present + .6, 0, LIN);
+  ARM(B.present + .4, 120, -160, st(.3)); ARM(B.bow, 40, -40, LIN);
+  /* ── 7 鞠躬：從腰折 90°，三格；起來兩格 ── */
+  UP(B.bow, 0, "steps(3,end)"); UP(B.bow + .45, -90, LIN); UP(B.hold, -90, LIN); UP(B.unbow, -90, "steps(2,end)"); UP(B.unbow + .28, 0, LIN);
+  ARM(B.bow, 40, -40, "steps(3,end)"); ARM(B.bow + .45, 80, -60, LIN); ARM(B.unbow, 80, -60, "steps(2,end)"); ARM(B.unbow + .28, 14, -14, LIN);
+  /* ── 8 幕合上；他趁黑移到中間、頭在幕縫的高度 ── */
+  CURT(B.close + .7, 1, 1, LIN); CURT(B.peek, 1, 1, EO); CURT(B.peek + .35, .74, .74, LIN);
+  X(B.close + .5, on1.x, LIN); X(B.close + .55, peek.x, LIN); Y(B.close + .5, on1.y, LIN); Y(B.close + .55, peek.y, LIN);
+  UP(B.close + .55, 0, LIN); HEADR(B.close + .55, 0, LIN); BODY(B.close + .55, 0, LIN);
+  /* 探頭：頭左右看兩下 */
+  HEADR(B.peek + .35, 0, st(.2)); HEADR(B.look, -16, st(.3)); HEADR(B.look + .3, 14, st(.3)); HEADR(B.look + .6, 0, LIN);
+  BODY(B.peek, 0, st(.35)); BODY(B.peek + .35, -4, LIN);
+  /* 幕合，他退回舞台底下；幕再拉開，台上只剩排行榜 */
+  CURT(B.look + .85, .74, .74, EIO); CURT(B.hide + .4, 1, 1, LIN); CURT(B.reopen, 1, 1, EO); CURT(B.reopen + .75, .14, .14, LIN);
+  Y(B.hide + .3, peek.y, LIN); Y(B.hide + .35, F + HEAD + 40 * k, LIN);
+  K("tomo", B.hide + .4, null, LIN, {opacity:1}); K("tomo", B.hide + .42, null, LIN, {opacity:0});
+  CX(B.reopen, cupGiven.x, LIN); CY(B.reopen, cupGiven.y, LIN);
+
+  /* ── 收尾：每一軌補上 offset 0／1 ── */
+  const parts = {tx:tom, ty:$("ty"), body:$("body"), upper:$("upper"), legL:$("legL"), legR:$("legR"), armL:$("armL"), armR:$("armR"), head:$("head"),
+                 cx:cup, cy:$("cupy"), cupr:cup.querySelector("svg"), tomo:tom, cupo:cup, cl:$("curtL"), cr:$("curtR")};
+  bulbs.forEach(function(b, i){ parts["b" + i] = b; });
+  const anims = [];
+  Object.keys(tracks).forEach(function(name){
+    let fr = tracks[name];
+    fr.sort(function(a, b){ return a.offset - b.offset; });
+    fr = fr.filter(function(f, i){ return !(i + 1 < fr.length && Math.abs(fr[i + 1].offset - f.offset) < 1e-6); });
+    if(fr.length && fr[fr.length - 1].offset < 1) fr.push(Object.assign({}, fr[fr.length - 1], {offset:1}));
+    if(fr.length && fr[0].offset > 0) fr.unshift(Object.assign({}, fr[0], {offset:0}));
+    if(!fr.length) return;
+    anims.push({el:parts[name], fr:fr});
+  });
+
+  /* 撞牌：頂牌整張倒下去 20° 再彈回 */
+  const topCard = p3.querySelector(".cd.face");
+  const knock = function(){
+    p3.animate([{transform:"rotate(0)"}, {transform:"rotate(-3deg)", offset:.3}, {transform:"rotate(1.5deg)", offset:.65}, {transform:"rotate(0)"}], {duration:520, easing:EO});
+    if(topCard) topCard.animate([{transform:"rotate(0)"}, {transform:"rotate(-20deg) translateX(-8px)", offset:.25, easing:"steps(2,end)"}, {transform:"rotate(-20deg) translateX(-8px)", offset:.45}, {transform:"rotate(4deg)", offset:.75}, {transform:"rotate(0)"}], {duration:640, easing:EO});
+  };
+  const winnerNod = function(){
+    document.querySelectorAll(".stack.p1 .faces").forEach(function(f){
+      f.animate([{transform:"none"}, {transform:"translateY(-7px) rotate(-9deg) scale(1.12)", offset:.38}, {transform:"none"}], {duration:620, easing:EO});
+    });
+  };
+
+  const start = (window.DEAL_END || 1.4) + .1;    /* 牌一發完就拉幕 */
+  if(reduce){
+    /* 不演：幕開著、他站在第一名旁、獎盃在冠軍旁邊，淡進來 */
+    tom.classList.add("still"); cup.classList.add("still");
+    $("curtL").style.transform = "scaleX(.14)"; $("curtR").style.transform = "scaleX(.14)";
+    bulbs.forEach(function(b){ b.style.opacity = 1; });
+    tom.style.transform = "translateX(" + on1.x + "px)"; $("ty").style.transform = "translateY(" + on1.y + "px)";
+    $("armL").style.transform = "rotate(20deg)"; $("armR").style.transform = "rotate(-20deg)";
+    cup.style.transform = "translateX(" + cupGiven.x + "px)"; $("cupy").style.transform = "translateY(" + cupGiven.y + "px)";
+    setTimeout(function(){ tom.style.opacity = 1; cup.style.opacity = 1; }, start * 1000);
+    return;
+  }
+  const rate = SLOW ? .35 : 1, A = [], timers = [];
+  const seekTo = (function(){ if(!q.has("t")) return NaN; const raw = q.get("t").replace(" ", "+"), m = /^([a-z0-9]+)([+-][\d.]+)?$/.exec(raw); if(m && B[m[1]] != null) return B[m[1]] + parseFloat(m[2] || 0); return parseFloat(raw); })();
+  const seek = function(sec){ A.forEach(function(an){ an.pause(); an.currentTime = Math.max(0, Math.min(TOTAL, sec)) * 1000; }); };
+  const pan = function(x){ return Math.max(-.5, Math.min(.5, (x - W / 2) / W)); };
+  const run = function(){
+    A.forEach(function(an){ an.cancel(); }); A.length = 0;
+    timers.forEach(clearTimeout); timers.length = 0;
+    const dur = TOTAL * 1000;
+    anims.forEach(function(a){ const an = a.el.animate(a.fr, {duration:dur, fill:"forwards"}); an.playbackRate = rate; A.push(an); });
+    if(!isNaN(seekTo)){ seek(seekTo); return; }
+    if(window.SFX && SFX.gag) SFX.gag(B, rate, {pan1:pan(P1.cx), pan3:pan(P3.cx)});
+    const at = function(sec, fn){ timers.push(setTimeout(fn, sec * 1000 / rate)); };
+    at(B.bump + .1, knock);
+    at(B.present + .6, winnerNod);
+  };
+  setTimeout(run, isNaN(seekTo) ? start * 1000 : 0);
+  if(window.SFX && isNaN(seekTo)){ SFX.over(true); SFX.deal(13, (window.DEAL_END || 1.4) - .38, .05); }
+  window.TOM = {B:B, TOTAL:TOTAL, seek:seek, A:A, run:run};
+
+  const dev = $("dev");
+  if(dev && !q.has("nodev")){
+    const mk = function(label, key, on){
+      const b = document.createElement("button"); b.textContent = label; b.setAttribute("aria-pressed", on);
+      b.onclick = function(){ const u = new URL(location.href); if(u.searchParams.has(key)) u.searchParams.delete(key); else u.searchParams.set(key, ""); location.href = u.pathname + (u.search ? u.search.replace(/=(&|$)/g, "$1") : ""); };
+      return b;
+    };
+    const sep = document.createElement("i"); dev.appendChild(sep);
+    dev.appendChild(mk("慢動作", "slow", SLOW));
+    const rp = document.createElement("button"); rp.textContent = "重播頒獎（有聲）"; rp.onclick = run; dev.appendChild(rp);
+    const sep2 = document.createElement("i"); dev.appendChild(sep2);
+    const rg = document.createElement("input"); rg.type = "range"; rg.min = 0; rg.max = TOTAL.toFixed(2); rg.step = .01; rg.value = 0; rg.style.width = "160px"; rg.title = "時間軸";
+    rg.oninput = function(){ seek(parseFloat(rg.value)); };
+    const play = document.createElement("button"); play.textContent = "播";
+    play.onclick = function(){ A.forEach(function(an){ an.play(); }); };
+    dev.appendChild(rg); dev.appendChild(play);
+    const tick = function(){ if(A.length && A[0].playState === "running") rg.value = (A[0].currentTime / 1000).toFixed(2); requestAnimationFrame(tick); }; tick();
+  }
+})();
+</script>

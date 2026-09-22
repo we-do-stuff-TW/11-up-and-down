@@ -1,0 +1,552 @@
+/* TITLE: H 巨獸 · 比講台還大 */
+/* ── H 案：E 牌疊 ＋ 巨獸登陸。Thomas 的頭比整座講台還大，從舞台底邊浮出來，一腳踩扁第三名那疊，跨兩步到第一名。
+   Thomas 的大頭照長出細細的手腳，從第三名那疊爬到第一名，把獎盃頒出去 ──
+   牌疊那一段跟 e.def 一字不差（E 已定案、已上線）；多的是底下「頒獎」那一節：一個角色、一只獎盃、
+   一條 WAAPI 主時間軸。角色只用 transform／opacity，x 與 y 拆兩層，跳起來才是真的拋物線。 */
+.stacks{display:flex;align-items:flex-end;justify-content:center;gap:26px;height:310px;padding-top:100px}
+.stack{position:relative;width:110px;flex:none;display:flex;flex-direction:column;align-items:center}
+.stack .who{margin-bottom:12px}
+.pile{position:relative;width:110px;height:calc(154px + var(--n) * 7px);transform-origin:50% 100%}
+.cd{position:absolute;left:0;bottom:calc(var(--i) * 7px);width:110px;height:154px;border-radius:9px;
+  rotate:var(--rz);opacity:0;transform:translate(70px,-110px) rotate(9deg);
+  animation:deal .46s var(--e-out) forwards;animation-delay:var(--d);
+  background:
+    repeating-linear-gradient(45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
+    repeating-linear-gradient(-45deg,oklch(1 0 0/.06) 0 1px,transparent 1px 9px),
+    linear-gradient(160deg in oklab,#8E2228,#5E1418);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.35),inset 0 0 0 5px #F1E9D6,inset 0 0 0 6px rgba(0,0,0,.18),
+    0 1px 0 rgba(0,0,0,.55),0 3px 6px rgba(0,0,0,.35)}
+@keyframes deal{to{opacity:1;transform:none}}
+.cd.face{display:grid;place-items:center;
+  background:linear-gradient(158deg in oklab,#FDFAF3,var(--stock) 46%,var(--stock-2));color:var(--stock-ink);
+  box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),0 6px 14px rgba(0,0,0,.35)}
+.cd.face::before{content:"";position:absolute;inset:5px;border-radius:6px;border:.5px solid var(--foil);opacity:.45}
+.cd.face .num{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:54px;line-height:1;
+  font-variation-settings:"opsz" 6;color:var(--stock-ink-2)}
+.cd.face .ix{position:absolute;left:9px;top:7px;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:16px;
+  font-variation-settings:"opsz" 6;color:var(--stock-ink-3)}
+.cd.face .ix.b{left:auto;right:9px;top:auto;bottom:7px;rotate:180deg}
+.stack.p1 .cd.face .num,.stack.p1 .cd.face .ix{color:var(--foil)}
+.stack.p1 .cd.face{box-shadow:inset 0 0 0 1px rgba(26,23,20,.16),inset 0 1px 0 rgba(255,255,255,.9),0 1px 0 rgba(0,0,0,.5),
+  0 6px 14px rgba(0,0,0,.35),0 0 60px oklch(.845 .128 84/.14)}
+.floor{width:min(560px,100%);height:1px;background:var(--hair);margin:0 auto}
+@media (prefers-reduced-motion:reduce){.cd{transform:none;animation:fadeIn .2s ease both}}
+@media (max-width:760px){
+  .stacks{gap:12px;height:250px;padding-top:88px}
+  .stack,.pile,.cd{width:88px}
+  .pile{height:calc(123px + var(--n) * 6px)}
+  .cd{height:123px;bottom:calc(var(--i) * 6px)}
+  .cd.face .num{font-size:42px}
+}
+
+
+/* ── 巨獸登陸 ──────────────────────────────────────────────────────────
+   舞台就是 .stage：地板那條線是它的底邊，底邊以下切掉（上／左／右放 400px 不切）。
+   頭頂一道聚光燈的光錐（::before，conic-gradient），地板一圈光；整頁一層暗角（.hvig），他浮出來時收緊一下。 */
+.stage{position:relative;isolation:isolate;clip-path:inset(-400px -400px 0 -400px)}
+.stage::before{content:"";position:absolute;left:-40px;right:-40px;top:-300px;bottom:0;z-index:-2;pointer-events:none;
+  background:
+    conic-gradient(from 180deg at 50% 0%, transparent 0 158deg, oklch(.96 .03 88/.045) 168deg, oklch(.96 .03 88/.085) 180deg, oklch(.96 .03 88/.045) 192deg, transparent 202deg),
+    radial-gradient(ellipse 46% 9% at 50% 100%, oklch(.9 .06 85/.14), transparent 70%);
+  opacity:0;animation:hspot 1.2s var(--e-out) both 1.9s}
+@keyframes hspot{to{opacity:1}}
+.hvig{position:fixed;inset:0;z-index:5;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse 48% 44% at 50% 46%, transparent 28%, rgba(6,5,8,.82) 100%)}
+/* 角色：.tom 管 x、.ty 管 y、.body 管站姿（scale 縫在這裡，原點腳底）。
+   比例是重點：頭 180（×1.4 ＝ 螢幕 252px，三疊牌加起來才 380 寬），腿 34、手臂 130——手臂比腿長四倍，站著會拖到地上。 */
+.tom{position:absolute;left:0;top:0;width:0;height:0;z-index:2;--k:1.4;pointer-events:none;opacity:0;will-change:transform}
+.ty{position:absolute;left:0;top:0;width:0;height:0}
+.body{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;scale:var(--k)}
+.limb{position:absolute;width:1.6px;border-radius:1px;background:var(--ink);opacity:.9;transform-origin:50% 0;
+  box-shadow:0 0 0 .7px rgba(20,16,12,.55)}
+.leg{left:-.8px;top:-34px;height:34px}
+.leg.l{left:-4px}.leg.r{left:2.4px}
+.torso{position:absolute;left:-.8px;top:-54px;width:1.6px;height:21px;border-radius:1px;background:var(--ink);opacity:.9;
+  box-shadow:0 0 0 .7px rgba(20,16,12,.55)}
+.arm{top:-53px;height:130px}
+.arm.l{left:-6.5px}.arm.r{left:5px}
+.head{position:absolute;left:-90px;top:-234px;width:180px;height:180px;border-radius:99px;overflow:hidden;
+  transform-origin:50% 100%;
+  box-shadow:0 0 0 1px var(--hair),0 6px 22px rgba(0,0,0,.5),0 30px 60px rgba(0,0,0,.35)}
+.head img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 42%}
+/* 眼冒金星：三顆銅色小星在頭頂繞圈 */
+.stars{position:absolute;left:0;top:-250px;width:0;height:0;opacity:0;transform-origin:0 0}
+.stars i{position:absolute;left:-7px;top:-7px;width:14px;height:14px;color:var(--brass);
+  background:currentColor;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%)}
+.stars i:nth-child(1){transform:translate(-46px,0)}
+.stars i:nth-child(2){transform:translate(23px,-40px) scale(.8)}
+.stars i:nth-child(3){transform:translate(23px,40px) scale(.7)}
+/* 獎盃：跟他比起來小得可笑（不跟著 --k 放大） */
+.cup{position:absolute;left:0;top:0;width:0;height:0;z-index:3;--k:1;pointer-events:none;opacity:0;will-change:transform}
+.cupy{position:absolute;left:0;top:0;width:0;height:0}
+.cup svg{position:absolute;left:-18px;top:-40px;width:36px;height:40px;overflow:visible;transform-origin:50% 100%;scale:var(--k);
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+@media (max-width:760px){.tom{--k:.9}.cup{--k:.8}}
+.tom.still,.cup.still{transition:opacity .3s ease}
+@media (prefers-reduced-motion:reduce){.stage::before{animation:none;opacity:1}}
+/*==HTML==*/
+    <div class="stage" id="stage">
+      <div class="stacks" id="stacks"></div>
+      <div class="floor" id="floor"></div>
+      <div class="tom" id="tom" aria-hidden="true"><div class="ty" id="ty"><div class="body" id="body">
+        <i class="limb leg l" id="legL"></i><i class="limb leg r" id="legR"></i>
+        <i class="torso"></i>
+        <i class="limb arm l" id="armL"></i><i class="limb arm r" id="armR"></i>
+        <div class="head" id="head"><img src="_tom.jpg" alt=""></div>
+        <div class="stars" id="stars"><i></i><i></i><i></i></div>
+      </div></div></div>
+      <div class="cup" id="cup" aria-hidden="true"><div class="cupy" id="cupy">
+        <svg viewBox="0 0 36 40" fill="none" stroke="var(--brass)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 3h18v10a9 9 0 0 1-18 0z" fill="oklch(.845 .128 84/.16)"/>
+          <path d="M9 6H4.5a1.5 1.5 0 0 0-1.5 1.5C3 12 6 15.5 10.5 16"/>
+          <path d="M27 6h4.5a1.5 1.5 0 0 1 1.5 1.5c0 4.5-3 8-7.5 8.5"/>
+          <path d="M18 22v5"/><path d="M14 27h8"/>
+          <path d="M12 30h12l3 8H9z" fill="oklch(.845 .128 84/.16)"/>
+        </svg>
+      </div></div>
+    </div>
+    <div class="hvig" id="hvig" aria-hidden="true"></div>
+<script>
+(function(){
+  const who = function(t){ return '<div class="who" style="--dw:' + t.dw + '"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div><span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span><span class="sc">' + sc(t.sc) + '</span></div>'; };
+  const T = END.tiers, order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  const N = {1:7, 2:4, 3:2}, sizes = T.map(function(t, i){ return N[i + 1] || 2; });
+  const delays = T.map(function(){ return []; });
+  let clock = 0, more = true;
+  while(more){
+    more = false;
+    for(let i = T.length - 1; i >= 0; i--){
+      if(delays[i].length < sizes[i]){ delays[i].push(clock); clock += 75; more = true; }
+    }
+  }
+  const wob = [-1.6, 1.1, -.7, 1.8, -1.2, .6, -1.9, 1.4];
+  document.getElementById("stacks").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1, n = sizes[k - 1], ds = delays[k - 1];
+    t.dw = ((ds[ds.length - 1] + 380) / 1000).toFixed(2) + "s";
+    let cards = "";
+    for(let i = 0; i < n; i++){
+      const last = i === n - 1;
+      cards += '<div class="cd' + (last ? " face" : "") + '" style="--i:' + i + ';--d:' + (ds[i] / 1000).toFixed(2) + 's;--rz:' + wob[i % wob.length] + 'deg">' +
+        (last ? '<span class="ix">' + t.pos + '</span><span class="ix b">' + t.pos + '</span><span class="num">' + t.pos + '</span>' : "") + '</div>';
+    }
+    return '<div class="stack p' + k + '">' + who(t) + '<div class="pile" style="--n:' + (n - 1) + '">' + cards + '</div></div>';
+  }).join("");
+  window.DEAL_END = clock / 1000 + .38;   /* 最後一張落定、名字亮起 */
+})();
+</script>
+<script>
+/*==SFX==*/
+</script>
+<script>
+/* ═══ 巨獸的聲音 ══════════════════════════════════════════════════════
+   同一間房，但一切都放大：每一步是 45–60Hz 的地板在響＋一疊牌被踩扁，玻璃在架子上震；
+   浮出來是一聲從地底上來的低吼（三顆 rhodes 疊成一團）；撞到頭是木頭的「咚」加三顆小星星在叮；
+   倒下去是滑笛，落地是全頁最大的一聲，再一下餘震。 */
+(function(){
+  if(!window.SFX || !SFX._prim) return;
+  var P = SFX._prim, grain = P.grain, thump = P.thump, rhodes = P.rhodes, cardLand = P.cardLand, pack = P.pack, sweep = P.sweep,
+      out = P.out, now = P.now, live = P.live, rnd = P.rnd, N = P.N, ctx = P.ctx;
+  /* 滑笛：三角波，音高滑一段，一點抖音，低通壓暗。卡通裡「掉下去」就是這一聲。 */
+  function whistle(t, o){
+    var c = ctx(), dur = o.dur || 0.4;
+    var osc = c.createOscillator(); osc.type = "triangle";
+    osc.frequency.setValueAtTime(o.f0, t);
+    osc.frequency.exponentialRampToValueAtTime(o.f1, t + dur);
+    var lfo = c.createOscillator(); lfo.frequency.value = 6.5;
+    var lg = c.createGain(); lg.gain.value = o.f0 * 0.012;
+    lfo.connect(lg); lg.connect(osc.frequency);
+    var lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = o.lp || 2400; lp.Q.value = 0.7;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.00012, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.03);
+    g.gain.setValueAtTime(o.gain, t + dur * 0.8);
+    g.gain.exponentialRampToValueAtTime(0.00012, t + dur);
+    osc.connect(lp); lp.connect(g); out(g, o.pan || 0, o.verb === undefined ? 0.25 : o.verb);
+    osc.start(t); lfo.start(t); osc.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02);
+  }
+  /* 橡皮筋彈回來：音高被一個快速衰減的 LFO 甩來甩去 */
+  function boing(t, o){
+    var c = ctx(), dur = o.dur || 0.38, f = o.f || 250;
+    var osc = c.createOscillator(); osc.type = "triangle"; osc.frequency.value = f;
+    var lfo = c.createOscillator(); lfo.frequency.value = o.rate || 11;
+    var lg = c.createGain();
+    lg.gain.setValueAtTime(f * 0.5, t);
+    lg.gain.exponentialRampToValueAtTime(f * 0.01, t + dur);
+    lfo.connect(lg); lg.connect(osc.frequency);
+    var lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2600; lp.Q.value = 0.8;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.00012, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.00012, t + dur);
+    osc.connect(lp); lp.connect(g); out(g, o.pan || 0, 0.2);
+    osc.start(t); lfo.start(t); osc.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02);
+  }
+  /* 小銅獎盃的「叮」：三個不成整數比的正弦（鐘的做法），很短 */
+  function ting(t, o){
+    var c = ctx(), f = (o.f || 1900) * rnd(0.97, 1.03), g0 = o.gain || 0.15;
+    [[1, 1, 0.42], [2.76, 0.45, 0.28], [5.4, 0.18, 0.14]].forEach(function(p){
+      var osc = c.createOscillator(); osc.type = "sine"; osc.frequency.value = f * p[0];
+      var g = c.createGain();
+      g.gain.setValueAtTime(0.00012, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.00012, g0 * p[1]), t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.00012, t + p[2]);
+      osc.connect(g); out(g, o.pan || 0, 0.3);
+      osc.start(t); osc.stop(t + p[2] + 0.02);
+    });
+    grain(t, {f0:6000, f1:3500, q:1.2, a:0.0006, dur:0.012, gain:g0 * 0.5, pan:o.pan || 0, verb:0.1, pink:false});
+  }
+  /* 一步。地板是木頭、牌疊是紙——站在牌上時多一層紙的啪 */
+  function step(t, o){
+    var k = (o.k || 1) * rnd(0.95, 1.06), g = o.gain === undefined ? 1 : o.gain, pan = o.pan || 0;
+    grain(t, {f0:1000 * k, f1:600 * k, q:1.3, a:0.001, dur:0.026, gain:0.4 * g, pan:pan, verb:0.1, pink:false, hp:300, lp:o.lp});
+    grain(t, {f0:600 * k, f1:400 * k, q:0.8, a:0.002, dur:0.04, gain:0.14 * g, pan:pan, verb:0.12, lp:o.lp});
+    if(o.paper) grain(t + 0.001, {f0:1500 * k, f1:800 * k, q:0.9, a:0.0015, dur:0.04, gain:0.2 * g, pan:pan, verb:0.14});
+    if(!o.air) thump(t + 0.001, {f:150 * k, dur:0.036, gain:0.08 * g, pan:pan * 0.5, verb:0.06});
+  }
+  function whoosh(t, o){
+    grain(t, {f0:o.up === false ? 1800 : 400, f1:o.up === false ? 450 : 1900, q:0.55, a:(o.dur || 0.3) * 0.5, dur:(o.dur || 0.3) * 0.5,
+              gain:o.gain || 0.17, pan:o.pan || 0, verb:0.15, sweep:o.dur || 0.3});
+  }
+  /* 牌疊晃一下：紙在蹭 */
+  function rustle(t, o){
+    grain(t, {f0:1900, f1:900, q:0.8, a:0.01, dur:0.22, gain:o.gain || 0.11, pan:o.pan || 0, verb:0.16});
+    grain(t + 0.03, {f0:3200, f1:1800, q:1.1, a:0.005, dur:0.12, gain:(o.gain || 0.11) * 0.5, pan:o.pan || 0, verb:0.1, pink:false});
+  }
+  /* 「嗯？」：兩顆 rhodes 往上走四度；o.down 就是「喔。」往下 */
+  function hm(t, o){
+    var a = o.down ? N.D5 : N.A4, b = o.down ? N.A4 : N.D5;
+    rhodes(t, {f:a, dur:0.45, gain:0.05, pan:o.pan || 0, verb:0.4, index:1.8, lp:3800});
+    rhodes(t + 0.11, {f:b, dur:0.6, gain:0.055, pan:o.pan || 0, verb:0.45, index:2.0, lp:4200});
+  }
+
+  /* B 是節拍表（秒，相對開演），rate 是 playbackRate，o.pan1／pan2／pan3 是三疊牌的左右位置 */
+
+  /* 一腳踩下去：地板、牌疊、幾張牌散開、架上的玻璃 */
+  function stomp(t, o){
+    var g = o.gain === undefined ? 1 : o.gain, pan = o.pan || 0;
+    thump(t, {f:52 * rnd(.95, 1.05), dur:0.28, gain:0.28 * g, pan:pan * 0.3, verb:0.2, bend:0.5});
+    thump(t + 0.01, {f:96, dur:0.09, gain:0.1 * g, pan:pan * 0.5, verb:0.1});
+    pack(t + 0.004, {gain:0.95 * g, pan:pan, verb:0.25});
+    if(o.cards !== false){
+      cardLand(t + 0.05, {gain:0.5 * g, soft:0.6, pan:pan + 0.15, verb:0.3});
+      cardLand(t + 0.11, {gain:0.42 * g, soft:0.8, pan:pan - 0.12, verb:0.3});
+      cardLand(t + 0.19, {gain:0.3 * g, soft:0.9, pan:pan + 0.05, verb:0.35});
+    }
+    rattle(t + 0.03, {gain:0.7 * g, pan:-pan * 0.6});
+  }
+  /* 玻璃在架上震：幾下很短、Q 很高的高頻 */
+  function rattle(t, o){
+    var g = o.gain === undefined ? 1 : o.gain;
+    for(var i = 0; i < 5; i++)
+      grain(t + i * 0.027 + rnd(-0.004, 0.004), {f0:rnd(4600, 6200), q:14, a:0.0006, dur:0.03, gain:(0.12 - i * 0.018) * g, pan:(o.pan || 0) + rnd(-0.1, 0.1), verb:0.35, pink:false});
+  }
+  /* 低吼：地底上來的隆隆＋三顆 rhodes 疊成一團、慢慢起 */
+  function roar(t, o){
+    var pan = o.pan || 0;
+    grain(t, {f0:55, f1:140, q:0.6, a:0.7, hold:0.5, dur:0.6, gain:0.55, pan:pan, verb:0.4, sweep:1.2, lp:320});
+    thump(t + 0.05, {f:36, dur:1.4, gain:0.22, pan:pan * 0.3, verb:0.3, bend:1.6});
+    [[N.F2, 0.35, -0.1], [N.Bb2, 0.42, 0.1], [N.C3, 0.5, 0]].forEach(function(n, i){
+      rhodes(t + n[1], {f:n[0], dur:1.5, gain:0.06, pan:n[2], verb:0.5, index:3.2, bark:0.5, lp:700, mallet:false});
+      rhodes(t + n[1] + 0.25, {f:n[0] * 1.012, dur:1.2, gain:0.045, pan:-n[2], verb:0.5, index:2.6, bark:0.4, lp:650, mallet:false});
+    });
+  }
+  /* 木頭的「咚」：撞到頭 */
+  function bonk(t, o){
+    var pan = o.pan || 0;
+    thump(t, {f:92, dur:0.13, gain:0.26, pan:pan * 0.5, verb:0.15, bend:0.7});
+    rhodes(t, {f:N.C3, dur:0.55, gain:0.13, pan:pan, verb:0.3, index:3.6, bark:0.03, lp:1500});
+    grain(t, {f0:1300, f1:600, q:1.1, a:0.001, dur:0.06, gain:0.45, pan:pan, verb:0.2});
+    cardLand(t + 0.03, {gain:0.5, soft:0.5, pan:pan, verb:0.25});
+  }
+  /* 眼冒金星：三顆很短的高音繞兩圈 */
+  function twinkle(t, o){
+    var ns = [N.C6, N.E5, N.A5, N.C6, N.A5, N.E5];
+    for(var i = 0; i < ns.length; i++)
+      rhodes(t + i * 0.11, {f:ns[i], dur:0.2, gain:0.045, pan:(o.pan || 0) + (i % 2 ? 0.2 : -0.2), verb:0.45, index:1.6, lp:6000});
+  }
+
+  SFX.gag = function(B, rate, o){
+    if(!live()) return;
+    rate = rate || 1; o = o || {};
+    var t0 = now() + 0.03, p1 = o.pan1 || 0, p3 = o.pan3 || 0.35;
+    var T = function(name, plus){ return t0 + (B[name] + (plus || 0)) / rate; };
+    /* 浮出：低吼；升到一半整頁震一下 */
+    roar(T("rise", 0.05), {pan:p3});
+    thump(T("rise", 0.9), {f:44, dur:0.4, gain:0.16, pan:0, verb:0.3, bend:0.6});
+    rattle(T("rise", 0.95), {gain:0.6, pan:-p3});
+    /* 抬頭看一眼：脖子的吱一聲（很小） */
+    grain(T("look", 0.05), {f0:420, f1:260, q:3, a:0.02, dur:0.22, gain:0.2, pan:p3, verb:0.15, pink:false});
+    /* 一腳踩上第三名：牌疊被踩扁 */
+    whoosh_(T("step3", 0.05), {pan:p3});
+    stomp(T("squash"), {pan:p3, gain:1});
+    /* 跨到第一名 */
+    whoosh_(T("step1", 0.05), {pan:(p3 + p1) / 2, dur:0.4});
+    stomp(T("land"), {pan:p1, gain:1.05});
+    /* 側身、瞄準：三下小小的嘎吱，獎盃到位叮一聲，冠軍點頭 */
+    grain(T("lean", 0.05), {f0:300, f1:200, q:3, a:0.03, dur:0.28, gain:0.22, pan:p1, verb:0.12, pink:false});
+    [0.1, 0.42, 0.74].forEach(function(d, i){
+      grain(T("aim", d), {f0:900 - i * 120, f1:600, q:3, a:0.01, dur:0.1, gain:0.22, pan:p1 - 0.2, verb:0.15, pink:false});
+    });
+    ting(T("place", 0.12), {gain:0.14, pan:p1 - 0.25, f:2100});
+    rhodes(T("place", 0.16), {f:N.F3, dur:1.2, gain:0.07, pan:-0.1, verb:0.5, index:2.0, lp:1800});
+    rhodes(T("place", 0.2),  {f:N.C4, dur:1.1, gain:0.06, pan:0.1, verb:0.5, index:2.0, lp:2400});
+    rhodes(T("place", 0.24), {f:N.A4, dur:1.0, gain:0.05, pan:0, verb:0.5, index:2.0, lp:3000});
+    rhodes(T("place", 0.28), {f:N.C6, dur:0.25, gain:0.045, pan:p1, verb:0.35, index:1.6, lp:5000});
+    /* 鞠躬：揮下去（大），咚，金星 */
+    whoosh_(T("bow", 0.02), {pan:p1, dur:0.45, gain:0.16, up:false});
+    bonk(T("bonk"), {pan:p1});
+    rattle(T("bonk", 0.02), {gain:0.5, pan:-p1});
+    twinkle(T("stars", 0.05), {pan:p1});
+    /* 往後倒：滑笛、木頭嘎吱，落地全頁最大的一聲，再一下餘震 */
+    whistle(T("topple", 0.05), {f0:620, f1:110, dur:0.62, gain:0.06, pan:p1 + 0.2, lp:2000});
+    grain(T("topple"), {f0:320, f1:170, q:6, a:0.05, hold:0.2, dur:0.35, gain:0.09, pan:p1, verb:0.2, pink:false, sweep:0.55});
+    thump(T("thud"), {f:42, dur:0.5, gain:0.35, pan:0, verb:0.35, bend:0.55});
+    thump(T("thud", 0.01), {f:88, dur:0.14, gain:0.14, pan:0.1, verb:0.2});
+    pack(T("thud", 0.005), {gain:1, pan:0.15, verb:0.4});
+    sweep(T("thud", 0.03), {dur:0.3, gain:0.5, pan:0.2});
+    rattle(T("thud", 0.04), {gain:0.9, pan:-0.3});
+    cardLand(T("thud", 0.12), {gain:0.45, soft:0.7, pan:0.3, verb:0.4});
+    cardLand(T("thud", 0.21), {gain:0.35, soft:0.8, pan:-0.2, verb:0.4});
+    thump(T("after"), {f:46, dur:0.32, gain:0.16, pan:0, verb:0.3, bend:0.6});
+    pack(T("after", 0.005), {gain:0.4, pan:-0.1, verb:0.4});
+    rattle(T("after", 0.03), {gain:0.4, pan:0.2});
+    /* 句點 */
+    rhodes(T("end", 0.5), {f:N.F2, dur:1.6, gain:0.05, pan:0, verb:0.5, index:1.2, lp:900, mallet:false});
+  };
+  function whoosh_(t, o){
+    var d = o.dur || 0.3;
+    grain(t, {f0:o.up === false ? 900 : 220, f1:o.up === false ? 220 : 900, q:0.5, a:d * 0.5, dur:d * 0.5, gain:o.gain || 0.24, pan:o.pan || 0, verb:0.2, sweep:d, lp:2400});
+  }
+})();
+</script>
+<script>
+/* ═══ 巨獸登陸 ════════════════════════════════════════════════════════
+   引擎跟 G 一樣：一條 WAAPI 主時間軸、每個零件一條軌、x／y 拆兩層、位置從 DOM 量。
+   劇本：從第三名那疊後面浮出來 → 抬頭看一眼 → 一腳踩上第三名（踩扁）→ 跨一步到第一名右外側 →
+   側身讓開冠軍的名字、瞄準三次把小獎盃放到冠軍旁邊 → 鞠躬，頭太大，咚一聲撞在第一名牌疊頂上 →
+   眼冒金星 → 往後仰倒，掉出舞台底邊，全頁最大的一聲，再一下餘震。 */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const $ = function(id){ return document.getElementById(id); };
+  const stage = $("stage"), tom = $("tom"), cup = $("cup"), vig = $("hvig"), end = $("end");
+  const p1 = document.querySelector(".stack.p1 .pile"), p2 = document.querySelector(".stack.p2 .pile"), p3 = document.querySelector(".stack.p3 .pile");
+  if(!p1 || !p3) return;
+  const S = stage.getBoundingClientRect();
+  const R = function(el){ const r = el.getBoundingClientRect(); return {l:r.left - S.left, r:r.right - S.left, t:r.top - S.top, b:r.bottom - S.top, cx:(r.left + r.right) / 2 - S.left, cy:(r.top + r.bottom) / 2 - S.top}; };
+  const F = R($("floor")).t, P1 = R(p1), P3 = R(p3), W = S.width;
+  const faces = R(document.querySelector(".stack.p1 .faces"));
+  const k = parseFloat(getComputedStyle(tom).getPropertyValue("--k")) || 1;
+  const EO = "cubic-bezier(.16,1,.3,1)", EIO = "cubic-bezier(.77,0,.175,1)", EI = "cubic-bezier(.11,0,.5,0)", BACK = "cubic-bezier(.34,1.56,.64,1)", LIN = "linear";
+  const HEAD = 234 * k, ARML = 130 * k, SH = 53 * k, HC = 144 * k, HR = 90 * k;   /* 頭頂、手臂長、肩高、頭心高、頭半徑（腳底算起，螢幕 px） */
+  const SLOW = q.has("slow");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ── 站位 ── */
+  const xRise = Math.min(W - HR - 6, P3.cx + 26 * k);     /* 從第三名那疊後面浮出來（手機夾在舞台裡） */
+  const on3 = {x:P3.cx + 8 * k, y:P3.t};
+  const on1 = {x:P1.r + 2 * k, y:P1.t};                   /* 第一名右外側：頭才不會整顆蓋在冠軍名字上 */
+  const cupGiven = {x:Math.max(faces.l - 26 * k, 14), y:faces.cy + 22 * k};
+  const LEAN = 22;                                         /* 站上第一名後側身的角度：rotate(+r) 頭往右甩，讓開冠軍的名字 */
+
+  /* 手在哪：肩 (5,-53)k，手臂 (−sinθ, cosθ)·L·st，再照身體的傾斜繞腳底轉 */
+  const hand = function(feet, rot, theta, st){
+    const th = theta * Math.PI / 180, r = rot * Math.PI / 180;
+    let px = 5 * k - Math.sin(th) * ARML * (st || 1), py = -SH + Math.cos(th) * ARML * (st || 1);
+    const rx = px * Math.cos(r) - py * Math.sin(r), ry = px * Math.sin(r) + py * Math.cos(r);
+    return {x:feet.x + rx, y:feet.y + ry};
+  };
+  /* 反過來：要摸到 target，右手該轉幾度、伸多長 */
+  const aim = function(feet, rot, target){
+    const r = rot * Math.PI / 180;
+    const sx = feet.x + (5 * k) * Math.cos(r) - (-SH) * Math.sin(r), sy = feet.y + (5 * k) * Math.sin(r) + (-SH) * Math.cos(r);
+    let vx = target.x - sx, vy = target.y - sy;
+    const ux = vx * Math.cos(-r) - vy * Math.sin(-r), uy = vx * Math.sin(-r) + vy * Math.cos(-r);
+    return {theta:Math.atan2(-ux, uy) * 180 / Math.PI, st:Math.hypot(ux, uy) / ARML};
+  };
+
+  /* ── 節拍表（秒） ── */
+  const B = {}; let t = 0;
+  const at = function(name, dur){ B[name] = t; t += dur; return B[name]; };
+  at("rise", 1.5);      /* 從地板底下浮出來（在第三名那疊後面） */
+  at("look", .5);       /* 抬頭看一眼講台 */
+  at("step3", .55);     /* 抬腿、一腳踩上第三名 */
+  at("squash", .4);     /* 牌疊被踩扁、回彈 */
+  at("step1", .6);      /* 跨一大步到第一名右外側 */
+  at("land", .35);
+  at("lean", .4);       /* 側身讓開冠軍的名字 */
+  at("aim", 1.05);      /* 瞄三次 */
+  at("place", .4);      /* 放下、冠軍點頭 */
+  at("bow", .5);        /* 鞠躬 */
+  at("bonk", .12);      /* 咚 */
+  at("stars", .9);      /* 眼冒金星 */
+  at("topple", .7);     /* 往後仰倒 */
+  at("thud", .5);       /* 落地 */
+  at("after", .45);     /* 餘震 */
+  at("end", .45);
+  const TOTAL = t;
+  const off = function(s){ return Math.min(1, Math.max(0, s / TOTAL)); };
+
+  const tracks = {tx:[], ty:[], body:[], legL:[], legR:[], armL:[], armR:[], head:[], stars:[], cx:[], cy:[], cupr:[], tomo:[], cupo:[], tz:[], vig:[]};
+  const K = function(tr, s, tf, ease, extra){ const f = {offset:off(s), easing:ease || LIN}; if(tf != null) f.transform = tf; if(extra) Object.assign(f, extra); tracks[tr].push(f); };
+  const X = function(s, x, e){ K("tx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const Y = function(s, y, e){ K("ty", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const BODY = function(s, rot, bob, e){ K("body", s, "translateY(" + (bob || 0) + "px) rotate(" + rot + "deg)", e); };
+  const LEG = function(s, l, r, e){ K("legL", s, "rotate(" + l + "deg)", e); K("legR", s, "rotate(" + r + "deg)", e); };
+  const ARM = function(s, l, r, e, sr){ K("armL", s, "rotate(" + l + "deg)", e); K("armR", s, "rotate(" + r + "deg)" + (sr ? " scaleY(" + sr.toFixed(3) + ")" : ""), e); };
+  const HEADR = function(s, d, e){ K("head", s, "rotate(" + d + "deg)", e); };
+  const CX = function(s, x, e){ K("cx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const CY = function(s, y, e){ K("cy", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const CUPR = function(s, d, e, sc){ K("cupr", s, "rotate(" + d + "deg)" + (sc ? " scale(" + sc + ")" : ""), e); };
+  const VIG = function(s, o, e){ K("vig", s, null, e, {opacity:o}); };
+  /* 獎盃捏在右手：右手在哪、獎盃就在哪（吊在指尖下面一點） */
+  const CARRY = -118;                      /* 拿著獎盃時右手的角度：伸向右上、離頭遠一點 */
+  const holdCup = function(s, feet, rot, theta, e){ const h = hand(feet, rot, theta); CX(s, h.x, e); CY(s, h.y + 6 * k, e); };
+
+  /* ── 0 浮出：在第三名後面（z -1），整頁暗角收緊，頭頂先露出來 ── */
+  K("tomo", 0, null, LIN, {opacity:1}); K("cupo", 0, null, LIN, {opacity:1});
+  K("tz", 0, null, LIN, {zIndex:-1}); K("tz", B.step3 - .02, null, LIN, {zIndex:-1}); K("tz", B.step3, null, LIN, {zIndex:2});
+  VIG(0, 0, EIO); VIG(B.rise + .9, .85, EIO); VIG(B.look + .3, .3, EIO); VIG(B.topple, .3, EIO); VIG(B.thud, .7, EO); VIG(B.end + .3, .15, EIO);
+  const deep = {x:xRise, y:F + HEAD + 40 * k}, up = {x:xRise, y:F};
+  X(0, xRise, LIN); Y(0, deep.y, EIO); Y(B.rise + 1.2, F, EO); Y(B.look, F, LIN);
+  BODY(0, 0, 0, EIO); BODY(B.rise + .4, 3, 0, EIO); BODY(B.rise + .9, -3, 0, EIO); BODY(B.look, 0, 0, EIO);
+  LEG(0, 6, -6, LIN); ARM(0, 8, CARRY, LIN); HEADR(0, -4, LIN); CUPR(0, 0, LIN);
+  holdCup(0, deep, 0, CARRY, EIO); holdCup(B.rise + 1.2, up, 0, CARRY, EO); holdCup(B.look, up, 0, CARRY, LIN);
+  K("stars", 0, "rotate(0)", LIN, {opacity:0});
+  /* ── 1 抬頭看講台：頭往左歪，身體微傾 ── */
+  HEADR(B.look, -4, EIO); HEADR(B.look + .25, -13, EIO); HEADR(B.step3, -6, EIO);
+  BODY(B.look + .3, -5, 0, EIO);
+  /* ── 2 一腳踩上第三名：左腿高抬（往左）、身體後仰蓄力，落下 ── */
+  LEG(B.step3, 6, -6, EIO); LEG(B.step3 + .28, 78, -14, EIO); LEG(B.squash, 10, -8, EO);
+  BODY(B.step3, -5, 0, EIO); BODY(B.step3 + .28, 14, -6, EIO); BODY(B.squash, -8, 4, EO); BODY(B.squash + .2, 0, 0, EO);
+  X(B.step3, xRise, EIO); X(B.step3 + .3, on3.x, EIO); X(B.squash, on3.x, LIN);
+  Y(B.step3, F, EO); Y(B.step3 + .3, on3.y - 34 * k, EI); Y(B.squash, on3.y, LIN);
+  holdCup(B.step3, up, -5, CARRY, EIO); holdCup(B.step3 + .3, {x:on3.x, y:on3.y - 34 * k}, 14, CARRY, EI); holdCup(B.squash, on3, -8, CARRY, LIN); holdCup(B.squash + .2, on3, 0, CARRY, EO);
+  CUPR(B.step3 + .3, -14, EIO); CUPR(B.squash, 10, EO); CUPR(B.squash + .25, 0, EO);
+  ARM(B.step3 + .3, 24, CARRY - 12, EIO); ARM(B.squash, 4, CARRY + 4, EO);
+  /* ── 3 跨到第一名右外側 ── */
+  const mid1 = {x:(on3.x + on1.x) / 2, y:Math.min(on3.y, on1.y) - 50 * k};
+  LEG(B.step1, 10, -8, EIO); LEG(B.step1 + .32, 70, -30, EIO); LEG(B.land, 8, -6, EO);
+  X(B.step1, on3.x, LIN); X(B.land, on1.x, LIN);
+  Y(B.step1, on3.y, EO); Y(B.step1 + .3, mid1.y, EI); Y(B.land, on1.y, LIN);
+  BODY(B.step1, 0, 0, EIO); BODY(B.step1 + .3, 12, 0, EIO); BODY(B.land, -10, 5, EO); BODY(B.land + .22, 0, 0, EO);
+  holdCup(B.step1, on3, 0, CARRY, EO); holdCup(B.step1 + .3, mid1, 12, CARRY, EI); holdCup(B.land, on1, -10, CARRY, LIN); holdCup(B.land + .22, on1, 0, CARRY, EO);
+  HEADR(B.step1, -6, EIO); HEADR(B.land, 6, EO); HEADR(B.lean, 0, EIO);
+  /* ── 4 側身讓開冠軍的名字 ── */
+  BODY(B.lean, 0, 0, EIO); BODY(B.lean + .35, LEAN, 0, EIO);
+  holdCup(B.lean, on1, 0, CARRY, EIO); holdCup(B.lean + .35, on1, LEAN, CARRY, EIO);
+  ARM(B.lean, 4, CARRY, EIO);
+  /* ── 5 瞄準：右手伸過去，獎盃在目標附近晃三次才放下；頭跟著歪 ── */
+  const A = aim(on1, LEAN, cupGiven);
+  const near = function(dx, dy){ return {x:cupGiven.x + dx * k, y:cupGiven.y + dy * k}; };
+  const AT = function(s, target, e){ const a = aim(on1, LEAN, target); ARM(s, 4, a.theta, e, a.st); CX(s, target.x, e); CY(s, target.y, e); };
+  AT(B.aim, hand(on1, LEAN, CARRY), EIO);
+  AT(B.aim + .32, near(-16, -14), EIO);
+  AT(B.aim + .62, near(14, 6), EIO);
+  AT(B.aim + .9, near(-5, -4), EIO);
+  AT(B.place + .1, cupGiven, EO);
+  HEADR(B.aim, 0, EIO); HEADR(B.aim + .3, 16, EIO); HEADR(B.aim + .6, -10, EIO); HEADR(B.aim + .9, 9, EIO); HEADR(B.place + .1, 0, EIO);
+  CUPR(B.aim, 0, EIO); CUPR(B.aim + .32, -22, EIO); CUPR(B.aim + .62, 16, EIO); CUPR(B.place + .1, 0, EO);
+  /* 放下之後右手收回來，身體回正 */
+  ARM(B.place + .12, 4, A.theta, EO, A.st); ARM(B.bow, 4, -30, EO);
+  CX(1e9, cupGiven.x, LIN); CY(1e9, cupGiven.y, LIN); CUPR(1e9, 0, LIN);
+  BODY(B.place + .1, LEAN, 0, EIO); BODY(B.bow, 0, 0, EIO);
+  /* ── 6 鞠躬：往講台折下去，頭太大，咚 ── */
+  BODY(B.bow + .02, 0, 0, EI); BODY(B.bonk, -54, 0, LIN); BODY(B.bonk + .1, -44, 0, EO); BODY(B.stars, -46, 0, EIO);
+  ARM(B.bow + .3, -40, 60, EIO); ARM(B.bonk, -70, 80, EO);
+  HEADR(B.bonk, 0, EO); HEADR(B.bonk + .1, -12, EO); HEADR(B.stars + .4, 6, EIO);
+  /* 眼冒金星：頭上三顆星繞兩圈（星星掛在 body 上，跟著鞠躬的傾斜） */
+  K("stars", B.bonk, "rotate(0)", LIN, {opacity:0}); K("stars", B.bonk + .1, "rotate(40deg)", LIN, {opacity:1});
+  K("stars", B.topple + .15, "rotate(760deg)", LIN, {opacity:1}); K("stars", B.topple + .4, "rotate(900deg)", LIN, {opacity:0});
+  /* ── 7 往後仰倒：繞腳底往右轉過去，掉出舞台底邊 ── */
+  /* 頭底碰到地板的角度：-HC·cos r + HR = 腳底到地板的距離 */
+  const TOP = Math.acos(-(on1.y >= F ? 60 * k : (F - on1.y) - HR) / HC) * 180 / Math.PI;
+  BODY(B.topple, -46, 0, EIO); BODY(B.topple + .18, -30, 0, EI); BODY(B.thud, TOP, 0, LIN);
+  BODY(B.thud + .12, TOP - 9, 0, EO); BODY(B.after, TOP, 0, EI); BODY(B.after + .1, TOP - 4, 0, EO); BODY(B.after + .25, TOP, 0, EI); BODY(B.end + .3, TOP, 0, LIN);
+  LEG(B.topple + .2, 30, -40, EIO); LEG(B.thud, 60, -20, EO); LEG(B.thud + .12, 40, -10, EO);
+  ARM(B.topple + .2, -150, 150, EIO); ARM(B.thud, -120, 170, EO);
+  X(B.topple, on1.x, LIN); X(B.thud, on1.x + 8 * k, LIN); X(B.end + .3, on1.x + 8 * k, LIN);
+  Y(B.topple, on1.y, LIN); Y(B.after + .3, on1.y, EI); Y(B.end + .3, on1.y + 420 * k, LIN);
+  K("tz", B.topple + .28, null, LIN, {zIndex:2}); K("tz", B.topple + .3, null, LIN, {zIndex:-1});
+  K("tomo", B.end, null, LIN, {opacity:1}); K("tomo", B.end + .3, null, LIN, {opacity:0});
+
+  /* ── 收尾：每一軌補上 offset 0／1 ── */
+  const parts = {tx:tom, ty:$("ty"), body:$("body"), legL:$("legL"), legR:$("legR"), armL:$("armL"), armR:$("armR"), head:$("head"), stars:$("stars"), cx:cup, cy:$("cupy"), cupr:cup.querySelector("svg"), tomo:tom, cupo:cup, tz:tom, vig:vig};
+  const anims = [];
+  Object.keys(tracks).forEach(function(name){
+    let fr = tracks[name];
+    fr.sort(function(a, b){ return a.offset - b.offset; });
+    fr = fr.filter(function(f, i){ return !(i + 1 < fr.length && Math.abs(fr[i + 1].offset - f.offset) < 1e-6); });
+    if(fr.length && fr[fr.length - 1].offset < 1) fr.push(Object.assign({}, fr[fr.length - 1], {offset:1}));
+    if(fr.length && fr[0].offset > 0) fr.unshift(Object.assign({}, fr[0], {offset:0}));
+    if(!fr.length) return;
+    anims.push({el:parts[name], fr:fr});
+  });
+
+  /* 一次性的小動畫：踩扁、震動、點頭 */
+  const squash = function(pile, sy){
+    pile.animate([{transform:"scaleY(1)"}, {transform:"scaleY(" + sy + ")", offset:.28}, {transform:"scaleY(" + (1 + (1 - sy) * .3) + ")", offset:.68}, {transform:"scaleY(1)"}], {duration:560, easing:EO});
+  };
+  const shake = function(el, px, ms){
+    el.animate([{transform:"translate(0,0)"}, {transform:"translate(" + px + "px," + (-px * .7) + "px)", offset:.12}, {transform:"translate(" + (-px * .8) + "px," + (px * .5) + "px)", offset:.3},
+                {transform:"translate(" + (px * .5) + "px," + (-px * .25) + "px)", offset:.5}, {transform:"translate(" + (-px * .2) + "px," + (px * .1) + "px)", offset:.72}, {transform:"translate(0,0)"}], {duration:ms, easing:LIN});
+  };
+  const winnerNod = function(){
+    document.querySelectorAll(".stack.p1 .faces").forEach(function(f){
+      f.animate([{transform:"none"}, {transform:"translateY(-7px) rotate(-9deg) scale(1.12)", offset:.38}, {transform:"none"}], {duration:620, easing:EO});
+    });
+  };
+
+  const start = (window.DEAL_END || 1.4) + .6;
+  if(reduce){
+    tom.classList.add("still"); cup.classList.add("still");
+    tom.style.transform = "translateX(" + on1.x + "px)"; $("ty").style.transform = "translateY(" + on1.y + "px)";
+    $("body").style.transform = "rotate(" + LEAN + "deg)";
+    $("armL").style.transform = "rotate(8deg)"; $("armR").style.transform = "rotate(-30deg)";
+    cup.style.transform = "translateX(" + cupGiven.x + "px)"; $("cupy").style.transform = "translateY(" + cupGiven.y + "px)";
+    setTimeout(function(){ tom.style.opacity = 1; cup.style.opacity = 1; }, start * 1000);
+    return;
+  }
+  const rate = SLOW ? .35 : 1, AN = [], timers = [];
+  const seekTo = (function(){ if(!q.has("t")) return NaN; const raw = q.get("t").replace(" ", "+"), m = /^([a-z0-9]+)([+-][\d.]+)?$/.exec(raw); if(m && B[m[1]] != null) return B[m[1]] + parseFloat(m[2] || 0); return parseFloat(raw); })();
+  const seek = function(sec){ AN.forEach(function(an){ an.pause(); an.currentTime = Math.max(0, Math.min(TOTAL, sec)) * 1000; }); };
+  const pan = function(x){ return Math.max(-.5, Math.min(.5, (x - W / 2) / W)); };
+  const run = function(){
+    AN.forEach(function(an){ an.cancel(); }); AN.length = 0;
+    timers.forEach(clearTimeout); timers.length = 0;
+    const dur = TOTAL * 1000;
+    anims.forEach(function(a){ const an = a.el.animate(a.fr, {duration:dur, fill:"forwards"}); an.playbackRate = rate; AN.push(an); });
+    if(!isNaN(seekTo)){ seek(seekTo); return; }
+    if(window.SFX && SFX.gag) SFX.gag(B, rate, {pan1:pan(P1.cx), pan3:pan(P3.cx)});
+    const at = function(sec, fn){ timers.push(setTimeout(fn, sec * 1000 / rate)); };
+    at(B.rise + .9, function(){ shake(stage, 3, 420); });
+    at(B.squash, function(){ squash(p3, .74); shake(stage, 6, 480); });
+    at(B.land, function(){ squash(p1, .9); shake(stage, 7, 520); if(p2) squash(p2, .96); });
+    at(B.place + .28, winnerNod);
+    at(B.bonk, function(){ squash(p1, .86); shake(stage, 5, 420); });
+    at(B.thud, function(){ shake(end, 11, 640); squash(p3, .92); squash(p1, .95); if(p2) squash(p2, .95); });
+    at(B.after, function(){ shake(end, 5, 420); });
+  };
+  setTimeout(run, isNaN(seekTo) ? start * 1000 : 0);
+  if(window.SFX && isNaN(seekTo)){ SFX.over(true); SFX.deal(13, (window.DEAL_END || 1.4) - .38, .05); }
+  window.TOM = {B:B, TOTAL:TOTAL, seek:seek, A:AN, run:run};
+
+  const dev = $("dev");
+  if(dev && !q.has("nodev")){
+    const mk = function(label, key, on){
+      const b = document.createElement("button"); b.textContent = label; b.setAttribute("aria-pressed", on);
+      b.onclick = function(){ const u = new URL(location.href); if(u.searchParams.has(key)) u.searchParams.delete(key); else u.searchParams.set(key, ""); location.href = u.pathname + (u.search ? u.search.replace(/=(&|$)/g, "$1") : ""); };
+      return b;
+    };
+    const sep = document.createElement("i"); dev.appendChild(sep);
+    dev.appendChild(mk("慢動作", "slow", SLOW));
+    const rp = document.createElement("button"); rp.textContent = "重播頒獎（有聲）"; rp.onclick = run; dev.appendChild(rp);
+    const sep2 = document.createElement("i"); dev.appendChild(sep2);
+    const rg = document.createElement("input"); rg.type = "range"; rg.min = 0; rg.max = TOTAL.toFixed(2); rg.step = .01; rg.value = 0; rg.style.width = "160px"; rg.title = "時間軸";
+    rg.oninput = function(){ seek(parseFloat(rg.value)); };
+    const play = document.createElement("button"); play.textContent = "播";
+    play.onclick = function(){ AN.forEach(function(an){ an.play(); }); };
+    dev.appendChild(rg); dev.appendChild(play);
+    const tick = function(){ if(AN.length && AN[0].playState === "running") rg.value = (AN[0].currentTime / 1000).toFixed(2); requestAnimationFrame(tick); }; tick();
+  }
+})();
+</script>

@@ -953,6 +953,39 @@ body.in-lobby .app{display:none}
   0 6px 14px rgba(0,0,0,.35),0 0 60px oklch(.845 .128 84/.14)}
 .end-floor{width:min(560px,100%);height:1px;background:var(--hair)}
 
+/* ── 收桌頒獎：Thomas 爬上講台（design/end/g.def 定案；2026-09-22 Francis 四案裡挑了 G） ──
+   舞台＝.end-stage（三疊牌＋地板線）。角色與獎盃放在 .end-clip 這一層：往上、左右多留一截，
+   底邊貼著地板線——從地板底下爬上來、最後掉到牌疊後面，都是被這一刀切掉的。
+   用絕對定位＋overflow:clip 而不是 clip-path：.end-mid 是 overflow:auto，clip-path 剪掉的部分還是會撐出捲軸。
+   角色：.tom 管 x、.tom-y 管 y、.tom-body 管站姿與縮放（原點在腳底），四肢與頭各自一條 WAAPI 軌（endGag()）。 */
+.end-stage{position:relative;isolation:isolate;width:min(560px,100%);margin-top:34px}
+.end-stage>.stacks{margin-top:0}
+.end-stage .pile{transform-origin:50% 100%}
+.end-clip{position:absolute;left:-80px;right:-80px;top:-320px;bottom:0;overflow:clip;pointer-events:none;--cx:80px;--cy:320px}
+.tom,.tom-cup{position:absolute;left:var(--cx);top:var(--cy);width:0;height:0;--k:1.4;opacity:0;will-change:transform}
+.tom{z-index:2}.tom-cup{z-index:3}
+.tom-y,.tom-cupy{position:absolute;left:0;top:0;width:0;height:0}
+/* scale 只能掛這一層：個別屬性 scale 套在 transform 之後，掛在管位移的層會把 translate 也乘上去 */
+.tom-body{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;scale:var(--k)}
+.tom-limb{position:absolute;width:1.5px;border-radius:1px;background:var(--ink);opacity:.9;transform-origin:50% 0;
+  box-shadow:0 0 0 .7px rgba(20,16,12,.55)}   /* 淺線＋一圈暗邊：落在米色牌面上也看得見 */
+.tom-leg{left:-.75px;top:-30px;height:30px}.tom-leg.l{left:-3px}.tom-leg.r{left:1.5px}
+.tom-torso{position:absolute;left:-.75px;top:-46px;width:1.5px;height:17px;border-radius:1px;background:var(--ink);opacity:.9;
+  box-shadow:0 0 0 .7px rgba(20,16,12,.55)}
+.tom-arm{top:-44px;height:80px}.tom-arm.l{left:-6.5px}.tom-arm.r{left:5px}   /* 手臂比頭長：舉得過頭頂、伸得到地上 */
+/* 頭 72px × 1.4 ＝ 100px，比冠軍頭像大一倍 */
+.tom-head{position:absolute;left:-36px;top:-118px;width:72px;height:72px;border-radius:99px;overflow:hidden;transform-origin:50% 100%;
+  box-shadow:0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.35)}
+.tom-head img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 42%}
+/* 照片載不到（還沒放進 docs/img/）就跟其他沒照片的人一樣：一個字的圓盤，不是破圖 */
+.tom-head.nopic{display:grid;place-items:center;font-size:30px;font-weight:600;color:var(--ink-2);
+  background:linear-gradient(160deg in oklab,oklch(1 0 0/.10),oklch(1 0 0/.035))}
+.tom-head.nopic::after{content:"T"}
+.tom-cup svg{position:absolute;left:-18px;top:-40px;width:36px;height:40px;overflow:visible;transform-origin:50% 100%;scale:var(--k);
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+.tom.still,.tom-cup.still{transition:opacity .3s ease}
+@media (max-width:760px){.end-clip{left:0;right:0;--cx:0px}.tom,.tom-cup{--k:1.1}}
+
 /* 沒進前三名的話底下補一行自己的——收桌最想知道的還是「我第幾」 */
 .end-mine{margin:22px 0 0;font-size:13px;color:var(--ink-3);animation:endIn .4s var(--e-out) both 1.3s}
 .end-mine b{color:var(--ink-2);font-weight:500;font-family:"IBM Plex Mono",monospace}
@@ -1850,8 +1883,28 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   <main class="end-mid">
     <span class="end-cap" id="endSub"></span>
     <h1 class="end-ask" id="endAsk"></h1>
-    <div class="stacks" id="endStacks"></div>
-    <div class="end-floor"></div>
+    <div class="end-stage" id="endStage">
+      <div class="stacks" id="endStacks"></div>
+      <div class="end-floor" id="endFloor"></div>
+      <!-- 頒獎：Thomas 的大頭照長出細細的手腳，從第三名那疊爬到第一名把獎盃頒出去。填軌、開演的是 endGag() -->
+      <div class="end-clip" aria-hidden="true">
+        <div class="tom" id="tom"><div class="tom-y" id="tomY"><div class="tom-body" id="tomBody">
+          <i class="tom-limb tom-leg l" id="tomLegL"></i><i class="tom-limb tom-leg r" id="tomLegR"></i>
+          <i class="tom-torso"></i>
+          <i class="tom-limb tom-arm l" id="tomArmL"></i><i class="tom-limb tom-arm r" id="tomArmR"></i>
+          <div class="tom-head" id="tomHead"><img src="img/tom.jpg" alt="" onerror="this.hidden=true;this.parentNode.classList.add('nopic')"></div>
+        </div></div></div>
+        <div class="tom-cup" id="tomCup"><div class="tom-cupy" id="tomCupY">
+          <svg viewBox="0 0 36 40" fill="none" stroke="var(--brass)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 3h18v10a9 9 0 0 1-18 0z" fill="oklch(.845 .128 84/.16)"/>
+            <path d="M9 6H4.5a1.5 1.5 0 0 0-1.5 1.5C3 12 6 15.5 10.5 16"/>
+            <path d="M27 6h4.5a1.5 1.5 0 0 1 1.5 1.5c0 4.5-3 8-7.5 8.5"/>
+            <path d="M18 22v5"/><path d="M14 27h8"/>
+            <path d="M12 30h12l3 8H9z" fill="oklch(.845 .128 84/.16)"/>
+          </svg>
+        </div></div>
+      </div>
+    </div>
     <p class="end-mine" id="endMine" hidden></p>
     <p class="end-err" id="endErr" hidden></p>
     <div class="end-acts">
@@ -3281,6 +3334,178 @@ SFX.bounce = function(name, arg, sec){
 
 /* console 裡想單獨試某一顆：SFX.demo("round", true) */
 SFX.demo = function(name, a){ unlock(); if(typeof SFX[name] === "function") SFX[name](a); };
+
+
+/* ---------------- 收桌頒獎 ----------------
+   Thomas 爬上講台那一段（endGag()）的聲音。跟牌桌同一間房：紙、絨布、木頭、rhodes。
+   多了三顆卡通的——滑笛（撞牌滑下來、最後掉下去）、橡皮的 boing（手臂彈回來）、銅獎盃的叮——
+   因為這一段本來就是卡通。全部照節拍表排在 AudioContext 的時間軸上，跟畫面對得上毫秒。 */
+  /* 滑笛：三角波，音高滑一段，一點抖音，低通壓暗。卡通裡「掉下去」就是這一聲。 */
+  function whistle(t, o){
+    var c = ctx, dur = o.dur || 0.4;
+    var osc = c.createOscillator(); osc.type = "triangle";
+    osc.frequency.setValueAtTime(o.f0, t);
+    osc.frequency.exponentialRampToValueAtTime(o.f1, t + dur);
+    var lfo = c.createOscillator(); lfo.frequency.value = 6.5;
+    var lg = c.createGain(); lg.gain.value = o.f0 * 0.012;
+    lfo.connect(lg); lg.connect(osc.frequency);
+    var lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = o.lp || 2400; lp.Q.value = 0.7;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.00012, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.03);
+    g.gain.setValueAtTime(o.gain, t + dur * 0.8);
+    g.gain.exponentialRampToValueAtTime(0.00012, t + dur);
+    osc.connect(lp); lp.connect(g); out(g, o.pan || 0, o.verb === undefined ? 0.25 : o.verb);
+    osc.start(t); lfo.start(t); osc.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02);
+  }
+  /* 橡皮筋彈回來：音高被一個快速衰減的 LFO 甩來甩去 */
+  function boing(t, o){
+    var c = ctx, dur = o.dur || 0.38, f = o.f || 250;
+    var osc = c.createOscillator(); osc.type = "triangle"; osc.frequency.value = f;
+    var lfo = c.createOscillator(); lfo.frequency.value = o.rate || 11;
+    var lg = c.createGain();
+    lg.gain.setValueAtTime(f * 0.5, t);
+    lg.gain.exponentialRampToValueAtTime(f * 0.01, t + dur);
+    lfo.connect(lg); lg.connect(osc.frequency);
+    var lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 2600; lp.Q.value = 0.8;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.00012, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.00012, t + dur);
+    osc.connect(lp); lp.connect(g); out(g, o.pan || 0, 0.2);
+    osc.start(t); lfo.start(t); osc.stop(t + dur + 0.02); lfo.stop(t + dur + 0.02);
+  }
+  /* 小銅獎盃的「叮」：三個不成整數比的正弦（鐘的做法），很短 */
+  function ting(t, o){
+    var c = ctx, f = (o.f || 1900) * rnd(0.97, 1.03), g0 = o.gain || 0.15;
+    [[1, 1, 0.42], [2.76, 0.45, 0.28], [5.4, 0.18, 0.14]].forEach(function(p){
+      var osc = c.createOscillator(); osc.type = "sine"; osc.frequency.value = f * p[0];
+      var g = c.createGain();
+      g.gain.setValueAtTime(0.00012, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.00012, g0 * p[1]), t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.00012, t + p[2]);
+      osc.connect(g); out(g, o.pan || 0, 0.3);
+      osc.start(t); osc.stop(t + p[2] + 0.02);
+    });
+    grain(t, {f0:6000, f1:3500, q:1.2, a:0.0006, dur:0.012, gain:g0 * 0.5, pan:o.pan || 0, verb:0.1, pink:false});
+  }
+  /* 一步。地板是木頭、牌疊是紙——站在牌上時多一層紙的啪 */
+  function step(t, o){
+    var k = (o.k || 1) * rnd(0.95, 1.06), g = o.gain === undefined ? 1 : o.gain, pan = o.pan || 0;
+    grain(t, {f0:1000 * k, f1:600 * k, q:1.3, a:0.001, dur:0.026, gain:0.4 * g, pan:pan, verb:0.1, pink:false, hp:300, lp:o.lp});
+    grain(t, {f0:600 * k, f1:400 * k, q:0.8, a:0.002, dur:0.04, gain:0.14 * g, pan:pan, verb:0.12, lp:o.lp});
+    if(o.paper) grain(t + 0.001, {f0:1500 * k, f1:800 * k, q:0.9, a:0.0015, dur:0.04, gain:0.2 * g, pan:pan, verb:0.14});
+    if(!o.air) thump(t + 0.001, {f:150 * k, dur:0.036, gain:0.08 * g, pan:pan * 0.5, verb:0.06});
+  }
+  function whoosh(t, o){
+    grain(t, {f0:o.up === false ? 1800 : 400, f1:o.up === false ? 450 : 1900, q:0.55, a:(o.dur || 0.3) * 0.5, dur:(o.dur || 0.3) * 0.5,
+              gain:o.gain || 0.17, pan:o.pan || 0, verb:0.15, sweep:o.dur || 0.3});
+  }
+  /* 牌疊晃一下：紙在蹭 */
+  function rustle(t, o){
+    grain(t, {f0:1900, f1:900, q:0.8, a:0.01, dur:0.22, gain:o.gain || 0.11, pan:o.pan || 0, verb:0.16});
+    grain(t + 0.03, {f0:3200, f1:1800, q:1.1, a:0.005, dur:0.12, gain:(o.gain || 0.11) * 0.5, pan:o.pan || 0, verb:0.1, pink:false});
+  }
+  /* 「嗯？」：兩顆 rhodes 往上走四度；o.down 就是「喔。」往下 */
+  function hm(t, o){
+    var a = o.down ? N.D5 : N.A4, b = o.down ? N.A4 : N.D5;
+    rhodes(t, {f:a, dur:0.45, gain:0.05, pan:o.pan || 0, verb:0.4, index:1.8, lp:3800});
+    rhodes(t + 0.11, {f:b, dur:0.6, gain:0.055, pan:o.pan || 0, verb:0.45, index:2.0, lp:4200});
+  }
+
+  var gagGain = null;
+  SFX.gag = function(B, rate, o){
+    if(!live()) return;
+    SFX.gagStop();
+    rate = rate || 1; o = o || {};
+    /* 整段走自己的一顆 gain：收桌那一頁被關掉時把它壓到 0，排在後面的聲音就一起沒了 */
+    var keep = bus; gagGain = ctx.createGain(); gagGain.connect(keep); bus = gagGain;
+    var t0 = now() + 0.03, p1 = o.pan1 || 0, p2 = o.pan2 || -0.35, p3 = o.pan3 || 0.35;
+    var T = function(name, plus){ return t0 + (B[name] + (plus || 0)) / rate; };
+    var i, s;
+
+    /* 上場：地板底下走樓梯上來——前兩步悶（還在地板下面），一步比一步高 */
+    step(T("rise", 0.15), {pan:p3, k:0.92, gain:0.8, lp:900});
+    step(T("rise", 0.4),  {pan:p3, k:1.0,  gain:0.9, lp:1600});
+    step(T("rise", 0.65), {pan:p3, k:1.08, gain:1.0});
+    for(i = 0, s = B.walk; s < B.crouch - 0.05; s += 0.17, i++) step(t0 + s / rate, {pan:p3 + (i % 2 ? 0.03 : -0.03), gain:0.75});
+    /* 第一跳：起跳、撞牌、貼著牌滑下來（滑笛）、落地 */
+    whoosh(T("jump1"), {pan:p3, dur:0.3});
+    pack(T("bump"), {gain:0.75, pan:p3});
+    cardLand(T("bump", 0.01), {gain:0.6, soft:0.5, pan:p3, verb:0.2});
+    rhodes(T("bump", 0.02), {f:N.F3, dur:0.3, gain:0.07, pan:p3, verb:0.2, index:3.2, bark:0.05, lp:2200});
+    rustle(T("bump", 0.06), {pan:p3});
+    whistle(T("slide"), {f0:760, f1:250, dur:0.34, gain:0.05, pan:p3});
+    grain(T("slide"), {f0:1600, f1:500, q:0.7, a:0.05, hold:0.1, dur:0.2, gain:0.13, pan:p3, verb:0.14, sweep:0.32});
+    thump(T("slide", 0.34), {f:110, dur:0.08, gain:0.11, pan:p3 * 0.5, verb:0.1});
+    grain(T("slide", 0.34), {f0:900, f1:500, q:1, a:0.002, dur:0.05, gain:0.2, pan:p3, verb:0.12});
+    /* 放下獎盃 */
+    ting(T("backup", -0.06), {gain:0.09, pan:p3 + 0.05});
+    thump(T("backup", -0.05), {f:170, dur:0.04, gain:0.04, pan:p3 * 0.5});
+    /* 退兩步、助跑、第二跳、抓到邊 */
+    for(i = 0, s = B.backup; s < B.run - 0.03; s += 0.105, i++) step(t0 + s / rate, {pan:p3 + 0.04, gain:0.7});
+    for(i = 0, s = B.run; s < B.jump2 - 0.03; s += 0.085, i++) step(t0 + s / rate, {pan:p3, k:1.1, gain:0.9});
+    whoosh(T("jump2"), {pan:p3, dur:0.38, gain:0.2});
+    cardLand(T("hang"), {gain:0.75, soft:0.3, pan:p3, verb:0.2});
+    rustle(T("hang", 0.05), {pan:p3, gain:0.09});
+    /* 吊著亂踢：腳在牌面上拍 */
+    for(i = 0, s = B.hang + 0.08; s < B.haul - 0.05; s += 0.13, i++)
+      grain(t0 + s / rate, {f0:2300, f1:1200, q:1.1, a:0.001, dur:0.04, gain:0.2, pan:p3 + (i % 2 ? 0.04 : -0.02), verb:0.12});
+    /* 爬上去：拖過紙面，腳踩上牌頂，撣撣手 */
+    sweep(T("haul"), {dur:0.42, gain:0.85, pan:p3});
+    step(T("stand3"), {pan:p3, paper:true, gain:0.9});
+    grain(T("stand3", 0.1),  {f0:2600, f1:1500, q:1, a:0.001, dur:0.03, gain:0.2, pan:p3, verb:0.12, pink:false});
+    grain(T("stand3", 0.22), {f0:2400, f1:1400, q:1, a:0.001, dur:0.03, gain:0.18, pan:p3, verb:0.12, pink:false});
+    /* 嗯？獎盃呢——手伸長（橡皮拉長的吱聲）、撿到（叮）、彈回來（boing）、回到頭上（叮） */
+    hm(T("look", 0.18), {pan:p3});
+    grain(T("reach"), {f0:380, f1:1600, q:7, a:0.04, hold:0.08, dur:0.18, gain:0.1, pan:p3, verb:0.12, sweep:0.3, pink:false});
+    ting(T("reach", 0.3), {gain:0.12, pan:p3 + 0.05, f:1700});
+    boing(T("retract"), {f:230, gain:0.1, pan:p3, dur:0.4});
+    ting(T("retract", 0.3), {gain:0.08, pan:p3, f:2000});
+    /* 跳：繞第二名再回來，或直達 */
+    if(B.hop != null){
+      whoosh(T("hop"), {pan:(p3 + p2) / 2, dur:0.5, gain:0.12});
+      step(T("land2"), {pan:p2, paper:true, gain:1.1}); thump(T("land2"), {f:120, dur:0.06, gain:0.08, pan:p2 * 0.5});
+      rustle(T("land2", 0.04), {pan:p2});
+      hm(T("look2", 0.1), {pan:p2});
+      for(i = 0; i < 3; i++) grain(T("look2", 0.34 + i * 0.07), {f0:3400, f1:2600, q:2.2, a:0.001, dur:0.018, gain:0.11, pan:p2, verb:0.08, pink:false});
+      hm(T("look2", 0.62), {pan:p2, down:true});
+      whoosh(T("hop1"), {pan:(p2 + p1) / 2, dur:0.48, gain:0.12});
+    }else{
+      whoosh(T("hop1"), {pan:(p3 + p1) / 2, dur:0.5, gain:0.12});
+    }
+    step(T("land1"), {pan:p1, paper:true, gain:1.1}); thump(T("land1"), {f:120, dur:0.06, gain:0.08, pan:p1 * 0.5});
+    rustle(T("land1", 0.04), {pan:p1});
+    /* 頒獎：琶音往上走，獎盃到位叮一聲，冠軍點頭一顆高音 */
+    [[N.F4, 0], [N.A4, 0.09], [N.C5, 0.18], [N.F5, 0.27]].forEach(function(n, j){
+      rhodes(T("present", 0.2 + n[1]), {f:n[0], dur:1.1 - j * 0.1, gain:0.085 - j * 0.008, pan:p1 + (j % 2 ? 0.1 : -0.1), verb:0.5, index:2.3});
+    });
+    ting(T("present", 0.6), {gain:0.13, pan:p1 - 0.2, f:2100});
+    rhodes(T("present", 0.56), {f:N.C6, dur:0.25, gain:0.045, pan:p1, verb:0.35, index:1.6, lp:5000});
+    /* 鞠躬：揮下去、起來 */
+    whoosh(T("bow", 0.05), {pan:p1, dur:0.32, gain:0.1, up:false});
+    whoosh(T("unbow"), {pan:p1, dur:0.24, gain:0.07});
+    /* 倒退、踩空（在空中原地跑：沒有地板，只剩拍打聲）、「啊喔」、滑笛掉下去、後台一聲悶響加幾張牌散掉 */
+    step(T("step", 0.02), {pan:p1 + 0.1, paper:true, gain:0.8}); step(T("step", 0.2), {pan:p1 + 0.15, paper:true, gain:0.8});
+    for(i = 0, s = B.air; s < B.fall - 0.02; s += 0.09, i++) step(t0 + s / rate, {pan:p1 + 0.2, air:true, gain:0.5, k:1.3});
+    rhodes(T("air", 0.12), {f:N.E5, dur:0.35, gain:0.05, pan:p1 + 0.2, verb:0.35, index:1.8, lp:3600});
+    rhodes(T("air", 0.24), {f:N.C5, dur:0.5, gain:0.05, pan:p1 + 0.2, verb:0.4, index:1.6, lp:3200});
+    whistle(T("fall"), {f0:950, f1:190, dur:0.52, gain:0.06, pan:p1 + 0.2, lp:2000});
+    pack(T("fall", 0.55), {gain:0.38, pan:p1 + 0.2, verb:0.5});
+    thump(T("fall", 0.55), {f:70, dur:0.16, gain:0.09, pan:p1 * 0.5, verb:0.3, bend:0.6});
+    cardLand(T("fall", 0.62), {gain:0.4, soft:0.7, pan:p1 + 0.3, verb:0.4});
+    cardLand(T("fall", 0.70), {gain:0.32, soft:0.8, pan:p1 + 0.1, verb:0.4});
+    cardLand(T("fall", 0.81), {gain:0.25, soft:0.9, pan:p1 + 0.25, verb:0.45});
+    /* 句點 */
+    rhodes(T("end", 0.55), {f:N.F3, dur:1.2, gain:0.04, pan:0, verb:0.5, index:1.2, lp:1400, mallet:false});
+    bus = keep;
+  };
+  SFX.gagStop = function(){
+    if(!gagGain || !ctx) return;
+    var g = gagGain; gagGain = null;
+    g.gain.setTargetAtTime(0, ctx.currentTime, 0.03);
+    setTimeout(function(){ try{ g.disconnect(); }catch(e){} }, 500);
+  };
 
 window.SFX = SFX;
 })();
@@ -6071,6 +6296,308 @@ function showFinal(){
   ag.disabled = false; ag.textContent = T("再來一局");
   $("endErr").hidden = true;
   $("endOv").hidden = false;
+  endGag(clock / 1000 + .38);   /* 頒獎：最後一張牌落定、名字亮起之後才上場 */
+}
+
+/* ================= 收桌頒獎：Thomas 爬上講台 =================
+   design/end/g.def 定案（劇本、節拍、做法、四案對照都在 design/end/README.md）。
+   一條 WAAPI 主時間軸、十四條軌（x、y、身、雙腿、雙臂、頭、獎盃 x／y／轉、透明度、z），
+   全部只動 transform／opacity；x 與 y 拆兩層，跳起來才是真的拋物線。位置從 DOM 量（牌疊頂、地板線、冠軍頭像），
+   所以同分、手機寬都對。聲音是 SFX.gag() 照同一張節拍表排在 AudioContext 的時間軸上。
+   dealEnd：最後一張牌落定、名字亮起的時刻（秒）；他在那之後 0.6 秒上場。
+   收桌那一頁被關掉（hidden）就整段停：動畫取消、聲音收掉。 */
+function endGag(dealEnd){
+  if(endGag.stop) endGag.stop();
+  const stage = $("endStage"), tom = $("tom"), cup = $("tomCup");
+  const p1 = stage.querySelector(".stack.p1 .pile"), p2 = stage.querySelector(".stack.p2 .pile"), p3 = stage.querySelector(".stack.p3 .pile");
+  if(!p1 || !p3 || !stage.querySelector(".stack.p1 .faces")) return;   /* 台上不到三疊（同分併階）就不演：沒有第三名可以爬 */
+  const S = stage.getBoundingClientRect();
+  const R = function(el){ const r = el.getBoundingClientRect(); return {l:r.left - S.left, r:r.right - S.left, t:r.top - S.top, b:r.bottom - S.top, cx:(r.left + r.right) / 2 - S.left, cy:(r.top + r.bottom) / 2 - S.top}; };
+  const F = R($("endFloor")).t, P1 = R(p1), P2 = R(p2 || p1), P3 = R(p3), W = S.width;
+  const faces = R(stage.querySelector(".stack.p1 .faces"));
+  const k = parseFloat(getComputedStyle(tom).getPropertyValue("--k")) || 1;
+  const EO = "cubic-bezier(.16,1,.3,1)", EIO = "cubic-bezier(.77,0,.175,1)", EI = "cubic-bezier(.11,0,.5,0)", BACK = "cubic-bezier(.34,1.56,.64,1)", LIN = "linear";
+  const HEAD = 118 * k, ARML = 80 * k, SH = 44 * k;        /* 頭頂、手臂長、肩高（腳底算起） */
+  const DETOUR = true;   /* 繞第二名那一版（Francis 看的就是這版） */
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ── 站位 ── */
+  const x0 = Math.min(W - 36 * k, P3.r + 60 * k);       /* 上場：第三名右邊一點（手機時夾在舞台裡） */
+  const xJ = P3.r + 26 * k;                              /* 起跳點：貼著第三名那疊的右側 */
+  const on3 = {x:P3.r - 4 * k, y:P3.t}, on2 = {x:P2.l + 4 * k, y:P2.t}, on1 = {x:P1.r - 4 * k, y:P1.t};
+  const cupFloor = {x:xJ + 36 * k, y:F};
+  const cupGiven = {x:Math.max(faces.l - 24 * k, 20 * k), y:faces.cy + 20 * k};   /* 落在冠軍頭像左邊：他站右邊，不撞頭 */
+  const overHead = function(){ return -(HEAD + 4 * k); };  /* 拿在頭上時獎盃底座相對腳底的高度 */
+
+  /* ── 節拍表（秒）。DETOUR 才有 land2／look2／hop1 ── */
+  const B = {}; let t = 0;
+  const at = function(name, dur){ B[name] = t; t += dur; return B[name]; };
+  at("rise", .8);       /* 從地板底下走樓梯上來 */
+  at("walk", 1.0);       /* 走到第三名旁邊 */
+  at("crouch", .16);
+  at("jump1", .34);      /* 第一跳：不夠高，撞上牌疊 */
+  at("bump", .12);
+  at("slide", .36);      /* 貼著牌滑下來 */
+  at("putdown", .34);    /* 把獎盃放地上 */
+  at("backup", .36);     /* 退兩步 */
+  at("run", .3);        /* 助跑 */
+  at("jump2", .38);      /* 第二跳：抓到邊 */
+  at("hang", .6);       /* 吊著亂踢 */
+  at("haul", .45);        /* 爬上去 */
+  at("stand3", .35);
+  at("look", .3);       /* 低頭：獎盃呢 */
+  at("reach", .38);      /* 手臂伸長到地上 */
+  at("retract", .34);    /* 收回來、獎盃回到頭上 */
+  at("set", .26);
+  if(DETOUR){
+    at("hop", .58);      /* 一跳跳過頭，落在第二名 */
+    at("land2", .26);
+    at("look2", .8);    /* 看看那張 2，再看第一名 */
+    at("hop1", .55);     /* 跳回第一名 */
+  }else{
+    at("hop1", .55);      /* 直接跳到第一名 */
+  }
+  at("land1", .26);
+  at("present", .65);     /* 遞出去、冠軍點頭 */
+  at("bow", .5);
+  at("hold", .35);
+  at("unbow", .26);
+  at("step", .36);        /* 倒退一步、踩空 */
+  at("air", .4);        /* 原地跑 */
+  at("fall", .55);
+  at("end", .15);
+  const TOTAL = t;
+  const off = function(s){ return Math.min(1, Math.max(0, s / TOTAL)); };
+
+  /* ── 軌：每個零件收一串 {offset, transform, easing} ── */
+  const tracks = {tx:[], ty:[], body:[], legL:[], legR:[], armL:[], armR:[], head:[], cx:[], cy:[], cupr:[], tomo:[], cupo:[], tz:[]};
+  const K = function(tr, s, tf, ease, extra){ const f = {offset:off(s), easing:ease || LIN}; if(tf != null) f.transform = tf; if(extra) Object.assign(f, extra); tracks[tr].push(f); };
+  const X = function(s, x, e){ K("tx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const Y = function(s, y, e){ K("ty", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const BODY = function(s, rot, bob, e, sy){ K("body", s, "translateY(" + (bob || 0) + "px) rotate(" + rot + "deg)" + (sy ? " scaleY(" + sy + ")" : ""), e); };
+  const LEG = function(s, l, r, e){ K("legL", s, "rotate(" + l + "deg)", e); K("legR", s, "rotate(" + r + "deg)", e); };
+  const ARM = function(s, l, r, e, sr){ K("armL", s, "rotate(" + l + "deg)", e); K("armR", s, "rotate(" + r + "deg)" + (sr ? " scaleY(" + sr.toFixed(3) + ")" : ""), e); };
+  const HEADR = function(s, d, e){ K("head", s, "rotate(" + d + "deg)", e); };
+  const CX = function(s, x, e){ K("cx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const CY = function(s, y, e){ K("cy", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const CUPR = function(s, d, e, sc){ K("cupr", s, "rotate(" + d + "deg)" + (sc ? " scale(" + sc + ")" : ""), e); };
+  /* 走路：腿剪刀、身體上下彈；step 是一步幾秒 */
+  const walk = function(t0, t1, step, amp){
+    amp = amp || 26; let i = 0;
+    for(let s = t0; s < t1 - 1e-6; s += step / 2, i++){
+      const a = i % 2 ? amp : -amp;
+      LEG(s, a, -a, EIO); BODY(s, 0, i % 2 ? -3 : 0, EIO);
+    }
+  };
+  /* 拋物線：x 自己一條線性軌，y 先 ease-out 上到頂點再 ease-in 落地 */
+  const hop = function(t0, t1, from, to, apexUp){
+    const apex = Math.min(from.y, to.y) - apexUp;
+    X(t0, from.x, LIN); X(t1, to.x, LIN);
+    Y(t0, from.y, EO); Y(t0 + (t1 - t0) * .45, apex, EI); Y(t1, to.y, LIN);
+  };
+  /* 拿在頭上的獎盃跟著人：同一組 x／y 節拍，再加頭頂的高度 */
+  const carry = function(t0, t1, from, to, apexUp){
+    if(apexUp == null){ CX(t0, from.x, LIN); CX(t1, to.x, LIN); CY(t0, from.y + overHead(), EO); CY(t1, to.y + overHead(), LIN); return; }
+    const apex = Math.min(from.y, to.y) - apexUp;
+    CX(t0, from.x, LIN); CX(t1, to.x, LIN);
+    CY(t0, from.y + overHead(), EO); CY(t0 + (t1 - t0) * .45, apex + overHead(), EI); CY(t1, to.y + overHead(), LIN);
+  };
+
+  /* ── 0 上場：地板底下走上來，獎盃高舉過頭 ── */
+  K("tomo", 0, null, LIN, {opacity:1}); K("cupo", 0, null, LIN, {opacity:1}); K("tz", 0, null, LIN, {zIndex:2});
+  X(0, x0, LIN); Y(0, F + HEAD + 30 * k, LIN); Y(B.walk, F, LIN);
+  CX(0, x0, LIN); CY(0, F + HEAD + 30 * k + overHead(), LIN); CY(B.walk, F + overHead(), LIN);
+  ARM(0, 168, -168, LIN); HEADR(0, 0, LIN); CUPR(0, 0, LIN);
+  walk(0, B.walk, .3, 22);
+  /* ── 1 走到第三名旁邊 ── */
+  X(B.walk, x0, LIN); X(B.crouch, xJ, LIN);
+  CX(B.walk, x0, LIN); CX(B.crouch, xJ, LIN);
+  walk(B.walk, B.crouch, .34);
+  CUPR(B.walk, 0, EIO); CUPR(B.walk + .17, 5, EIO); CUPR(B.walk + .5, -5, EIO); CUPR(B.walk + .8, 5, EIO); CUPR(B.crouch, 0, EIO);
+  /* ── 2 第一跳：蹲、跳、撞牌、滑下 ── */
+  LEG(B.crouch, 38, -38, EO); BODY(B.crouch, 0, 0, EO); Y(B.crouch, F, EO); CY(B.crouch, F + overHead(), EO);
+  BODY(B.jump1, 0, 8, EO); LEG(B.jump1, 18, -18, EO);
+  Y(B.jump1, F, EO); Y(B.bump, F - 28 * k, LIN);
+  CY(B.jump1, F + overHead(), EO); CY(B.bump, F - 28 * k + overHead(), LIN);
+  BODY(B.bump, -6, 0, LIN); LEG(B.bump, -24, 26, EO); ARM(B.bump, 176, -176, EO);
+  X(B.bump, xJ, LIN); X(B.bump + .12, xJ - 6 * k, LIN); X(B.slide, xJ - 6 * k, LIN);
+  CX(B.bump, xJ, LIN); CX(B.bump + .12, xJ - 6 * k, LIN); CX(B.slide, xJ - 6 * k, LIN);
+  BODY(B.slide, -14, 0, EI); LEG(B.slide, -4, 6, LIN); Y(B.slide, F - 28 * k, EI); CY(B.slide, F - 28 * k + overHead(), EI);
+  CUPR(B.bump, 0, EO); CUPR(B.bump + .1, -18, EIO); CUPR(B.slide, -18, EIO);
+  /* 滑到地上，腿蹬幾下 */
+  LEG(B.slide + .08, 30, -20, EIO); LEG(B.slide + .2, -20, 34, EIO); LEG(B.slide + .32, 6, -6, EO);
+  Y(B.putdown, F, LIN); CY(B.putdown, F + overHead(), LIN); BODY(B.putdown, 0, 0, EO); X(B.putdown, xJ - 6 * k, LIN); CX(B.putdown, xJ - 6 * k, LIN);
+  CUPR(B.putdown, 0, EO);
+  /* ── 3 放下獎盃 ── */
+  ARM(B.putdown, 176, -176, EIO); ARM(B.backup - .06, 60, -110, EIO);
+  CX(B.putdown, xJ - 6 * k, EIO); CX(B.backup - .06, cupFloor.x, EIO);
+  CY(B.putdown, F + overHead(), EIO); CY(B.backup - .06, cupFloor.y, EIO);
+  CUPR(B.backup - .06, -4, EO); CUPR(B.backup + .1, 0, EO);
+  HEADR(B.putdown, 0, EIO); HEADR(B.backup - .06, 14, EIO);
+  /* ── 4 退兩步、助跑、第二跳抓住邊 ── */
+  X(B.backup, xJ - 6 * k, LIN); X(B.run, xJ + 60 * k, LIN); X(B.jump2, xJ, LIN);
+  walk(B.backup, B.run, .21, 20); walk(B.run, B.jump2, .17, 34);
+  ARM(B.backup, 40, -40, EIO); ARM(B.run, -30, 30, EIO); HEADR(B.backup, 0, EIO); HEADR(B.run, -10, EIO);
+  BODY(B.run, 0, 0, EIO); BODY(B.jump2 - .02, 16, 0, EIO);
+  ARM(B.jump2, -20, 20, EO); ARM(B.jump2 + .2, 176, -176, EO);
+  const hangY = Math.min(P3.t + HEAD + 2 * k, F - 8 * k);   /* 人比牌疊高的話，腳就快貼地了 */
+  Y(B.jump2, F, EO); Y(B.hang, hangY, LIN);              /* 手抓到牌頂：腳吊在牌頂下方一個身高 */
+  X(B.hang, P3.r - 4 * k, LIN);
+  BODY(B.jump2, 12, 0, EO); BODY(B.hang, 0, 0, EO); HEADR(B.jump2, 0, EO);
+  /* ── 5 吊著亂踢 ── */
+  LEG(B.hang, 10, -10, EIO);
+  for(let i = 0, s = B.hang + .08; s < B.haul - .05; s += .13, i++) LEG(s, i % 2 ? 44 : -30, i % 2 ? -34 : 40, EIO);
+  ARM(B.hang, 176, -176, LIN); ARM(B.haul - .1, 170, -170, EIO);
+  BODY(B.hang + .1, 4, 0, EIO); BODY(B.hang + .28, -5, 0, EIO); BODY(B.hang + .46, 4, 0, EIO); BODY(B.haul, 0, 0, EIO);
+  /* ── 6 爬上去 ── */
+  Y(B.haul, hangY, EIO); Y(B.stand3, on3.y, EO);
+  X(B.haul, P3.r - 4 * k, EIO); X(B.stand3, on3.x, EO);
+  ARM(B.haul, 170, -170, EIO); ARM(B.haul + .22, 100, -100, EIO); ARM(B.stand3, 14, -14, EO);
+  LEG(B.haul, 52, 10, EIO); LEG(B.haul + .22, 14, 60, EIO); LEG(B.stand3, 4, -4, EO);
+  BODY(B.haul, 0, 0, EIO); BODY(B.haul + .26, -10, 0, EIO); BODY(B.stand3, 0, 0, EO);
+  /* 站直，拍拍手（撣塵） */
+  ARM(B.stand3 + .1, 40, -10, EIO); ARM(B.stand3 + .22, 14, -40, EIO); ARM(B.look, 12, -12, EIO);
+  /* ── 7 低頭：獎盃呢？手臂伸長到地上撿 ── */
+  HEADR(B.stand3, 0, EIO); HEADR(B.look, 0, EIO); HEADR(B.look + .18, 32, EIO);
+  BODY(B.look, 0, 0, EIO); BODY(B.reach, 10, 0, EIO);
+  (function(){
+    /* 右手：肩在 (4k, 腳底-38k)；目標是獎盃的把手（底座上方 30k） */
+    const sx = on3.x + 4 * k, sy = on3.y - SH;
+    const dx = cupFloor.x - sx, dy = (cupFloor.y - 34 * k) - sy;
+    const L = Math.hypot(dx, dy), ang = Math.atan2(-dx, dy) * 180 / Math.PI, s = L / ARML;
+    ARM(B.reach, 12, -12, BACK); ARM(B.reach + .3, 12, ang, BACK, s);
+    ARM(B.retract - .04, 12, ang, EIO, s);
+    ARM(B.retract + .3, 168, -168, EO);
+    /* 獎盃：先被握住一下，再跟著手臂回到頭上 */
+    CX(B.retract - .04, cupFloor.x, EIO); CY(B.retract - .04, cupFloor.y, EIO);
+    CX(B.retract + .3, on3.x, EIO); CY(B.retract + .3, on3.y + overHead(), EIO);
+    CUPR(B.retract - .04, 0, EIO); CUPR(B.retract + .1, -40, EIO); CUPR(B.retract + .3, 0, EO);
+  })();
+  HEADR(B.retract, 32, EIO); HEADR(B.retract + .3, 0, EIO);
+  BODY(B.retract, 10, 0, EIO); BODY(B.retract + .3, 0, 0, EIO);
+  X(B.stand3, on3.x, LIN); Y(B.stand3, on3.y, LIN);
+  /* ── 8 跳：繞到第二名（跳過頭）再回第一名，或直接到第一名 ── */
+  const preHop = B.set;
+  LEG(B.set, 4, -4, EIO); LEG(B.set + .16, 34, -34, EO); BODY(B.set + .16, 0, 6, EO);
+  X(preHop, on3.x, LIN); Y(preHop, on3.y, LIN); CX(preHop, on3.x, LIN); CY(preHop, on3.y + overHead(), LIN);
+  let landAt;
+  if(DETOUR){
+    hop(B.hop, B.land2, on3, on2, 70 * k); carry(B.hop, B.land2, on3, on2, 70 * k);
+    LEG(B.hop, 34, -34, EO); LEG(B.hop + .2, -40, 46, EIO); LEG(B.land2 - .04, 30, -30, EO);
+    BODY(B.hop, 0, 0, EIO); BODY(B.hop + .3, -14, 0, EIO); BODY(B.land2, 0, 4, EO);
+    CUPR(B.hop, 0, EIO); CUPR(B.hop + .3, 12, EIO); CUPR(B.land2, 0, EO);
+    /* 落地晃兩下，低頭看那張「2」，再抬頭看隔壁 */
+    BODY(B.land2 + .08, -7, 0, EIO); BODY(B.land2 + .2, 5, 0, EIO); BODY(B.look2, 0, 0, EIO);
+    LEG(B.land2 + .12, 6, -6, EO);
+    HEADR(B.land2, 0, EIO); HEADR(B.look2 + .1, 26, EIO); HEADR(B.look2 + .42, 26, EIO); HEADR(B.look2 + .62, -18, EIO); HEADR(B.hop1, -18, EIO);
+    ARM(B.look2 + .1, 168, -168, EIO); ARM(B.look2 + .32, 168, -130, EIO); ARM(B.look2 + .6, 168, -168, EIO);  /* 一手放下來搔搔頭又舉回去 */
+    X(B.look2, on2.x, LIN); Y(B.look2, on2.y, LIN); CX(B.look2, on2.x, LIN); CY(B.look2, on2.y + overHead(), LIN);
+    LEG(B.hop1 - .12, 34, -34, EO); BODY(B.hop1 - .12, 0, 6, EO);
+    hop(B.hop1, B.land1, on2, on1, 60 * k); carry(B.hop1, B.land1, on2, on1, 60 * k);
+    BODY(B.hop1, 0, 0, EIO); BODY(B.hop1 + .28, 14, 0, EIO); BODY(B.land1, 0, 4, EO);
+    HEADR(B.hop1 + .2, 0, EIO);
+  }else{
+    hop(B.hop1, B.land1, on3, on1, 70 * k); carry(B.hop1, B.land1, on3, on1, 70 * k);
+    BODY(B.hop1, 0, 0, EIO); BODY(B.hop1 + .28, -14, 0, EIO); BODY(B.land1, 0, 4, EO);
+  }
+  LEG(B.hop1, 34, -34, EO); LEG(B.hop1 + .2, -40, 46, EIO); LEG(B.land1 - .04, 30, -30, EO);
+  CUPR(B.hop1, 0, EIO); CUPR(B.hop1 + .3, -12, EIO); CUPR(B.land1, 0, EO);
+  landAt = B.land1;
+  BODY(landAt + .08, 6, 0, EIO); BODY(landAt + .2, -4, 0, EIO); BODY(B.present, 0, 0, EIO);
+  LEG(landAt + .12, 6, -6, EO);
+  X(B.present, on1.x, LIN); Y(B.present, on1.y, LIN);
+  /* ── 9 遞出去：踮腳、手舉到最高，獎盃飛到冠軍旁邊；冠軍點頭 ── */
+  ARM(B.present, 168, -168, EIO); ARM(B.present + .25, 178, -178, EO); ARM(B.present + .55, 150, -150, EO);
+  BODY(B.present + .25, -8, -4, EO); BODY(B.bow, 0, 0, EIO);
+  LEG(B.present + .25, 2, -2, EO);
+  HEADR(B.present, 0, EIO); HEADR(B.present + .3, -12, EIO); HEADR(B.bow, 0, EIO);
+  CX(B.present, on1.x, LIN); CY(B.present, on1.y + overHead(), LIN);
+  CX(B.present + .2, on1.x, EO); CY(B.present + .2, on1.y + overHead(), EO);
+  CX(B.present + .6, cupGiven.x, EO); CY(B.present + .6, cupGiven.y, EO);
+  CUPR(B.present + .2, 0, EO); CUPR(B.present + .45, -10, EO, 1.15); CUPR(B.present + .6, 0, EO, 1);
+  CUPR(1e9, 0, LIN, 1);
+  CX(1e9, cupGiven.x, LIN); CY(1e9, cupGiven.y, LIN);
+  /* ── 10 鞠躬（整個人從腳底往前折） ── */
+  ARM(B.bow, 150, -150, EIO); ARM(B.bow + .3, 30, -60, EIO); ARM(B.unbow, 20, -20, EIO); ARM(B.step, 24, -24, EIO);
+  BODY(B.bow + .32, -62, 0, EIO); BODY(B.hold, -62, 0, EIO); BODY(B.unbow, -62, 0, EIO); BODY(B.unbow + .26, 0, 0, EO);
+  HEADR(B.bow + .32, -20, EIO); HEADR(B.unbow + .26, 0, EO);
+  /* ── 11 倒退一步、踩空、原地跑、掉到舞台後面 ── */
+  X(B.step, on1.x, LIN); X(B.step + .34, P1.r + 18 * k, LIN); walk(B.step, B.air, .18, 18);
+  Y(B.step, on1.y, LIN); Y(B.fall, on1.y, EI); Y(B.end, F + 130 * k, LIN);
+  HEADR(B.step, 0, EIO); HEADR(B.air + .1, 38, EIO); HEADR(B.fall, 38, EIO);
+  for(let i = 0, s = B.air; s < B.fall - .02; s += .09, i++) LEG(s, i % 2 ? 42 : -42, i % 2 ? -42 : 42, LIN);
+  ARM(B.air, 24, -24, EIO); ARM(B.air + .2, 176, -176, EIO);
+  BODY(B.air, 0, 0, LIN); BODY(B.fall, 0, 0, EI); BODY(B.end, 230, 0, LIN);
+  ARM(B.fall, 176, -176, EIO); ARM(B.fall + .25, 60, -120, EIO); ARM(B.end, 150, -30, EIO);
+  LEG(B.fall, 30, -10, EIO); LEG(B.fall + .25, -30, 50, EIO); LEG(B.end, 20, -50, EIO);
+  K("tz", B.fall, null, LIN, {zIndex:2}); K("tz", B.fall + .02, null, LIN, {zIndex:-1});
+  K("tomo", B.fall + .45, null, LIN, {opacity:1}); K("tomo", B.end, null, LIN, {opacity:0});
+  X(B.end, P1.r + 18 * k, LIN);
+
+  /* ── 收尾：每一軌補上 offset 1 的定格 ── */
+  const parts = {tx:tom, ty:$("tomY"), body:$("tomBody"), legL:$("tomLegL"), legR:$("tomLegR"), armL:$("tomArmL"), armR:$("tomArmR"), head:$("tomHead"), cx:cup, cy:$("tomCupY"), cupr:cup.querySelector("svg"), tomo:tom, cupo:cup, tz:tom};
+  const anims = [];
+  Object.keys(tracks).forEach(function(name){
+    let fr = tracks[name];
+    fr.sort(function(a, b){ return a.offset - b.offset; });
+    /* 同一個 offset 只留最後寫的那一格 */
+    fr = fr.filter(function(f, i){ return !(i + 1 < fr.length && Math.abs(fr[i + 1].offset - f.offset) < 1e-6); });
+    if(fr.length && fr[fr.length - 1].offset < 1) fr.push(Object.assign({}, fr[fr.length - 1], {offset:1}));
+    if(fr.length && fr[0].offset > 0) fr.unshift(Object.assign({}, fr[0], {offset:0}));
+    if(!fr.length) return;
+    anims.push({el:parts[name], fr:fr});
+  });
+
+  const pileWobble = function(pile, deg){
+    pile.animate([{transform:"rotate(0)"}, {transform:"rotate(" + deg + "deg)", offset:.25}, {transform:"rotate(" + (-deg * .55) + "deg)", offset:.6}, {transform:"rotate(0)"}], {duration:520, easing:EO});
+  };
+  const winnerNod = function(){
+    stage.querySelectorAll(".stack.p1 .faces").forEach(function(f){
+      f.animate([{transform:"none"}, {transform:"translateY(-7px) rotate(-9deg) scale(1.12)", offset:.38}, {transform:"none"}], {duration:620, easing:EO});
+    });
+  };
+
+
+  const A = [], timers = [];
+  const pan = function(x){ return Math.max(-.5, Math.min(.5, (x - W / 2) / W)); };
+  const dur = TOTAL * 1000;
+  /* 關掉那一頁就停：動畫取消（回到 opacity 0）、計時器清掉、聲音收掉 */
+  const ov = $("endOv");
+  const obs = new MutationObserver(function(){ if(ov.hidden) endGag.stop(); });
+  obs.observe(ov, {attributes:true, attributeFilter:["hidden"]});
+  endGag.stop = function(){
+    obs.disconnect();
+    A.forEach(function(an){ an.cancel(); }); A.length = 0;
+    timers.forEach(clearTimeout); timers.length = 0;
+    tom.classList.remove("still"); cup.classList.remove("still");
+    tom.style.opacity = cup.style.opacity = "";
+    if(window.SFX && SFX.gagStop) SFX.gagStop();
+    endGag.stop = null;
+  };
+  endGag.seek = function(sec){ A.forEach(function(an){ an.pause(); an.currentTime = Math.max(0, Math.min(TOTAL, sec)) * 1000; }); };   /* 測試用：停在某一秒 */
+  endGag.B = B; endGag.TOTAL = TOTAL;
+  const later = function(sec, fn){ timers.push(setTimeout(fn, sec * 1000)); };
+  const run = function(){
+    anims.forEach(function(a){ A.push(a.el.animate(a.fr, {duration:dur, fill:"forwards"})); });
+    if(window.SFX && SFX.gag) SFX.gag(B, 1, {pan1:pan(P1.cx), pan2:pan(P2.cx), pan3:pan(P3.cx)});
+    later(B.bump, function(){ pileWobble(p3, -2.4); });
+    later(B.hang, function(){ pileWobble(p3, 1.6); });
+    later(B.land2, function(){ pileWobble(p2, 1.4); });
+    later(B.land1, function(){ pileWobble(p1, -1.4); });
+    later(B.present + .55, winnerNod);
+    later(B.fall, function(){ pileWobble(p1, 1.2); });
+  };
+  const start = (dealEnd || 1.4) + .6;
+  if(reduce){
+    /* 不演：直接站在第一名旁邊、獎盃在冠軍旁邊，淡進來 */
+    tom.classList.add("still"); cup.classList.add("still");
+    tom.style.transform = "translateX(" + on1.x + "px)"; $("tomY").style.transform = "translateY(" + on1.y + "px)";
+    $("tomArmL").style.transform = "rotate(20deg)"; $("tomArmR").style.transform = "rotate(-20deg)";
+    cup.style.transform = "translateX(" + cupGiven.x + "px)"; $("tomCupY").style.transform = "translateY(" + cupGiven.y + "px)";
+    later(start, function(){ tom.style.opacity = 1; cup.style.opacity = 1; });
+    return;
+  }
+  later(start, run);
 }
 
 /* 窄螢幕才看得到這顆：計分表平常不佔版面，要看隨時點開 */
@@ -6384,6 +6911,7 @@ function startSolo(){
    three.js 載入失敗、或裝置根本沒有 WebGL 時沒有人來取用它，
    上面那張 2D 牌桌就原封不動繼續運作——3D 是加上去的一層，不是取代。 */
 const UD = window.UD = {
+  gag:endGag,   /* 收桌頒獎（endGag.seek／B／stop）：測試腳本從這裡拿 */
   SUITS:SUITS, LAY:LAY, rankLabel:rankLabel, legalCards:legalCards, REDUCED:REDUCED,
   SUIT_D:SUIT_D, PIC:PIC, CARD_DIR:CARD_DIR, COURT_KEYS:COURT_KEYS, cardHTML:cardHTML,
   JS:JS, JOKER:JOKER, isJoker:isJoker, rules:rules,

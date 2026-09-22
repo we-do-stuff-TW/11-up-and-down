@@ -5,3 +5,11 @@ supabase/.temp/
 CLAUDE.local.md
 .claude/settings.local.json
 design/i18n/_fail-*.png
+
+# 大廳「特別感謝」的原型：2026-09-15 決定先不放，而且裡面有一張認得出是誰的照片，
+# 這個 repo 是公開的——要 commit 之前先問 Francis（見 design/thanks/README.md）
+design/thanks/
+# 收桌頒獎原型用的頭像：symlink 到 design/thanks/_avatar.jpg，同一個理由不進版控
+design/end/_tom.jpg
+# 收桌頒獎的 Thomas 頭像：先用 symlink 指到 design/thanks，Francis 決定「進不進公開 repo」之前不進版控
+docs/img/tom.jpg

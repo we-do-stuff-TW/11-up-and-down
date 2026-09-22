@@ -1,0 +1,476 @@
+/* TITLE: J 電玩 · RESULTS */
+/* ── J 案：收桌那一塊變成一台街機的 RESULTS 畫面 ──────────────────────────────
+   舞台是一塊 CRT 面板（掃描線、暗角、琥珀色暈），三疊牌換成三個像素方塊講台（1ST／2ND／3RD），
+   Thomas 是像素人：頭是把照片畫成 20×20 再放大的像素圖，身體是 4px 的方塊火柴人，
+   走路兩格交替、跳躍 y 走階梯（steps）拋物線。聲音全部 chiptune。
+   引擎（節拍表、軌、x／y 拆層、量 DOM、?t、拉桿、重播）跟 g.def 同一套。 */
+.stage{position:relative;isolation:isolate;overflow:hidden;border-radius:12px;
+  background:oklch(.14 .02 250);
+  box-shadow:inset 0 0 0 3px oklch(.30 .025 250),inset 0 0 90px rgba(0,0,0,.55),0 0 48px oklch(.80 .14 80/.10)}
+/* 掃描線與暗角壓在最上面 */
+.stage::before{content:"";position:absolute;inset:0;z-index:7;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.30) 0 2px,transparent 2px 4px)}
+.stage::after{content:"";position:absolute;inset:0;z-index:7;pointer-events:none;
+  background:radial-gradient(ellipse 70% 60% at 50% 45%,transparent 60%,rgba(0,0,0,.42) 100%)}
+.stacks{display:flex;align-items:flex-end;justify-content:center;gap:26px;height:370px;padding-top:150px}
+.stack{position:relative;width:110px;flex:none;display:flex;flex-direction:column;align-items:center}
+.stack .who{margin-bottom:10px}
+.stack .who .nm{font-family:"Press Start 2P",monospace;font-size:10px;letter-spacing:0;line-height:1.5;max-width:150px;text-shadow:0 2px 0 rgba(0,0,0,.6)}
+.p1 .who .nm{font-size:12px}
+.stack .who .sc{font-family:"Press Start 2P",monospace;font-size:10px;color:oklch(.85 .14 80);text-shadow:0 2px 0 rgba(0,0,0,.6)}
+.stack .who .faces>*{border-radius:0;image-rendering:pixelated;box-shadow:0 0 0 2px oklch(.30 .025 250),0 0 0 4px rgba(0,0,0,.5)}
+/* 方塊講台：8px 網格的磚，頂面一道亮的，正面寫名次 */
+.pile{position:relative;width:110px;height:var(--h);transform-origin:50% 100%;display:grid;place-items:center;
+  background-color:#7a4a22;
+  background-image:
+    linear-gradient(oklch(.88 .12 80) 0 8px,rgba(255,255,255,.18) 8px 10px,transparent 10px),
+    repeating-linear-gradient(0deg,rgba(0,0,0,.42) 0 2px,transparent 2px 16px),
+    repeating-linear-gradient(90deg,rgba(0,0,0,.42) 0 2px,transparent 2px 22px);
+  box-shadow:inset -6px 0 0 rgba(0,0,0,.28),inset 6px 0 0 rgba(255,255,255,.08),0 0 0 2px #2a1608;
+  opacity:0;transform:translateY(110%);animation:blkIn .36s steps(5,end) forwards;animation-delay:var(--d)}
+@keyframes blkIn{to{opacity:1;transform:none}}
+.pile .lbl{font-family:"Press Start 2P",monospace;font-size:13px;color:oklch(.88 .12 80);text-shadow:2px 2px 0 rgba(0,0,0,.7);
+  margin-top:10px}
+.stack.p1 .pile{box-shadow:inset -6px 0 0 rgba(0,0,0,.28),inset 6px 0 0 rgba(255,255,255,.08),0 0 0 2px #2a1608,0 0 46px oklch(.85 .14 80/.22)}
+/* 地：一條像素地面 */
+.floor{width:100%;height:8px;margin:0;
+  background:repeating-linear-gradient(90deg,oklch(.42 .06 80) 0 8px,oklch(.30 .05 80) 8px 16px);box-shadow:0 -2px 0 oklch(.60 .10 80)}
+@media (prefers-reduced-motion:reduce){.pile{transform:none;animation:fadeIn .2s ease both}}
+@media (max-width:760px){
+  .stacks{gap:12px;height:300px;padding-top:110px}
+  .stack,.pile{width:88px}
+  .pile .lbl{font-size:10px}
+  .stack .who .nm{font-size:8px}.p1 .who .nm{font-size:9px}
+}
+
+/* ── 像素人：.tom 管 x、.ty 管 y、.body 縮放與轉圈（原點在腳底） ── */
+.tom{position:absolute;left:0;top:0;width:0;height:0;z-index:3;--k:1;pointer-events:none;opacity:0;will-change:transform}
+.ty{position:absolute;left:0;top:0;width:0;height:0}
+.body{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 -70px;scale:var(--k)}
+.limb{position:absolute;width:6px;background:#fff;box-shadow:0 0 0 2px #1a1a24;transform-origin:50% 0}
+.leg{left:-3px;top:-30px;height:30px}
+.leg.l{left:-9px}.leg.r{left:3px}
+.torso{position:absolute;left:-4px;top:-46px;width:8px;height:18px;background:oklch(.62 .20 25);box-shadow:0 0 0 2px #1a1a24}
+.arm{top:-44px;height:28px;width:6px}
+.arm.l{left:-14px}.arm.r{left:8px}
+/* 頭：20×20 的像素照片放大到 150px（比一個講台還寬） */
+.head{position:absolute;left:-75px;top:-196px;width:150px;height:150px;transform-origin:50% 100%}
+.head canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.head img{display:none}
+/* 獎盃與金幣：12×14／8×8 的像素圖（SVG rect，crispEdges） */
+.cup{position:absolute;left:0;top:0;width:0;height:0;z-index:4;--k:1;pointer-events:none;opacity:0;will-change:transform}
+.cupy{position:absolute;left:0;top:0;width:0;height:0}
+.cup svg{position:absolute;left:-18px;top:-42px;width:36px;height:42px;overflow:visible;transform-origin:50% 100%;scale:var(--k);shape-rendering:crispEdges}
+.coin{position:absolute;left:0;top:0;width:0;height:0;z-index:4;pointer-events:none;opacity:0}
+.coin svg{position:absolute;left:-12px;top:-24px;width:24px;height:24px;shape-rendering:crispEdges}
+/* 像素字幕 */
+.px{position:absolute;z-index:6;font-family:"Press Start 2P",monospace;color:oklch(.88 .12 80);text-shadow:2px 2px 0 rgba(0,0,0,.8);
+  white-space:nowrap;opacity:0;pointer-events:none;transform:translate(-50%,-50%)}
+.px.win{font-size:16px}
+.px.plus{font-size:10px;color:#fff}
+.px.oneup{font-size:11px;color:oklch(.80 .18 145)}
+@media (max-width:760px){.tom,.cup{--k:.72}.px.win{font-size:12px}}
+.tom.still,.cup.still{transition:opacity .3s ease}
+/*==HTML==*/
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <div class="stage" id="stage">
+      <div class="stacks" id="stacks"></div>
+      <div class="floor" id="floor"></div>
+      <div class="tom" id="tom" aria-hidden="true"><div class="ty" id="ty"><div class="body" id="body">
+        <i class="limb leg l" id="legL"></i><i class="limb leg r" id="legR"></i>
+        <i class="torso"></i>
+        <i class="limb arm l" id="armL"></i><i class="limb arm r" id="armR"></i>
+        <div class="head" id="head"><img id="tomSrc" src="_tom.jpg" alt=""><canvas id="tomPx" width="20" height="20"></canvas></div>
+      </div></div></div>
+      <div class="cup" id="cup" aria-hidden="true"><div class="cupy" id="cupy"></div></div>
+      <div class="coin" id="coin" aria-hidden="true"></div>
+      <span class="px win" id="pxWin">WINNER!</span>
+      <span class="px plus" id="pxPlus">+100</span>
+      <span class="px oneup" id="pxUp">1UP</span>
+    </div>
+<script>
+(function(){
+  /* 三個方塊講台。class（.stack.pN／.who／.faces）與 --dw 節奏跟 E 一樣，正式版 showFinal() 照這個填 */
+  const who = function(t){ return '<div class="who" style="--dw:' + t.dw + '"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div><span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span><span class="sc" data-v="' + t.sc + '">' + (t.sc > 0 ? "+" : "") + '0</span></div>'; };
+  const T = END.tiers, order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  const H = {1:136, 2:96, 3:64}, LBL = {1:"1ST", 2:"2ND", 3:"3RD"};
+  const phone = matchMedia("(max-width:760px)").matches;
+  document.getElementById("stacks").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1;
+    const d = (3 - k) * .22 + .1;                    /* 3RD 先冒出來，1ST 最後 */
+    t.dw = (d + .42).toFixed(2) + "s";
+    return '<div class="stack p' + k + '">' + who(t) + '<div class="pile" style="--h:' + Math.round(H[k] * (phone ? .8 : 1)) + 'px;--d:' + d.toFixed(2) + 's"><span class="lbl">' + LBL[k] + '</span></div></div>';
+  }).join("");
+  window.DEAL_END = .1 + .44 + .42 + .5;   /* 1ST 站好、名字亮起、分數跳完 */
+  /* 分數從 0 逐位跳到最後值 */
+  document.querySelectorAll(".stack .sc").forEach(function(el){
+    const v = parseInt(el.dataset.v, 10), dw = parseFloat(el.parentNode.style.getPropertyValue("--dw")) * 1000;
+    setTimeout(function(){
+      const n = 14; let i = 0;
+      const iv = setInterval(function(){ i++; const cur = Math.round(v * i / n); el.textContent = (cur > 0 ? "+" : "") + cur; if(i >= n) clearInterval(iv); }, 36);
+    }, dw + 120);
+  });
+  /* 像素頭：照片畫成 28×28（20 太糊，臉認不出來），圓形以外清掉，外圍一圈暗邊。
+     照片是夜拍的、又戴安全帽：先用 gamma 把暗部整個抬起來、再拉對比，最後量化到 8 階才像 8-bit。 */
+  const img = document.getElementById("tomSrc"), cv = document.getElementById("tomPx"), NPX = 28;
+  const draw = function(){
+    cv.width = cv.height = NPX;
+    const c = cv.getContext("2d"); c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
+    const s = Math.min(img.naturalWidth, img.naturalHeight) * .92, sx = (img.naturalWidth - s) / 2, sy = (img.naturalHeight - s) / 2 - s * .04;
+    /* 兩段縮：先 84 再 28，每格是平均色而不是抽到一個點 */
+    const mid = document.createElement("canvas"); mid.width = mid.height = NPX * 3;
+    const mc = mid.getContext("2d"); mc.imageSmoothingEnabled = true; mc.imageSmoothingQuality = "high";
+    mc.drawImage(img, sx, Math.max(0, sy), s, s, 0, 0, NPX * 3, NPX * 3);
+    c.clearRect(0, 0, NPX, NPX); c.drawImage(mid, 0, 0, NPX * 3, NPX * 3, 0, 0, NPX, NPX);
+    const d = c.getImageData(0, 0, NPX, NPX), px = d.data;
+    const lift = function(v){ let l = Math.pow(v / 255, .58); l = (l - .5) * 1.45 + .6; return Math.max(0, Math.min(255, l * 255)); };
+    const R = NPX / 2;
+    for(let y = 0; y < NPX; y++) for(let x = 0; x < NPX; x++){
+      const dx = x + .5 - R, dy = y + .5 - R, r = Math.hypot(dx, dy), i = (y * NPX + x) * 4;
+      if(r > R){ px[i + 3] = 0; }
+      else if(r > R - 1.2){ px[i] = 26; px[i + 1] = 26; px[i + 2] = 36; px[i + 3] = 255; }
+      else {
+        px[i] = Math.round(lift(px[i]) / 32) * 32; px[i + 1] = Math.round(lift(px[i + 1]) / 32) * 32; px[i + 2] = Math.round(lift(px[i + 2]) / 32) * 32;
+      }
+    }
+    c.putImageData(d, 0, 0);
+  };
+  if(img.complete && img.naturalWidth) draw(); else img.onload = draw;
+  /* 像素圖：字元地圖 → SVG rect */
+  window.pix = function(map, pal, w, h){
+    let r = '<svg viewBox="0 0 ' + w + ' ' + h + '" shape-rendering="crispEdges">';
+    map.forEach(function(row, y){ row.split("").forEach(function(ch, x){ if(pal[ch]) r += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + pal[ch] + '"/>'; }); });
+    return r + '</svg>';
+  };
+  const G = "#f2c14e", D = "#9a6a12", L = "#fff2b0", O = "#2a1a08";
+  document.getElementById("cupy").innerHTML = pix([
+    "..OOOOOOOO..",
+    ".OOLGGGGGDO.",
+    "OO.LGGGGGD.O",
+    "O..LGGGGGD.O",
+    ".O.LGGGGGD.O",
+    "..O.GGGGD.O.",
+    "....OGGDO...",
+    ".....GD.....",
+    ".....GD.....",
+    "....LGGD....",
+    "...OGGGGDO..",
+    "..OLGGGGGDO.",
+    "..OOOOOOOOO.",
+    "............"], {O:O, G:G, D:D, L:L}, 12, 14);
+  document.getElementById("coin").innerHTML = pix([
+    "..OOOO..",
+    ".OLGGGO.",
+    "OLGDGGGO",
+    "OLGDGGGO",
+    "OLGDGGGO",
+    "OLGDGGGO",
+    ".OGGGDO.",
+    "..OOOO.."], {O:O, G:G, D:D, L:L}, 8, 8);
+})();
+</script>
+<script>
+/*==SFX==*/
+</script>
+<script>
+/* ═══ 頒獎的聲音：全部 chiptune ═══════════════════════════════════════════
+   方波與三角波、硬的包絡（attack 0、瞬間收）、沒有殘響——這是一台街機。
+   照節拍表排在 AudioContext 的時間軸上。正式版搬進音效層那個 IIFE。 */
+(function(){
+  if(!window.SFX || !SFX._prim) return;
+  var P = SFX._prim, out = P.out, now = P.now, live = P.live, ctx = P.ctx;
+  var nf = function(semis){ return 440 * Math.pow(2, semis / 12); };
+  var C3 = nf(-21), G3 = nf(-14), C5 = nf(3), E5 = nf(7), G5 = nf(10), C6 = nf(15), E6 = nf(19), G6 = nf(22), B5 = nf(14), A6 = nf(24), E7 = nf(31), C7 = nf(27), D7 = nf(29), G7 = nf(34), B4 = nf(2), F5 = nf(8);
+  /* 一顆 8-bit 音：wave 方波或三角波，f→f1 是滑音，dur 之後瞬間收 */
+  function chip(t, o){
+    var c = ctx(), osc = c.createOscillator(); osc.type = o.wave || "square";
+    osc.frequency.setValueAtTime(o.f, t);
+    if(o.f1) osc.frequency.linearRampToValueAtTime(o.f1, t + o.dur);
+    var g = c.createGain(), v = o.gain || 0.05;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.004);
+    g.gain.setValueAtTime(v, t + o.dur - 0.006); g.gain.linearRampToValueAtTime(0, t + o.dur);
+    osc.connect(g); out(g, o.pan || 0, 0);
+    osc.start(t); osc.stop(t + o.dur + 0.01);
+  }
+  var tick = function(t, pan, f){ chip(t, {f:f || 220, dur:0.03, gain:0.045, pan:pan}); };
+  var blip = function(t, pan){ chip(t, {f:300, f1:900, dur:0.12, gain:0.07, pan:pan}); };
+  var land = function(t, pan){ chip(t, {f:80, dur:0.08, gain:0.09, wave:"triangle", pan:pan}); chip(t, {f:160, dur:0.03, gain:0.03, pan:pan}); };
+  var coin = function(t, pan, hi){ chip(t, {f:hi ? E6 : B5, dur:0.08, gain:0.075, pan:pan}); chip(t + 0.08, {f:hi ? A6 : E6, dur:0.3, gain:0.07, pan:pan}); };
+
+  SFX.gag = function(B, rate, o){
+    if(!live()) return;
+    rate = rate || 1; o = o || {};
+    var t0 = now() + 0.03, p1 = o.pan1 || 0, p2 = o.pan2 || -0.35, p3 = o.pan3 || 0.35;
+    var T = function(name, plus){ return t0 + (B[name] + (plus || 0)) / rate; };
+    var i, s;
+    /* 跑進來 */
+    for(i = 0, s = B.run; s < B.crouch - 0.02; s += 0.12, i++) tick(t0 + s / rate, p3 + 0.1, i % 2 ? 220 : 196);
+    /* 第一跳：頭撞方塊，方塊被頂起、金幣冒出、+100 */
+    blip(T("jump1"), p3);
+    chip(T("bonk"), {f:110, dur:0.06, gain:0.08, pan:p3});
+    chip(T("bonk", 0.01), {f:330, f1:520, dur:0.05, gain:0.04, wave:"triangle", pan:p3});
+    coin(T("bonk", 0.04), p3);
+    land(T("land1"), p3);
+    /* 第二跳：站上 3RD，撿到獎盃 */
+    blip(T("jump2"), p3);
+    land(T("land2"), p3);
+    coin(T("grab", 0.02), p3, true);
+    [C6, E6, G6].forEach(function(f, j){ chip(T("grab", 0.4 + j * 0.05), {f:f, dur:0.045, gain:0.05, pan:p3}); });
+    /* 跳過 1ST 到 2ND，再跳回 1ST */
+    blip(T("jump3"), (p3 + p2) / 2); land(T("land3"), p2);
+    blip(T("jump4"), (p2 + p1) / 2); land(T("land4"), p1);
+    /* WINNER!：琶音、長音、三角波低音；分數 +999 逐位跳、再跳回來 */
+    [C5, E5, G5, C6].forEach(function(f, j){ chip(T("present", 0.1 + j * 0.09), {f:f, dur:0.085, gain:0.065, pan:p1}); });
+    chip(T("present", 0.46), {f:C6, dur:0.5, gain:0.06, pan:p1});
+    chip(T("present", 0.1), {f:C3, dur:0.36, gain:0.06, wave:"triangle", pan:p1});
+    chip(T("present", 0.46), {f:G3, dur:0.5, gain:0.06, wave:"triangle", pan:p1});
+    for(i = 0; i < 12; i++) chip(T("score", i * 0.04), {f:1200 + i * 40, dur:0.015, gain:0.03, pan:p1});
+    for(i = 0; i < 3; i++) chip(T("score", 0.9 + i * 0.05), {f:900 - i * 200, dur:0.03, gain:0.035, pan:p1});
+    /* 往右跑、踩空（「？」兩聲）、死亡音、掉下去、1UP */
+    for(i = 0, s = B.run2; s < B.air - 0.02; s += 0.12, i++) tick(t0 + s / rate, p1 + 0.15, i % 2 ? 220 : 196);
+    chip(T("air", 0.05), {f:880, dur:0.05, gain:0.04, pan:p1 + 0.2}); chip(T("air", 0.15), {f:880, dur:0.05, gain:0.04, pan:p1 + 0.2});
+    chip(T("fall"), {f:B4, dur:0.1, gain:0.07, pan:p1 + 0.2});
+    [0.2, 0.3, 0.4].forEach(function(d){ chip(T("fall", d), {f:F5, dur:0.09, gain:0.065, pan:p1 + 0.2}); });
+    chip(T("fall", 0.55), {f:660, f1:110, dur:0.45, gain:0.07, pan:p1 + 0.2});
+    [E6, G6, E7, C7, D7, G7].forEach(function(f, j){ chip(T("end", 0.15 + j * 0.07), {f:f, dur:0.065, gain:0.05, pan:0}); });
+  };
+})();
+</script>
+<script>
+/* ═══ 頒獎（Mario 邏輯）═══════════════════════════════════════════════════
+   引擎跟 g.def 同一套：節拍表、每個零件一條 WAAPI 軌、x 等速、y 走階梯（steps）拋物線、位置從 DOM 量。
+   ?slow 慢動作；?t=節拍名+秒 停格；重播頒獎（有聲）不重新載入。 */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const $ = function(id){ return document.getElementById(id); };
+  const stage = $("stage"), tom = $("tom"), cup = $("cup"), coin = $("coin");
+  const p1 = document.querySelector(".stack.p1 .pile"), p2 = document.querySelector(".stack.p2 .pile"), p3 = document.querySelector(".stack.p3 .pile");
+  if(!p1 || !p3) return;
+  const S = stage.getBoundingClientRect();
+  const R = function(el){ const r = el.getBoundingClientRect(); return {l:r.left - S.left, r:r.right - S.left, t:r.top - S.top, b:r.bottom - S.top, cx:(r.left + r.right) / 2 - S.left, cy:(r.top + r.bottom) / 2 - S.top}; };
+  /* 方塊還在冒出來的路上（translateY），量它們最後的位置：用 .stack 的底減方塊高 */
+  const blk = function(pile){ const st = R(pile.parentNode), h = pile.offsetHeight; return {l:st.l, r:st.r, cx:st.cx, t:st.b - h, b:st.b}; };
+  const F = R($("floor")).t, P1 = blk(p1), P2 = blk(p2 || p1), P3 = blk(p3), W = S.width;
+  const faces = R(document.querySelector(".stack.p1 .faces"));
+  const k = parseFloat(getComputedStyle(tom).getPropertyValue("--k")) || 1;
+  const LIN = "linear", STEP = "steps(1,end)", EO = "cubic-bezier(.16,1,.3,1)";
+  const HEAD = 196 * k;                                    /* 頭頂（腳底算起） */
+  const SLOW = q.has("slow");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ── 站位 ── */
+  const x0 = W + 90 * k;                                   /* 畫面外右邊跑進來 */
+  const xJ = P3.r + 34 * k;                                /* 在 3RD 右邊起跳 */
+  const on3 = {x:P3.cx, y:P3.t}, on2 = {x:P2.cx, y:P2.t}, on1 = {x:P1.r - 10 * k, y:P1.t};
+  const cupStart = {x:P3.cx, y:P3.t};                      /* 獎盃一開始就放在 3RD 上，像關卡裡的道具 */
+  const cupGiven = {x:Math.max(faces.l - 30 * k, 22 * k), y:faces.cy + 20 * k};
+  const overHead = function(){ return -(HEAD + 10 * k); };
+
+  /* ── 節拍表（秒） ── */
+  const B = {}; let t = 0;
+  const at = function(name, dur){ B[name] = t; t += dur; return B[name]; };
+  at("run", 1.0);        /* 從右邊跑進來 */
+  at("crouch", .12);
+  at("jump1", .32);      /* 第一跳：頭撞到 3RD */
+  at("bonk", .1);        /* 方塊被頂起、金幣、+100 */
+  at("fall1", .3);
+  at("land1", .22);
+  at("jump2", .4);       /* 第二跳：站上 3RD */
+  at("land2", .18);
+  at("grab", .55);       /* 獎盃冒出來、飄到頭上 */
+  at("jump3", .6);       /* 跳過 1ST 落在 2ND */
+  at("land3", .28);
+  at("jump4", .48);      /* 跳回 1ST */
+  at("land4", .26);
+  at("present", .95);    /* 獎盃飛給冠軍、WINNER! 閃三下 */
+  at("score", 1.1);      /* 冠軍分數 +999 跳上去、再跳回來 */
+  at("run2", .42);       /* 往右跑，跑出方塊邊 */
+  at("air", .3);         /* 踩空：停一拍 */
+  at("fall", 1.0);       /* 死亡音，轉圈掉下去 */
+  at("end", .7);         /* 1UP */
+  const TOTAL = t;
+  const off = function(s){ return Math.min(1, Math.max(0, s / TOTAL)); };
+
+  const tracks = {tx:[], ty:[], body:[], legL:[], legR:[], armL:[], armR:[], cx:[], cy:[], cupr:[], tomo:[], cupo:[], coinx:[], coiny:[], coino:[], win:[], plus:[], plusy:[], oneup:[]};
+  const K = function(tr, s, tf, ease, extra){ const f = {offset:off(s), easing:ease || LIN}; if(tf != null) f.transform = tf; if(extra) Object.assign(f, extra); tracks[tr].push(f); };
+  const X = function(s, x, e){ K("tx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const Y = function(s, y, e){ K("ty", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const BODY = function(s, rot, bob, e){ K("body", s, "translateY(" + (bob || 0) + "px) rotate(" + rot + "deg)", e); };
+  const LEG = function(s, l, r, e){ K("legL", s, "rotate(" + l + "deg)", e || STEP); K("legR", s, "rotate(" + r + "deg)", e || STEP); };
+  const ARM = function(s, l, r, e){ K("armL", s, "rotate(" + l + "deg)", e || STEP); K("armR", s, "rotate(" + r + "deg)", e || STEP); };
+  const CX = function(s, x, e){ K("cx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const CY = function(s, y, e){ K("cy", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const CUPR = function(s, d, e, sc){ K("cupr", s, "rotate(" + d + "deg)" + (sc ? " scale(" + sc + ")" : ""), e); };
+  /* 跑步：兩格交替，每格硬切 */
+  const walk = function(t0, t1, step){
+    let i = 0;
+    for(let s = t0; s < t1 - 1e-6; s += step, i++){ const a = i % 2 ? 32 : -32; LEG(s, a, -a); ARM(s, -a * 1.2, a * 1.2); BODY(s, 0, i % 2 ? -2 : 0, STEP); }
+  };
+  /* 拋物線：x 等速；y 取 n 格、每格硬切（8-bit 的弧線） */
+  const hop = function(t0, t1, from, to, clear, n){
+    n = n || 9;
+    X(t0, from.x, LIN); X(t1, to.x, LIN);
+    const amp = Math.abs(to.y - from.y) / 2 + clear;
+    for(let i = 0; i <= n; i++){ const u = i / n; Y(t0 + (t1 - t0) * u, from.y + (to.y - from.y) * u - amp * 4 * u * (1 - u), STEP); }
+  };
+  const carry = function(t0, t1, from, to, clear, n){
+    n = n || 9;
+    CX(t0, from.x, LIN); CX(t1, to.x, LIN);
+    const amp = Math.abs(to.y - from.y) / 2 + clear;
+    for(let i = 0; i <= n; i++){ const u = i / n; CY(t0 + (t1 - t0) * u, from.y + (to.y - from.y) * u - amp * 4 * u * (1 - u) + overHead(), STEP); }
+  };
+
+  /* ── 0 跑進來 ── */
+  K("tomo", 0, null, LIN, {opacity:1}); K("cupo", 0, null, LIN, {opacity:1});
+  K("coino", 0, null, STEP, {opacity:0}); K("win", 0, null, STEP, {opacity:0}); K("plus", 0, null, STEP, {opacity:0}); K("oneup", 0, null, STEP, {opacity:0});
+  X(0, x0, LIN); Y(0, F, LIN); X(B.crouch, xJ, LIN);
+  walk(0, B.crouch, .12);
+  CX(0, cupStart.x, LIN); CY(0, cupStart.y, LIN); CUPR(0, 0, LIN);
+  K("coinx", 0, "translateX(" + P3.cx.toFixed(1) + "px)", LIN); K("coiny", 0, "translateY(" + P3.t.toFixed(1) + "px)", LIN);
+  /* ── 1 第一跳：頭撞到 3RD，掉回地上 ── */
+  LEG(B.crouch, 40, -40); ARM(B.crouch, 30, -30); BODY(B.crouch, 0, 6, STEP);
+  BODY(B.jump1, 0, 0, STEP); LEG(B.jump1, -20, 30); ARM(B.jump1, 150, -150);
+  X(B.jump1, xJ, LIN); X(B.bonk, P3.r - 6 * k, LIN);
+  (function(){ const n = 5, apex = F - 64 * k; for(let i = 0; i <= n; i++){ const u = i / n; Y(B.jump1 + (B.bonk - B.jump1) * u, F - (apex < F ? (F - apex) : 0) * (1 - (1 - u) * (1 - u)), STEP); } })();
+  X(B.bonk, P3.r - 6 * k, LIN); X(B.fall1, P3.r + 24 * k, LIN); X(B.land1, xJ, LIN);
+  Y(B.bonk, F - 64 * k, STEP); Y(B.bonk + .06, F - 58 * k, STEP);
+  (function(){ const n = 5; for(let i = 0; i <= n; i++){ const u = i / n; Y(B.fall1 + (B.land1 - B.fall1) * u, F - 58 * k * (1 - u * u), STEP); } })();
+  LEG(B.fall1, 30, -20); ARM(B.fall1, 120, -120);
+  LEG(B.land1, 36, -36); ARM(B.land1, 20, -20); BODY(B.land1, 0, 6, STEP); BODY(B.land1 + .1, 0, 0, STEP); LEG(B.land1 + .1, 4, -4);
+  /* 金幣：從方塊頂彈出去、往上飛、消失；+100 往上飄 */
+  K("coino", B.bonk, null, STEP, {opacity:0}); K("coino", B.bonk + .01, null, STEP, {opacity:1}); K("coino", B.bonk + .5, null, STEP, {opacity:1}); K("coino", B.bonk + .52, null, STEP, {opacity:0});
+  (function(){ const n = 6; for(let i = 0; i <= n; i++){ const u = i / n; K("coiny", B.bonk + .5 * u, "translateY(" + (P3.t - 110 * k * (1 - (1 - u) * (1 - u))).toFixed(1) + "px)", STEP); } })();
+  K("plus", B.bonk + .1, null, STEP, {opacity:0}); K("plus", B.bonk + .11, null, STEP, {opacity:1}); K("plus", B.bonk + .9, null, "steps(4,end)", {opacity:1}); K("plus", B.bonk + 1.2, null, STEP, {opacity:0});
+  K("plusy", 0, "translate(-50%,-50%) translateY(0)", LIN); K("plusy", B.bonk + .1, "translate(-50%,-50%) translateY(0)", LIN); K("plusy", B.bonk + 1.2, "translate(-50%,-50%) translateY(-70px)", LIN);
+  /* ── 2 第二跳：站上 3RD；獎盃冒出來、飄到頭上 ── */
+  LEG(B.jump2 - .06, 40, -40); BODY(B.jump2 - .06, 0, 6, STEP); BODY(B.jump2, 0, 0, STEP);
+  LEG(B.jump2, -20, 30); ARM(B.jump2, 150, -150);
+  hop(B.jump2, B.land2, {x:xJ, y:F}, on3, 36 * k, 8);
+  LEG(B.land2, 36, -36); ARM(B.land2, 20, -20); LEG(B.land2 + .1, 4, -4);
+  CX(B.grab, cupStart.x, LIN); CY(B.grab, cupStart.y, STEP);
+  (function(){ const n = 6; for(let i = 0; i <= n; i++){ const u = i / n; CY(B.grab + .05 + .3 * u, on3.y + (overHead() - 30 * k) * u * (2 - u), STEP); } })();
+  CY(B.grab + .4, on3.y + overHead() - 30 * k, STEP); CY(B.grab + .5, on3.y + overHead(), STEP);
+  CUPR(B.grab, 0, STEP); CUPR(B.grab + .1, 90, STEP); CUPR(B.grab + .2, 180, STEP); CUPR(B.grab + .3, 270, STEP); CUPR(B.grab + .4, 360, STEP);
+  ARM(B.grab + .1, 170, -170); ARM(B.grab + .45, 20, -20);
+  X(B.grab, on3.x, LIN); Y(B.grab, on3.y, LIN);
+  /* ── 3 跳過 1ST 落在 2ND，再跳回 1ST ── */
+  LEG(B.jump3 - .06, 40, -40); BODY(B.jump3 - .06, 0, 6, STEP); BODY(B.jump3, 0, 0, STEP);
+  X(B.jump3 - .06, on3.x, LIN); Y(B.jump3 - .06, on3.y, LIN); CX(B.jump3 - .06, on3.x, LIN); CY(B.jump3 - .06, on3.y + overHead(), LIN);
+  LEG(B.jump3, -20, 30); ARM(B.jump3, 150, -150);
+  hop(B.jump3, B.land3, on3, on2, 150 * k, 11); carry(B.jump3, B.land3, on3, on2, 150 * k, 11);
+  LEG(B.land3, 36, -36); ARM(B.land3, 20, -20); LEG(B.land3 + .1, 4, -4);
+  LEG(B.jump4 - .06, 40, -40); BODY(B.jump4 - .06, 0, 6, STEP); BODY(B.jump4, 0, 0, STEP);
+  X(B.jump4 - .06, on2.x, LIN); Y(B.jump4 - .06, on2.y, LIN); CX(B.jump4 - .06, on2.x, LIN); CY(B.jump4 - .06, on2.y + overHead(), LIN);
+  LEG(B.jump4, -20, 30); ARM(B.jump4, 150, -150);
+  hop(B.jump4, B.land4, on2, on1, 60 * k, 9); carry(B.jump4, B.land4, on2, on1, 60 * k, 9);
+  LEG(B.land4, 36, -36); ARM(B.land4, 20, -20); LEG(B.land4 + .1, 4, -4);
+  /* ── 4 頒獎：獎盃飛到冠軍旁邊（階梯弧線），WINNER! 閃三下 ── */
+  X(B.present, on1.x, LIN); Y(B.present, on1.y, LIN);
+  ARM(B.present, 170, -170); ARM(B.present + .5, 20, -20);
+  (function(){ const n = 7, t0 = B.present + .05, t1 = B.present + .45, from = {x:on1.x, y:on1.y + overHead()}, to = cupGiven;
+    CX(t0, from.x, LIN); CX(t1, to.x, LIN);
+    for(let i = 0; i <= n; i++){ const u = i / n; CY(t0 + (t1 - t0) * u, from.y + (to.y - from.y) * u - 40 * k * 4 * u * (1 - u), STEP); } })();
+  CUPR(B.present + .05, 0, STEP); CUPR(B.present + .45, 0, STEP);
+  [0, .16, .32].forEach(function(d){ K("win", B.present + .5 + d, null, STEP, {opacity:1}); K("win", B.present + .5 + d + .09, null, STEP, {opacity:0}); });
+  K("win", B.present + .98, null, STEP, {opacity:1});
+  K("win", B.score + 1.0, null, STEP, {opacity:1}); K("win", B.score + 1.02, null, STEP, {opacity:0}); K("win", 1e9, null, STEP, {opacity:0});
+  CX(1e9, cupGiven.x, LIN); CY(1e9, cupGiven.y, LIN);
+  /* ── 5 往右跑、踩空、掉下去（轉圈） ── */
+  X(B.run2, on1.x, LIN); X(B.air, P1.r + 40 * k, LIN); walk(B.run2, B.air, .12);
+  Y(B.run2, on1.y, LIN); Y(B.fall, on1.y, STEP);
+  LEG(B.air, 4, -4); ARM(B.air, 60, -60);
+  X(B.fall, P1.r + 40 * k, LIN); X(B.end, P1.r + 40 * k, LIN);
+  (function(){ const n = 10, t0 = B.fall + .55, t1 = B.end + .1; for(let i = 0; i <= n; i++){ const u = i / n; Y(t0 + (t1 - t0) * u, on1.y + (F - on1.y + 240 * k) * u * u, STEP); } })();
+  Y(B.fall + .55, on1.y, STEP);
+  /* 死亡音那一拍：先往上彈一下（Mario 死掉就是這樣），再轉圈掉下去 */
+  Y(B.fall + .05, on1.y - 30 * k, STEP); Y(B.fall + .55, on1.y - 30 * k, STEP);
+  [0, 90, 180, 270, 360, 450, 540].forEach(function(d, i){ BODY(B.fall + .55 + i * .12, d, 0, STEP); });
+  LEG(B.fall, 30, -30); ARM(B.fall, 160, -160);
+  K("tomo", B.end + .3, null, LIN, {opacity:1}); K("tomo", B.end + .32, null, LIN, {opacity:0});
+  /* 1UP */
+  [0, .14, .28].forEach(function(d){ K("oneup", B.end + .1 + d, null, STEP, {opacity:1}); K("oneup", B.end + .1 + d + .07, null, STEP, {opacity:0}); });
+  K("oneup", B.end + .5, null, STEP, {opacity:1}); K("oneup", 1e9, null, STEP, {opacity:1});
+
+  /* 字幕的位置 */
+  const win = $("pxWin"), plus = $("pxPlus"), oneup = $("pxUp");
+  win.style.left = Math.max(60 * k, faces.l - 30 * k) + "px"; win.style.top = (faces.t - 28 * k) + "px";
+  plus.style.left = (P3.cx + 30 * k) + "px"; plus.style.top = (P3.t - 30 * k) + "px";
+  oneup.style.left = (W - 48) + "px"; oneup.style.top = (F - 22) + "px";
+
+  /* ── 收尾：每一軌補上 offset 1 的定格 ── */
+  const parts = {tx:tom, ty:$("ty"), body:$("body"), legL:$("legL"), legR:$("legR"), armL:$("armL"), armR:$("armR"), cx:cup, cy:$("cupy"), cupr:cup.querySelector("svg"), tomo:tom, cupo:cup, coinx:coin, coiny:coin.querySelector("svg"), coino:coin, win:win, plus:plus, plusy:plus, oneup:oneup};
+  const anims = [];
+  Object.keys(tracks).forEach(function(name){
+    let fr = tracks[name];
+    fr.sort(function(a, b){ return a.offset - b.offset; });
+    fr = fr.filter(function(f, i){ return !(i + 1 < fr.length && Math.abs(fr[i + 1].offset - f.offset) < 1e-6); });
+    if(fr.length && fr[fr.length - 1].offset < 1) fr.push(Object.assign({}, fr[fr.length - 1], {offset:1}));
+    if(fr.length && fr[0].offset > 0) fr.unshift(Object.assign({}, fr[0], {offset:0}));
+    if(!fr.length) return;
+    anims.push({el:parts[name], fr:fr});
+  });
+
+  const bump = function(pile){ pile.animate([{transform:"translateY(0)"}, {transform:"translateY(-10px)", offset:.3}, {transform:"translateY(0)"}], {duration:240, easing:"steps(3,end)"}); };
+  const winnerNod = function(){
+    document.querySelectorAll(".stack.p1 .faces").forEach(function(f){
+      f.animate([{transform:"none"}, {transform:"translateY(-8px)", offset:.4}, {transform:"none"}], {duration:400, easing:"steps(2,end)"});
+    });
+  };
+  /* 冠軍分數 +999 逐位跳上去、停一下、再跳回真的 */
+  const scoreGag = function(){
+    const el = document.querySelector(".stack.p1 .sc"); if(!el) return;
+    const v = parseInt(el.dataset.v, 10); let i = 0;
+    const iv = setInterval(function(){ i++; const cur = v + Math.round(999 * i / 12); el.textContent = (cur > 0 ? "+" : "") + cur; if(i >= 12) clearInterval(iv); }, 40 / rate);
+    timers.push(setTimeout(function(){ let j = 0; const iv2 = setInterval(function(){ j++; const cur = v + Math.round(999 * (1 - j / 3)); el.textContent = (cur > 0 ? "+" : "") + cur; if(j >= 3) clearInterval(iv2); }, 50 / rate); }, 900 / rate));
+  };
+
+  const start = (window.DEAL_END || 1.4) + .5;
+  if(reduce){
+    tom.classList.add("still"); cup.classList.add("still");
+    tom.style.transform = "translateX(" + on1.x + "px)"; $("ty").style.transform = "translateY(" + on1.y + "px)";
+    cup.style.transform = "translateX(" + cupGiven.x + "px)"; $("cupy").style.transform = "translateY(" + cupGiven.y + "px)";
+    setTimeout(function(){ tom.style.opacity = 1; cup.style.opacity = 1; win.style.opacity = 1; }, start * 1000);
+    return;
+  }
+  const rate = SLOW ? .35 : 1, A = [], timers = [];
+  const seekTo = (function(){ if(!q.has("t")) return NaN; const raw = q.get("t").replace(" ", "+"), m = /^([a-z0-9]+)([+-][\d.]+)?$/.exec(raw); if(m && B[m[1]] != null) return B[m[1]] + parseFloat(m[2] || 0); return parseFloat(raw); })();
+  const seek = function(sec){ A.forEach(function(an){ an.pause(); an.currentTime = Math.max(0, Math.min(TOTAL, sec)) * 1000; }); };
+  const pan = function(x){ return Math.max(-.5, Math.min(.5, (x - W / 2) / W)); };
+  const run = function(){
+    A.forEach(function(an){ an.cancel(); }); A.length = 0;
+    timers.forEach(clearTimeout); timers.length = 0;
+    const dur = TOTAL * 1000;
+    anims.forEach(function(a){ const an = a.el.animate(a.fr, {duration:dur, fill:"forwards"}); an.playbackRate = rate; A.push(an); });
+    if(!isNaN(seekTo)){ seek(seekTo); return; }
+    if(window.SFX && SFX.gag) SFX.gag(B, rate, {pan1:pan(P1.cx), pan2:pan(P2.cx), pan3:pan(P3.cx)});
+    const at = function(sec, fn){ timers.push(setTimeout(fn, sec * 1000 / rate)); };
+    at(B.bonk, function(){ bump(p3); });
+    at(B.land2, function(){ bump(p3); });
+    at(B.land3, function(){ bump(p2); });
+    at(B.land4, function(){ bump(p1); });
+    at(B.present + .45, winnerNod);
+    at(B.score, scoreGag);
+  };
+  setTimeout(run, isNaN(seekTo) ? start * 1000 : 0);
+  window.TOM = {B:B, TOTAL:TOTAL, seek:seek, A:A, run:run};
+
+  const dev = $("dev");
+  if(dev && !q.has("nodev")){
+    const mk = function(label, key, on){
+      const b = document.createElement("button"); b.textContent = label; b.setAttribute("aria-pressed", on);
+      b.onclick = function(){ const u = new URL(location.href); if(u.searchParams.has(key)) u.searchParams.delete(key); else u.searchParams.set(key, ""); location.href = u.pathname + (u.search ? u.search.replace(/=(&|$)/g, "$1") : ""); };
+      return b;
+    };
+    const sep = document.createElement("i"); dev.appendChild(sep);
+    dev.appendChild(mk("慢動作", "slow", SLOW));
+    const rp = document.createElement("button"); rp.textContent = "重播頒獎（有聲）"; rp.onclick = run; dev.appendChild(rp);
+    const sep2 = document.createElement("i"); dev.appendChild(sep2);
+    const rg = document.createElement("input"); rg.type = "range"; rg.min = 0; rg.max = TOTAL.toFixed(2); rg.step = .01; rg.value = 0; rg.style.width = "160px"; rg.title = "時間軸";
+    rg.oninput = function(){ seek(parseFloat(rg.value)); };
+    const play = document.createElement("button"); play.textContent = "播";
+    play.onclick = function(){ A.forEach(function(an){ an.play(); }); };
+    dev.appendChild(rg); dev.appendChild(play);
+    const tick = function(){ if(A.length && A[0].playState === "running") rg.value = (A[0].currentTime / 1000).toFixed(2); requestAnimationFrame(tick); }; tick();
+  }
+})();
+</script>

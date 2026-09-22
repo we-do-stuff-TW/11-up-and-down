@@ -1,0 +1,1632 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>J 電玩 · RESULTS</title>
+<meta name="theme-color" content="#16332c">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600;6..96,700&family=IBM+Plex+Mono:wght@400;500&family=Libre+Baskerville:wght@700&display=swap">
+<style>
+/* 取自 docs/index.html 的 :root——大廳跟牌桌是同一個房間，色票不另立一套 */
+html,body{margin:0;padding:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --felt: oklch(.245 .042 168); --felt-deep: oklch(.165 .034 168); --glow: oklch(.375 .058 168);
+  --ink: oklch(.965 .014 92); --ink-2: oklch(.805 .017 92); --ink-3: oklch(.700 .016 92);
+  --hair: oklch(.90 .02 92 / .155); --hair-2: oklch(.90 .02 92 / .075);
+  --brass: oklch(.845 .128 84); --brass-2: oklch(.760 .112 84); --brass-soft: oklch(.845 .128 84 / .16);
+  --good: oklch(.800 .125 156); --bad: oklch(.735 .135 32);
+  --glass: oklch(.98 .012 92 / .085); --glass-edge: oklch(1 0 0 / .20); --glass-lip: oklch(1 0 0 / .34);
+  --card:#F8F5EC; --card-2:#ECE5D2; --card-ink:#1A1714; --card-red:#A32B25; --card-line:rgba(26,23,20,.20);
+  --sh-1: 0 1px 2px rgba(0,0,0,.34), 0 6px 16px rgba(0,0,0,.30);
+  --sh-2: 0 2px 5px rgba(0,0,0,.38), 0 16px 38px rgba(0,0,0,.42);
+  --sh-glass: 0 1px 1px rgba(0,0,0,.20), 0 10px 30px rgba(0,0,0,.34);
+  --e-out: cubic-bezier(.16,1,.3,1);
+}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:left}
+input{font:inherit}
+h1,h2,h3{margin:0;text-wrap:balance}
+p{text-wrap:pretty}
+body{
+  min-height:100dvh;display:flex;flex-direction:column;
+  background:var(--felt-deep);color:var(--ink);
+  font-family:"Archivo","Helvetica Neue",-apple-system,"PingFang TC","Noto Sans TC",sans-serif;
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(circle at 18% 6%,  rgba(255,255,255,.050), transparent 9%),
+    radial-gradient(circle at 42% 11%, rgba(255,255,255,.038), transparent 11%),
+    radial-gradient(circle at 24% 27%, rgba(255,255,255,.046), transparent 12%),
+    radial-gradient(circle at 63% 38%, rgba(255,255,255,.042), transparent 15%),
+    radial-gradient(circle at 48% 62%, rgba(255,255,255,.040), transparent 11%),
+    radial-gradient(circle at 89% 78%, rgba(255,255,255,.052), transparent 13%),
+    radial-gradient(circle at 58% 92%, rgba(255,255,255,.062), transparent 18%),
+    radial-gradient(125% 95% at 50% 14% in oklab, var(--glow) 0%, var(--felt) 58%, var(--felt-deep) 100%);
+}
+::selection{background:var(--brass-soft);color:var(--ink)}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px;border-radius:6px}
+.av{width:38px;height:38px;border-radius:99px;object-fit:cover;background:var(--glass);box-shadow:0 0 0 1px var(--hair);flex:none}
+.k{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3)}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+/* ── 名片專用（cream stock）─────────────────────────────── */
+:root{
+  --stock:#FAF6EC; --stock-2:#EDE6D4; --stock-3:#E2D9C2;
+  --stock-ink:#1A1714; --stock-ink-2:rgba(26,23,20,.62); --stock-ink-3:rgba(26,23,20,.40);
+  --stock-hair:rgba(26,23,20,.14); --stock-hair-2:rgba(26,23,20,.075);
+  --foil:#A9823C; --foil-2:#C4A15A;
+}
+.bodoni{font-family:"Bodoni Moda",Georgia,"Songti TC",serif}
+.serif{font-family:"Libre Baskerville",Georgia,serif}
+
+/* ── 開房頁共用底 ───────────────────────────────────────────
+   色票＝大廳那張空桌的狀態：trump 為 null → paintTable 的 TABLE_NONE
+   {h:250,c:.014}，hs=1 所以 L=.285。灰、冷、不帶綠。 */
+:root{
+  --felt:      oklch(.285 .0098 250);
+  --felt-deep: oklch(.197 .0078 250);
+  --glow:      oklch(.400 .0137 250);
+  --wood:      oklch(.255 .022 62);
+  --wood-2:    oklch(.185 .018 62);
+  --foil:#A9823C; --foil-2:#C4A15A;
+  --stock:#FAF6EC; --stock-2:#EDE6D4; --stock-ink:#1A1714;
+}
+/* 絨面的細顆粒。一張 140×140 的 turbulence 貼滿，透明度壓到剛好看得出不是純色 */
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.16;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.55'/></svg>")}
+
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.bodoni{font-family:"Bodoni Moda",Georgia,"Songti TC",serif}
+.cap{font-size:9.5px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-3)}
+
+/* 字標：跟大廳同一顆 */
+.mk{display:flex;align-items:baseline;gap:12px;line-height:1}
+.mk b{font-family:"Bodoni Moda",Georgia,serif;font-size:23px;font-weight:700}
+.mk u{text-decoration:none;font-size:8.5px;font-weight:600;letter-spacing:.34em;color:var(--ink-3)}
+
+/* 頭像：有照片就放照片，沒有就一個字 */
+.av{width:38px;height:38px;border-radius:99px;object-fit:cover;flex:none;
+  box-shadow:0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.34)}
+.mono-av{width:38px;height:38px;border-radius:99px;flex:none;display:grid;place-items:center;
+  font-size:14px;font-weight:600;letter-spacing:.02em;color:var(--ink-2);
+  background:linear-gradient(160deg in oklab,oklch(1 0 0/.10),oklch(1 0 0/.035));
+  box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.3)}
+
+/* 唯一的高對比 CTA */
+.go{display:block;width:100%;text-align:center;padding:14px 28px;border-radius:99px;
+  font-size:15px;font-weight:600;letter-spacing:.06em;
+  background:linear-gradient(178deg in oklab,var(--brass),var(--brass-2));color:#241906;
+  box-shadow:inset 0 1px 0 oklch(1 0 0/.5),0 2px 6px rgba(0,0,0,.3),0 14px 34px oklch(.845 .128 84/.22);
+  transition:transform .18s var(--e-out),box-shadow .22s}
+.go:hover{box-shadow:inset 0 1px 0 oklch(1 0 0/.5),0 2px 6px rgba(0,0,0,.3),0 18px 46px oklch(.845 .128 84/.34)}
+.go:active{transform:scale(.985)}
+
+/* 玻璃控制項：能按的東西才浮起來 */
+.glass{background:var(--glass);box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair),var(--sh-glass)}
+.ghost{color:var(--ink-3);font-size:12px;padding:8px 12px;border-radius:99px;transition:color .18s,background .18s}
+.ghost:hover{color:var(--ink);background:oklch(1 0 0/.05)}
+
+/* 原型切換：正式版沒有這條 */
+.dev{position:fixed;left:50%;top:12px;translate:-50% 0;z-index:99;display:flex;gap:2px;padding:3px;
+  border-radius:99px;background:oklch(0 0 0/.44);box-shadow:0 0 0 1px var(--hair);backdrop-filter:blur(8px)}
+.dev button{padding:6px 15px;border-radius:99px;font-size:11.5px;color:var(--ink-3);transition:.18s}
+.dev button[aria-pressed=true]{background:oklch(1 0 0/.10);color:var(--ink)}
+.dev button:disabled{opacity:.32}
+.dev i{width:1px;height:14px;background:var(--hair);display:block;margin:0 4px;align-self:center}
+@media print{.dev{display:none}}
+
+/* ── 收桌那一頁的殼：跟大廳同一個 register ─────────────────────────────
+   石板灰的地（_base.css 把 --felt 換成大廳那組 250 色相）、Bodoni 的一句大字、
+   線分隔不用面、整頁只有一顆銅色按鈕。三案共用這個殼，差別只在中間那一塊怎麼站三個人。 */
+.end{flex:1;display:flex;flex-direction:column;min-height:100dvh;
+  padding:22px clamp(18px,3vw,40px) calc(28px + env(safe-area-inset-bottom));
+  animation:pgIn .26s var(--e-out) both}
+@keyframes pgIn{from{opacity:0}to{opacity:1}}
+.top{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.top .ghost{margin-right:-12px}
+
+.mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:26px 0 10px}
+.mid>.cap{margin-bottom:14px;animation:riseIn .42s var(--e-out) both}
+.ask{font-family:"Bodoni Moda",Georgia,"Songti TC",serif;font-weight:600;
+  font-size:clamp(30px,4.6vw,44px);line-height:1.08;letter-spacing:-.008em;color:var(--ink);
+  animation:riseIn .46s var(--e-out) both .05s}
+@keyframes riseIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.stage{width:min(560px,100%);margin:34px 0 0}
+
+.mine{margin:22px 0 0;font-size:13px;color:var(--ink-3);animation:riseIn .4s var(--e-out) both 1.3s}
+.mine b{color:var(--ink-2);font-weight:500;font-family:"IBM Plex Mono",ui-monospace,monospace}
+
+.acts{display:flex;flex-direction:column;align-items:center;gap:22px;margin-top:38px;
+  animation:riseIn .46s var(--e-out) both 1.45s}
+.acts .go{width:auto;padding:14px 40px}
+.ft{display:flex;gap:12px;align-items:center;color:var(--ink-3);font-size:12px}
+.ft button{padding:6px 2px;color:inherit;transition:color .18s}
+.ft button:hover{color:var(--ink)}
+.ft i{width:1px;height:10px;background:var(--hair);display:block}
+
+/* 頭像 */
+.disc{display:grid;place-items:center;border-radius:99px;flex:none;
+  font-size:13px;font-weight:600;color:var(--ink-2);
+  background:linear-gradient(160deg in oklab,oklch(1 0 0/.10),oklch(1 0 0/.035));
+  box-shadow:inset 0 1px 0 var(--glass-lip),0 0 0 1px var(--hair),0 1px 3px rgba(0,0,0,.3)}
+
+/* 動得少一點，不是不動：位移拿掉，只留淡入 */
+@media (prefers-reduced-motion:reduce){
+  .end,.mid>.cap,.ask,.mine,.acts{animation:fadeIn .2s ease both}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+}
+
+/* 切換器多兩排狀態鈕 */
+.dev a{padding:6px 15px;border-radius:99px;font-size:11.5px;color:var(--ink-3);text-decoration:none;transition:.18s}
+.dev a[aria-current=page]{background:oklch(1 0 0/.10);color:var(--ink)}
+.dev button[aria-pressed=true]{color:var(--brass)}
+
+@media (max-width:760px){
+  .end{padding:16px 16px calc(22px + env(safe-area-inset-bottom))}
+  .mid{padding-top:14px}
+  .stage{margin-top:26px}
+  .acts{margin-top:30px;gap:18px}
+}
+
+/* ── 講台三案共用：台上那個人（頭像／名字／分數），跟 a.def 的 .step .who 同一組尺寸 ── */
+.who{display:flex;flex-direction:column;align-items:center;gap:7px;opacity:0;transform:translateY(10px);
+  animation:whoIn .38s var(--e-out) forwards;animation-delay:var(--dw)}
+@keyframes whoIn{to{opacity:1;transform:none}}
+.who .faces{display:flex}
+.who .faces>*{width:44px;height:44px;font-size:15px}
+.who .faces>*+*{margin-left:-11px}
+.who .nm{font-size:14px;font-weight:600;color:var(--ink);letter-spacing:.01em;line-height:1.3;max-width:170px;text-wrap:balance}
+.who .sc{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:14px;color:var(--ink-2)}
+.p1 .who .faces>*{width:56px;height:56px;font-size:19px}
+.p1 .who .nm{font-size:17px}
+.p1 .who .sc{color:var(--brass)}
+@media (prefers-reduced-motion:reduce){.who{transform:none;animation:fadeIn .2s ease both;animation-delay:.1s}}
+@media (max-width:760px){
+  .who .faces>*{width:38px;height:38px;font-size:13px}
+  .p1 .who .faces>*{width:48px;height:48px;font-size:16px}
+  .who .nm{font-size:13px}.p1 .who .nm{font-size:15px}
+}
+
+/* TITLE: J 電玩 · RESULTS */
+/* ── J 案：收桌那一塊變成一台街機的 RESULTS 畫面 ──────────────────────────────
+   舞台是一塊 CRT 面板（掃描線、暗角、琥珀色暈），三疊牌換成三個像素方塊講台（1ST／2ND／3RD），
+   Thomas 是像素人：頭是把照片畫成 20×20 再放大的像素圖，身體是 4px 的方塊火柴人，
+   走路兩格交替、跳躍 y 走階梯（steps）拋物線。聲音全部 chiptune。
+   引擎（節拍表、軌、x／y 拆層、量 DOM、?t、拉桿、重播）跟 g.def 同一套。 */
+.stage{position:relative;isolation:isolate;overflow:hidden;border-radius:12px;
+  background:oklch(.14 .02 250);
+  box-shadow:inset 0 0 0 3px oklch(.30 .025 250),inset 0 0 90px rgba(0,0,0,.55),0 0 48px oklch(.80 .14 80/.10)}
+/* 掃描線與暗角壓在最上面 */
+.stage::before{content:"";position:absolute;inset:0;z-index:7;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.30) 0 2px,transparent 2px 4px)}
+.stage::after{content:"";position:absolute;inset:0;z-index:7;pointer-events:none;
+  background:radial-gradient(ellipse 70% 60% at 50% 45%,transparent 60%,rgba(0,0,0,.42) 100%)}
+.stacks{display:flex;align-items:flex-end;justify-content:center;gap:26px;height:370px;padding-top:150px}
+.stack{position:relative;width:110px;flex:none;display:flex;flex-direction:column;align-items:center}
+.stack .who{margin-bottom:10px}
+.stack .who .nm{font-family:"Press Start 2P",monospace;font-size:10px;letter-spacing:0;line-height:1.5;max-width:150px;text-shadow:0 2px 0 rgba(0,0,0,.6)}
+.p1 .who .nm{font-size:12px}
+.stack .who .sc{font-family:"Press Start 2P",monospace;font-size:10px;color:oklch(.85 .14 80);text-shadow:0 2px 0 rgba(0,0,0,.6)}
+.stack .who .faces>*{border-radius:0;image-rendering:pixelated;box-shadow:0 0 0 2px oklch(.30 .025 250),0 0 0 4px rgba(0,0,0,.5)}
+/* 方塊講台：8px 網格的磚，頂面一道亮的，正面寫名次 */
+.pile{position:relative;width:110px;height:var(--h);transform-origin:50% 100%;display:grid;place-items:center;
+  background-color:#7a4a22;
+  background-image:
+    linear-gradient(oklch(.88 .12 80) 0 8px,rgba(255,255,255,.18) 8px 10px,transparent 10px),
+    repeating-linear-gradient(0deg,rgba(0,0,0,.42) 0 2px,transparent 2px 16px),
+    repeating-linear-gradient(90deg,rgba(0,0,0,.42) 0 2px,transparent 2px 22px);
+  box-shadow:inset -6px 0 0 rgba(0,0,0,.28),inset 6px 0 0 rgba(255,255,255,.08),0 0 0 2px #2a1608;
+  opacity:0;transform:translateY(110%);animation:blkIn .36s steps(5,end) forwards;animation-delay:var(--d)}
+@keyframes blkIn{to{opacity:1;transform:none}}
+.pile .lbl{font-family:"Press Start 2P",monospace;font-size:13px;color:oklch(.88 .12 80);text-shadow:2px 2px 0 rgba(0,0,0,.7);
+  margin-top:10px}
+.stack.p1 .pile{box-shadow:inset -6px 0 0 rgba(0,0,0,.28),inset 6px 0 0 rgba(255,255,255,.08),0 0 0 2px #2a1608,0 0 46px oklch(.85 .14 80/.22)}
+/* 地：一條像素地面 */
+.floor{width:100%;height:8px;margin:0;
+  background:repeating-linear-gradient(90deg,oklch(.42 .06 80) 0 8px,oklch(.30 .05 80) 8px 16px);box-shadow:0 -2px 0 oklch(.60 .10 80)}
+@media (prefers-reduced-motion:reduce){.pile{transform:none;animation:fadeIn .2s ease both}}
+@media (max-width:760px){
+  .stacks{gap:12px;height:300px;padding-top:110px}
+  .stack,.pile{width:88px}
+  .pile .lbl{font-size:10px}
+  .stack .who .nm{font-size:8px}.p1 .who .nm{font-size:9px}
+}
+
+/* ── 像素人：.tom 管 x、.ty 管 y、.body 縮放與轉圈（原點在腳底） ── */
+.tom{position:absolute;left:0;top:0;width:0;height:0;z-index:3;--k:1;pointer-events:none;opacity:0;will-change:transform}
+.ty{position:absolute;left:0;top:0;width:0;height:0}
+.body{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 -70px;scale:var(--k)}
+.limb{position:absolute;width:6px;background:#fff;box-shadow:0 0 0 2px #1a1a24;transform-origin:50% 0}
+.leg{left:-3px;top:-30px;height:30px}
+.leg.l{left:-9px}.leg.r{left:3px}
+.torso{position:absolute;left:-4px;top:-46px;width:8px;height:18px;background:oklch(.62 .20 25);box-shadow:0 0 0 2px #1a1a24}
+.arm{top:-44px;height:28px;width:6px}
+.arm.l{left:-14px}.arm.r{left:8px}
+/* 頭：20×20 的像素照片放大到 150px（比一個講台還寬） */
+.head{position:absolute;left:-75px;top:-196px;width:150px;height:150px;transform-origin:50% 100%}
+.head canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges}
+.head img{display:none}
+/* 獎盃與金幣：12×14／8×8 的像素圖（SVG rect，crispEdges） */
+.cup{position:absolute;left:0;top:0;width:0;height:0;z-index:4;--k:1;pointer-events:none;opacity:0;will-change:transform}
+.cupy{position:absolute;left:0;top:0;width:0;height:0}
+.cup svg{position:absolute;left:-18px;top:-42px;width:36px;height:42px;overflow:visible;transform-origin:50% 100%;scale:var(--k);shape-rendering:crispEdges}
+.coin{position:absolute;left:0;top:0;width:0;height:0;z-index:4;pointer-events:none;opacity:0}
+.coin svg{position:absolute;left:-12px;top:-24px;width:24px;height:24px;shape-rendering:crispEdges}
+/* 像素字幕 */
+.px{position:absolute;z-index:6;font-family:"Press Start 2P",monospace;color:oklch(.88 .12 80);text-shadow:2px 2px 0 rgba(0,0,0,.8);
+  white-space:nowrap;opacity:0;pointer-events:none;transform:translate(-50%,-50%)}
+.px.win{font-size:16px}
+.px.plus{font-size:10px;color:#fff}
+.px.oneup{font-size:11px;color:oklch(.80 .18 145)}
+@media (max-width:760px){.tom,.cup{--k:.72}.px.win{font-size:12px}}
+.tom.still,.cup.still{transition:opacity .3s ease}
+
+</style>
+</head>
+<body>
+<div class="end" id="end">
+  <header class="top">
+    <div class="mk"><b>11</b><u>UP &amp; DOWN</u></div>
+    <button class="ghost" id="btnLedger">看計分表</button>
+  </header>
+
+  <main class="mid">
+    <span class="cap" id="endCap">牌局結束</span>
+    <h1 class="ask" id="endAsk">—</h1>
+<script>
+/* 原型的資料：六個人的一桌，21 局打完。?tie 讓第一名與第三名各有人同分、?me 讓你是第一名、
+   ?solo 是對 AI 的單人局。正式版拿的是 G.seats／G.score，名次算法跟 showFinal() 一樣：同分同名次。 */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const TIE = q.has("tie"), ME = q.has("me"), SOLO = q.has("solo");
+  const AV = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NiIgaGVpZ2h0PSI5NiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjZDJhNzZjIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjOGY1YTNjIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiBmaWxsPSJ1cmwoI2cpIi8+PGNpcmNsZSBjeD0iNDgiIGN5PSIzOCIgcj0iMTgiIGZpbGw9IiNmN2YyZTQiLz48cGF0aCBkPSJNMTQgOTZjMC0yMCAxNS0zMiAzNC0zMnMzNCAxMiAzNCAzMnoiIGZpbGw9IiNmN2YyZTQiLz48L3N2Zz4=";
+  let P = SOLO
+    ? [{n:"你",me:1,av:AV,sc:54},{n:"B",ai:1,sc:61},{n:"C",ai:1,sc:47},{n:"D",ai:1,sc:31},{n:"E",ai:1,sc:22},{n:"F",ai:1,sc:-4}]
+    : [{n:"阿哲",sc:61},{n:"Francis",me:1,av:AV,sc:54},{n:"小美",sc:47},{n:"大衛",sc:31},{n:"AI 5",ai:1,sc:22},{n:"AI 6",ai:1,sc:-4}];
+  if(TIE){ P[1].sc = 61; P[3].sc = 47; }
+  if(ME){ P[1].sc = 66; }
+  P.forEach(function(p){ p.pos = 1 + P.filter(function(x){ return x.sc > p.sc; }).length; });
+  const rank = P.slice().sort(function(a,b){ return b.sc - a.sc; });
+  /* 台上三階：同分站同一階（跟 docs/index.html 的 showFinal 同一套） */
+  const tiers = [];
+  rank.forEach(function(p){
+    const t = tiers.filter(function(r){ return r.pos === p.pos; })[0];
+    if(t) t.who.push(p); else if(tiers.length < 3) tiers.push({pos:p.pos, sc:p.sc, who:[p]});
+  });
+  const me = P.filter(function(p){ return p.me; })[0];
+  const first = tiers[0];
+  const $ = function(id){ return document.getElementById(id); };
+  $("endCap").textContent = SOLO ? "牌局結束 · 21 局 · 對 AI，不記戰績" : "牌局結束 · 21 局 · 房號 7K2M";
+  const nm = function(p){ return p.me ? "你" : p.n; };
+  $("endAsk").textContent =
+    first.who.length > 1 ? first.who.map(nm).join("、") + " 平手"
+    : first.who[0].me ? "你贏了這一桌" : first.who[0].n + " 贏了這一桌";
+  window.END = {P:P, rank:rank, tiers:tiers, me:me, solo:SOLO};
+  /* 頭像：有照片放照片，沒有就名字第一個字 */
+  window.face = function(p, cls){
+    return p.av ? '<img class="av ' + (cls||"") + '" src="' + p.av + '" alt="">'
+                : '<span class="disc ' + (cls||"") + '">' + (p.me ? "你" : p.n).slice(0,1) + '</span>';
+  };
+  window.sc = function(v){ return (v > 0 ? "+" : "") + v; };
+})();
+</script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <div class="stage" id="stage">
+      <div class="stacks" id="stacks"></div>
+      <div class="floor" id="floor"></div>
+      <div class="tom" id="tom" aria-hidden="true"><div class="ty" id="ty"><div class="body" id="body">
+        <i class="limb leg l" id="legL"></i><i class="limb leg r" id="legR"></i>
+        <i class="torso"></i>
+        <i class="limb arm l" id="armL"></i><i class="limb arm r" id="armR"></i>
+        <div class="head" id="head"><img id="tomSrc" src="_tom.jpg" alt=""><canvas id="tomPx" width="20" height="20"></canvas></div>
+      </div></div></div>
+      <div class="cup" id="cup" aria-hidden="true"><div class="cupy" id="cupy"></div></div>
+      <div class="coin" id="coin" aria-hidden="true"></div>
+      <span class="px win" id="pxWin">WINNER!</span>
+      <span class="px plus" id="pxPlus">+100</span>
+      <span class="px oneup" id="pxUp">1UP</span>
+    </div>
+<script>
+(function(){
+  /* 三個方塊講台。class（.stack.pN／.who／.faces）與 --dw 節奏跟 E 一樣，正式版 showFinal() 照這個填 */
+  const who = function(t){ return '<div class="who" style="--dw:' + t.dw + '"><div class="faces">' + t.who.map(function(p){ return face(p); }).join("") + '</div><span class="nm">' + t.who.map(function(p){ return p.me ? "你" : p.n; }).join("、") + '</span><span class="sc" data-v="' + t.sc + '">' + (t.sc > 0 ? "+" : "") + '0</span></div>'; };
+  const T = END.tiers, order = T.length >= 3 ? [T[1], T[0], T[2]] : T.length === 2 ? [T[0], T[1]] : [T[0]];
+  const H = {1:136, 2:96, 3:64}, LBL = {1:"1ST", 2:"2ND", 3:"3RD"};
+  const phone = matchMedia("(max-width:760px)").matches;
+  document.getElementById("stacks").innerHTML = order.map(function(t){
+    const k = T.indexOf(t) + 1;
+    const d = (3 - k) * .22 + .1;                    /* 3RD 先冒出來，1ST 最後 */
+    t.dw = (d + .42).toFixed(2) + "s";
+    return '<div class="stack p' + k + '">' + who(t) + '<div class="pile" style="--h:' + Math.round(H[k] * (phone ? .8 : 1)) + 'px;--d:' + d.toFixed(2) + 's"><span class="lbl">' + LBL[k] + '</span></div></div>';
+  }).join("");
+  window.DEAL_END = .1 + .44 + .42 + .5;   /* 1ST 站好、名字亮起、分數跳完 */
+  /* 分數從 0 逐位跳到最後值 */
+  document.querySelectorAll(".stack .sc").forEach(function(el){
+    const v = parseInt(el.dataset.v, 10), dw = parseFloat(el.parentNode.style.getPropertyValue("--dw")) * 1000;
+    setTimeout(function(){
+      const n = 14; let i = 0;
+      const iv = setInterval(function(){ i++; const cur = Math.round(v * i / n); el.textContent = (cur > 0 ? "+" : "") + cur; if(i >= n) clearInterval(iv); }, 36);
+    }, dw + 120);
+  });
+  /* 像素頭：照片畫成 28×28（20 太糊，臉認不出來），圓形以外清掉，外圍一圈暗邊。
+     照片是夜拍的、又戴安全帽：先用 gamma 把暗部整個抬起來、再拉對比，最後量化到 8 階才像 8-bit。 */
+  const img = document.getElementById("tomSrc"), cv = document.getElementById("tomPx"), NPX = 28;
+  const draw = function(){
+    cv.width = cv.height = NPX;
+    const c = cv.getContext("2d"); c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
+    const s = Math.min(img.naturalWidth, img.naturalHeight) * .92, sx = (img.naturalWidth - s) / 2, sy = (img.naturalHeight - s) / 2 - s * .04;
+    /* 兩段縮：先 84 再 28，每格是平均色而不是抽到一個點 */
+    const mid = document.createElement("canvas"); mid.width = mid.height = NPX * 3;
+    const mc = mid.getContext("2d"); mc.imageSmoothingEnabled = true; mc.imageSmoothingQuality = "high";
+    mc.drawImage(img, sx, Math.max(0, sy), s, s, 0, 0, NPX * 3, NPX * 3);
+    c.clearRect(0, 0, NPX, NPX); c.drawImage(mid, 0, 0, NPX * 3, NPX * 3, 0, 0, NPX, NPX);
+    const d = c.getImageData(0, 0, NPX, NPX), px = d.data;
+    const lift = function(v){ let l = Math.pow(v / 255, .58); l = (l - .5) * 1.45 + .6; return Math.max(0, Math.min(255, l * 255)); };
+    const R = NPX / 2;
+    for(let y = 0; y < NPX; y++) for(let x = 0; x < NPX; x++){
+      const dx = x + .5 - R, dy = y + .5 - R, r = Math.hypot(dx, dy), i = (y * NPX + x) * 4;
+      if(r > R){ px[i + 3] = 0; }
+      else if(r > R - 1.2){ px[i] = 26; px[i + 1] = 26; px[i + 2] = 36; px[i + 3] = 255; }
+      else {
+        px[i] = Math.round(lift(px[i]) / 32) * 32; px[i + 1] = Math.round(lift(px[i + 1]) / 32) * 32; px[i + 2] = Math.round(lift(px[i + 2]) / 32) * 32;
+      }
+    }
+    c.putImageData(d, 0, 0);
+  };
+  if(img.complete && img.naturalWidth) draw(); else img.onload = draw;
+  /* 像素圖：字元地圖 → SVG rect */
+  window.pix = function(map, pal, w, h){
+    let r = '<svg viewBox="0 0 ' + w + ' ' + h + '" shape-rendering="crispEdges">';
+    map.forEach(function(row, y){ row.split("").forEach(function(ch, x){ if(pal[ch]) r += '<rect x="' + x + '" y="' + y + '" width="1" height="1" fill="' + pal[ch] + '"/>'; }); });
+    return r + '</svg>';
+  };
+  const G = "#f2c14e", D = "#9a6a12", L = "#fff2b0", O = "#2a1a08";
+  document.getElementById("cupy").innerHTML = pix([
+    "..OOOOOOOO..",
+    ".OOLGGGGGDO.",
+    "OO.LGGGGGD.O",
+    "O..LGGGGGD.O",
+    ".O.LGGGGGD.O",
+    "..O.GGGGD.O.",
+    "....OGGDO...",
+    ".....GD.....",
+    ".....GD.....",
+    "....LGGD....",
+    "...OGGGGDO..",
+    "..OLGGGGGDO.",
+    "..OOOOOOOOO.",
+    "............"], {O:O, G:G, D:D, L:L}, 12, 14);
+  document.getElementById("coin").innerHTML = pix([
+    "..OOOO..",
+    ".OLGGGO.",
+    "OLGDGGGO",
+    "OLGDGGGO",
+    "OLGDGGGO",
+    "OLGDGGGO",
+    ".OGGGDO.",
+    "..OOOO.."], {O:O, G:G, D:D, L:L}, 8, 8);
+})();
+</script>
+<script>
+
+/* ============================================================
+   11 Up & Down — 音效層
+   ------------------------------------------------------------
+   牌桌是深夜的、暖的、近的：一盞頂燈、一塊絨布、一圈胡桃木。
+   聲音照同一套世界觀做——近距離收音的 Foley，一間小房間的殘響，
+   偶爾一顆溫暖的琴音，不出現遊戲機的「叮咚」。
+
+   這一層跟 3D 一樣是「加上去的」：引擎與連線層都不知道它存在。
+   唯一的接縫是 render() 最後那行 SFX.frame(G, me, best)——
+   把當下的牌局狀態遞過來，音效層自己跟上一次比對，差在哪就發什麼聲。
+   所以 2D、3D、單人、連線都是同一份，不需要各接一次。
+
+   聲音怎麼組成：每一個 Foley 都是三層疊的（電影音效的老規矩）——
+     · 起音（transient）：接觸的那一下，1-3ms，寬頻
+     · 本體（body）：材質在響，紙牌是 700-1500Hz 那塊「啪」
+     · 尾巴（tail）：桌面吸收掉的低頻，加一點房間的殘響
+   少了低頻那層，牌就像掉在真空裡；少了殘響，就像貼在耳朵上。
+
+   沒有任何音檔。全部是 Web Audio 即時合成，所以：
+     · 不多一個 byte，不多一次 request
+     · 每一次都不一樣（音高、時值、濾波隨機扰動），連發不會變機關槍
+   要換成錄音的話看檔案最下面 SFX.load()。
+   ============================================================ */
+(function(){
+"use strict";
+
+var AC = window.AudioContext || window.webkitAudioContext;
+if(!AC){ window.SFX = {frame:function(){}, on:function(){}, enabled:false}; return; }
+
+/* ---------------- 使用者偏好 ---------------- */
+var PREF = {on:true, vol:0.8};
+try{
+  var raw = localStorage.getItem("ud.sfx");
+  if(raw !== null) PREF.on = raw !== "0";
+  var v = parseFloat(localStorage.getItem("ud.sfxvol"));
+  if(v >= 0 && v <= 1) PREF.vol = v;
+}catch(e){}
+function savePref(){
+  try{
+    localStorage.setItem("ud.sfx", PREF.on ? "1" : "0");
+    localStorage.setItem("ud.sfxvol", String(PREF.vol));
+  }catch(e){}
+}
+
+/* ---------------- 音訊圖 ----------------
+   voices ──┬─────────────────────────────┐
+            └─ send ─> convolver ─> wet ──┴─> bus ─> 膠水壓縮 ─> 限幅 ─> 音量 ─> 出
+   殘響只收 voice 的 send，不收 bus，所以不會回授。
+   兩顆 DynamicsCompressor：前面那顆把整體黏起來（電影混音的 glue），
+   後面那顆只做保險，發牌那種一秒幾十下的密集聲不會爆掉。 */
+var ctx = null, bus = null, wet = null, send = null, master = null, ready = false, offline = false;
+var noiseBuf = null, pinkBuf = null;
+
+function boot(inject){
+  if(ctx) return ctx;
+  ctx = inject || new AC({latencyHint:"interactive"});
+  offline = !!inject;
+
+  master = ctx.createGain();
+  master.gain.value = PREF.on ? PREF.vol : 0;
+
+  var limit = ctx.createDynamicsCompressor();
+  limit.threshold.value = -1.5; limit.knee.value = 0; limit.ratio.value = 20;
+  limit.attack.value = 0.001;   limit.release.value = 0.05;
+
+  var glue = ctx.createDynamicsCompressor();
+  glue.threshold.value = -17; glue.knee.value = 14; glue.ratio.value = 2.6;
+  glue.attack.value = 0.004;  glue.release.value = 0.19;
+
+  /* 40Hz 以下小喇叭放不出來，留著只會佔掉限幅器的餘裕 */
+  var rumble = ctx.createBiquadFilter();
+  rumble.type = "highpass"; rumble.frequency.value = 38; rumble.Q.value = 0.6;
+
+  bus = ctx.createGain(); bus.gain.value = 1;
+  bus.connect(rumble); rumble.connect(glue); glue.connect(limit);
+  limit.connect(master); master.connect(ctx.destination);
+
+  var verb = ctx.createConvolver();
+  verb.buffer = makeRoom(1.15, 0.52);
+  wet = ctx.createGain(); wet.gain.value = 0.95;
+  send = ctx.createGain(); send.gain.value = 1;
+  send.connect(verb); verb.connect(wet); wet.connect(bus);
+
+  noiseBuf = makeNoise(2.2, false);
+  pinkBuf  = makeNoise(2.2, true);
+  ready = true;
+  return ctx;
+}
+
+/* 白噪音與粉紅噪音各存一份，所有 Foley 都從裡面隨機取一段。
+   紙、布這類材質用粉紅噪音比較像——白噪音的高頻太平，聽起來像嘶聲不像纖維。 */
+function makeNoise(sec, pink){
+  var sr = ctx.sampleRate, n = Math.floor(sec * sr);
+  var b = ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+  if(!pink){ for(var i=0;i<n;i++) d[i] = Math.random()*2 - 1; return b; }
+  /* Voss-McCartney 的簡化版：幾個一階低通疊起來就有 -3dB/oct */
+  var b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  for(var j=0;j<n;j++){
+    var w = Math.random()*2 - 1;
+    b0 = 0.99886*b0 + w*0.0555179;
+    b1 = 0.99332*b1 + w*0.0750759;
+    b2 = 0.96900*b2 + w*0.1538520;
+    b3 = 0.86650*b3 + w*0.3104856;
+    b4 = 0.55000*b4 + w*0.5329522;
+    b5 = -0.7616*b5 - w*0.0168980;
+    d[j] = (b0+b1+b2+b3+b4+b5+b6 + w*0.5362) * 0.11;
+    b6 = w*0.115926;
+  }
+  return b;
+}
+
+/* 房間：不是音樂廳，是一間鋪了地毯、擺著一張圓桌的小房間。
+   早期反射七下（牆、天花板、桌面），之後才是擴散的尾巴；
+   尾巴一邊衰減一邊變暗——高頻先被布和地毯吃掉，低頻留最久。
+   左右兩聲道用不同的亂數與略微不同的反射時間，聲音才會有寬度。 */
+function makeRoom(sec, rt60){
+  var sr = ctx.sampleRate, n = Math.floor(sec * sr);
+  var buf = ctx.createBuffer(2, n, sr);
+  var tau = rt60 / Math.log(1000);
+  var peak = 0;
+  for(var ch=0; ch<2; ch++){
+    var d = buf.getChannelData(ch), lp = 0;
+    for(var i=0;i<n;i++){
+      var t = i / sr;
+      /* 擴散不是一開始就滿的，前 14ms 慢慢長出來 */
+      var build = t < 0.014 ? (t / 0.014) : 1;
+      var env = Math.exp(-t / tau) * build;
+      var x = (Math.random()*2 - 1) * env;
+      var cut = 8500 * Math.pow(0.075, t / sec);          /* 尾巴越後面越暗 */
+      var a = 1 - Math.exp(-2 * Math.PI * cut / sr);
+      lp += a * (x - lp);
+      d[i] = lp;
+    }
+    var taps = [[0.0061,0.44],[0.0089,-0.36],[0.0134,0.31],[0.0187,-0.25],
+                [0.0248,0.20],[0.0331,-0.16],[0.0417,0.12]];
+    for(var k=0;k<taps.length;k++){
+      var idx = Math.floor((taps[k][0] * (ch ? 1.037 : 1)) * sr);
+      if(idx < n) d[idx] += taps[k][1] * (ch ? -0.92 : 1);
+    }
+    for(var m=0;m<n;m++) if(Math.abs(d[m]) > peak) peak = Math.abs(d[m]);
+  }
+  if(peak > 0){
+    var g = 0.5 / peak;
+    for(var c2=0;c2<2;c2++){
+      var dd = buf.getChannelData(c2);
+      for(var q=0;q<n;q++) dd[q] *= g;
+    }
+  }
+  return buf;
+}
+
+/* ---------------- 解鎖 ----------------
+   瀏覽器規定：沒有使用者動作之前不准出聲。所以整個引擎在第一次
+   點擊／觸控／按鍵之前是睡著的——順帶解決「一進頁面就自己發牌吵一輪」。 */
+var unlocked = false, LASTG = null;
+function unlock(){
+  if(unlocked) return;
+  unlocked = true;
+  boot();
+  if(ctx.state === "suspended") ctx.resume();
+  /* 有些 iOS 版本要真的播過一次才算數 */
+  var s = ctx.createBufferSource();
+  s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+  s.connect(ctx.destination); s.start(0);
+  /* 頁面剛開的那一局，牌是在拿到出聲許可之前就發完的，那一手註定是安靜的。
+     如果這時還停在第一局的叫牌階段，就補一聲很輕的洗牌——
+     牌庫本來就在桌上，荷官順手理一下，房間從這裡醒過來。 */
+  setTimeout(function(){
+    var g = LASTG;
+    if(g && g.ri === 0 && g.phase === "bid" && !g.played && (!g.trick || !g.trick.length))
+      SFX.shuffle(0.05, 0.55);
+  }, 40);
+}
+["pointerdown","touchstart","keydown","mousedown"].forEach(function(ev){
+  document.addEventListener(ev, unlock, {capture:true, passive:true});
+});
+
+function live(){
+  if(!PREF.on || !unlocked || !ready) return false;
+  if(!offline && ctx.state === "suspended") ctx.resume();
+  return true;
+}
+var now = function(){ return ctx.currentTime; };
+var rnd = function(a, b){ return a + Math.random() * (b - a); };
+
+/* 同一個聲音短時間內連發會疊成一坨。每個 key 記上一次的時間，
+   太近就直接丟掉——這是混音台上的 gate，不是省效能。 */
+var lastAt = {};
+function gate(key, ms){
+  var t = ctx.currentTime * 1000;
+  if(lastAt[key] && t - lastAt[key] < ms) return false;
+  lastAt[key] = t;
+  return true;
+}
+
+/* ---------------- 基本單元 ---------------- */
+
+/* 一顆噪音粒子：材質的聲音都由這個疊出來。
+   f0 → f1 是帶通中心的滑動——磨擦、滑動、鬆手的差別幾乎全在這條線上。 */
+function grain(t, o){
+  var src = ctx.createBufferSource();
+  src.buffer = o.pink === false ? noiseBuf : pinkBuf;
+  src.playbackRate.value = o.rate || 1;
+  var off = Math.random() * 1.6;
+
+  var bp = ctx.createBiquadFilter();
+  bp.type = o.type || "bandpass";
+  bp.Q.value = o.q || 1;
+  bp.frequency.setValueAtTime(Math.max(30, o.f0), t);
+  if(o.f1 && o.f1 !== o.f0)
+    bp.frequency.exponentialRampToValueAtTime(Math.max(30, o.f1), t + (o.sweep || o.dur));
+
+  var hp = null;
+  if(o.hp){ hp = ctx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = o.hp; hp.Q.value = 0.7; }
+  var lpf = null;
+  if(o.lp){ lpf = ctx.createBiquadFilter(); lpf.type = "lowpass"; lpf.frequency.value = o.lp; lpf.Q.value = 0.7; }
+
+  var g = ctx.createGain();
+  var a = o.a === undefined ? 0.002 : o.a;
+  var pk = Math.max(0.00012, o.gain);
+  g.gain.setValueAtTime(0.00012, t);
+  g.gain.exponentialRampToValueAtTime(pk, t + a);
+  if(o.hold) g.gain.setValueAtTime(pk, t + a + o.hold);
+  g.gain.exponentialRampToValueAtTime(0.00012, t + a + (o.hold || 0) + o.dur);
+
+  var head = src, node = src;
+  if(hp){ node.connect(hp); node = hp; }
+  if(lpf){ node.connect(lpf); node = lpf; }
+  node.connect(bp); bp.connect(g);
+  out(g, o.pan, o.verb);
+  src.start(t, off, a + (o.hold || 0) + o.dur + 0.06);
+  src.stop(t + a + (o.hold || 0) + o.dur + 0.08);
+  return head;
+}
+
+/* 桌面被敲到的那一下低頻。牌與骰子都靠它才「落在東西上」而不是浮著。
+   絨布會把它吃掉大半，所以衰減很快、頻率往下滑一點點（桌板在讓） */
+function thump(t, o){
+  var osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(o.f, t);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(24, o.f * (o.bend || 0.72)), t + o.dur);
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(0.00012, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.00012, t + o.dur);
+  osc.connect(g);
+  out(g, o.pan, o.verb === undefined ? 0.05 : o.verb);
+  osc.start(t); osc.stop(t + o.dur + 0.03);
+}
+
+/* 溫暖的琴音：兩個算子的 FM（比例 1:1），調變指數快速衰減——
+   起音有一點「咬」，之後就剩乾淨的正弦。這是電鋼琴的做法，
+   比加法合成的鐘聲更適合這張桌子：不亮、不刺、放得進背景。 */
+function rhodes(t, o){
+  var f = o.f, dur = o.dur || 1.1;
+  var car = ctx.createOscillator(); car.type = "sine"; car.frequency.value = f;
+  var mod = ctx.createOscillator(); mod.type = "sine"; mod.frequency.value = f * (o.ratio || 1);
+  var mg = ctx.createGain();
+  mg.gain.setValueAtTime(f * (o.index || 2.6), t);
+  mg.gain.exponentialRampToValueAtTime(f * 0.02, t + (o.bark || 0.11));
+  mod.connect(mg); mg.connect(car.frequency);
+
+  var lp = ctx.createBiquadFilter();
+  lp.type = "lowpass"; lp.frequency.value = o.lp || 6500; lp.Q.value = 0.6;
+
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(0.00012, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.00012, o.gain), t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.00012, t + dur);
+
+  car.connect(lp); lp.connect(g);
+  out(g, o.pan, o.verb === undefined ? 0.3 : o.verb);
+  car.start(t); mod.start(t);
+  car.stop(t + dur + 0.05); mod.stop(t + dur + 0.05);
+
+  /* 琴槌敲到的那一點雜訊，量很小，但少了它音就是「憑空出現」的 */
+  if(o.mallet !== false)
+    grain(t, {f0:f * 5.5, f1:f * 3, q:1.4, dur:0.026, gain:o.gain * 0.26, pan:o.pan, verb:0.12, pink:false});
+}
+
+/* 出口：每個聲音自己的定位與殘響送出量。
+   遠處的座位送多一點殘響、乾聲小一點——距離感是這樣來的，不是只有音量。 */
+function out(node, pan, verb){
+  var p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if(p){ p.pan.value = Math.max(-1, Math.min(1, pan || 0)); node.connect(p); node = p; }
+  node.connect(bus);
+  if(verb > 0){
+    var s = ctx.createGain(); s.gain.value = verb;
+    node.connect(s); s.connect(send);
+  }
+}
+
+/* ---------------- 牌 ----------------
+   一張牌落在絨布上，近距離收音會聽到三段：
+     0-3ms   角先碰到，寬頻的一下「喀」
+     3-45ms  牌身彈一下，700-1600Hz 那塊「啪」——認得出是紙牌就靠這段
+     20-90ms 桌板回應的低頻，絨布吃掉大半
+   落在已經有牌的地方會軟一點、低頻多一點（下面那疊在墊著）。 */
+function cardLand(t, o){
+  o = o || {};
+  var g = (o.gain === undefined ? 1 : o.gain) * 0.85;
+  var pan = o.pan || 0, verb = o.verb === undefined ? 0.19 : o.verb;
+  var soft = o.soft || 0;                       /* 0 = 落在桌上，1 = 落在牌堆上 */
+  var k = rnd(0.92, 1.09);                      /* 每一張都不一樣 */
+
+  /* 一、角先碰到：寬頻的一下 */
+  grain(t, {f0:3100*k*(1-soft*0.3), f1:1500*k, q:0.8, a:0.0008, dur:0.021,
+            gain:0.55*g*(1-soft*0.35), pan:pan, verb:verb*0.7, hp:600, pink:false});
+  /* 二、牌身在響：認得出是紙牌全靠這一段，帶要寬（Q 低），不然只剩「咚」跟「嘶」 */
+  grain(t + 0.0015, {f0:1450*k, f1:780*k, q:0.85, a:0.0016, dur:0.055 + soft*0.02,
+            gain:1.15*g, pan:pan, verb:verb});
+  /* 三、「啪」的那一下脆：紙被彈開的高一點的共振 */
+  grain(t + 0.003, {f0:2550*k, f1:1700*k, q:1.9, a:0.0012, dur:0.033,
+            gain:0.5*g*(1-soft*0.3), pan:pan, verb:verb*0.8, pink:false});
+  /* 四、紙的纖維 */
+  grain(t + 0.004, {f0:5600*k, f1:3400*k, q:0.9, a:0.001, dur:0.03,
+            gain:0.14*g*(1-soft*0.5), pan:pan, verb:verb*0.5, pink:false});
+  /* 五、桌板讓了一下。正弦波的能量很集中，一大就把上面四層全蓋掉——
+     真的牌落在鋪絨的桌上，低頻只是「有」，不是主角 */
+  thump(t + 0.002, {f:(126 - soft*22)*k, dur:0.055 + soft*0.03,
+            gain:0.13*g*(1+soft*0.6), pan:pan*0.5, verb:verb*0.4});
+}
+
+/* 一張牌從牌堆頂端被推出去：先是「唰」的摩擦，最後鬆手那一下。
+   帶通從高滑到低，就是紙離開紙的那個下滑音。 */
+function cardSlide(t, o){
+  o = o || {};
+  var g = (o.gain === undefined ? 1 : o.gain), pan = o.pan || 0;
+  var len = o.len || 0.075, k = rnd(0.9, 1.12);
+  grain(t, {f0:3400*k, f1:1250*k, q:0.85, a:0.008, hold:len*0.35, dur:len,
+            gain:0.3*g, pan:pan, verb:0.1, sweep:len*1.1});
+  grain(t, {f0:7200*k, f1:5200*k, q:0.7, a:0.012, dur:len*0.8,
+            gain:0.07*g, pan:pan, verb:0.06, pink:false});
+}
+
+/* 發牌時甩出去的那一張：滑出去 + 在空中 + 落地。 */
+function cardDeal(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain;
+  cardSlide(t, {gain:0.85*g, pan:(o.pan||0)*0.5, len:rnd(0.055, 0.08)});
+  cardLand(t + rnd(0.055, 0.085), {gain:0.72*g, pan:o.pan, verb:0.2, soft:o.soft || 0.35});
+}
+
+/* 牌在空中飛的那段。很輕，但沒有它，牌就是憑空出現在檯面上。 */
+function whoosh(t, o){
+  o = o || {};
+  var d = o.dur || 0.28;
+  grain(t, {f0:520, f1:2100, q:0.55, a:d*0.55, dur:d*0.5,
+            gain:0.075*(o.gain===undefined?1:o.gain), pan:o.pan||0, verb:0.12, sweep:d});
+}
+
+/* 洗牌：三段。
+   一、橋牌式交錯——三四十下牌緣彈開，密度先快後慢
+   二、合攏時的一陣悶響
+   三、在桌上頓齊，兩下。 */
+function riffle(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, span = o.span || 0.34, n = o.n || 34;
+  for(var i=0;i<n;i++){
+    var u = i / (n - 1);
+    /* 密度曲線：中段最密（真的洗牌就是這樣，兩端慢） */
+    var at = t + span * (u - Math.sin(2 * Math.PI * u) / (2 * Math.PI) * 0.55);
+    var amp = (0.5 + 0.5 * Math.sin(Math.PI * u)) * rnd(0.55, 1);
+    grain(at + rnd(-0.004, 0.004), {
+      f0:rnd(2400, 5200), f1:rnd(1200, 2200), q:rnd(1.2, 2.6),
+      a:0.0006, dur:rnd(0.008, 0.018), gain:0.19 * g * amp,
+      pan:rnd(-0.16, 0.16), verb:0.1, hp:900
+    });
+  }
+  /* 合攏 */
+  grain(t + span * 0.98, {f0:1500, f1:600, q:0.9, a:0.006, dur:0.1, gain:0.2*g, pan:0, verb:0.16});
+  thump(t + span * 1.0, {f:104, dur:0.09, gain:0.14*g, pan:0, verb:0.1});
+  /* 頓齊 */
+  cardLand(t + span + 0.13, {gain:0.5*g, soft:0.85, verb:0.2, pan:-0.05});
+  cardLand(t + span + 0.23, {gain:0.42*g, soft:0.9, verb:0.2, pan:0.06});
+}
+
+/* 收墩：一疊牌被拖過絨布。摩擦聲比單張長很多、也低很多，
+   再加一點不規則的起伏（布不是平的）。 */
+function sweep(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, d = o.dur || 0.3;
+  grain(t, {f0:1700, f1:520, q:0.65, a:d*0.3, hold:d*0.2, dur:d*0.7,
+            gain:0.2*g, pan:o.pan||0, verb:0.2, sweep:d});
+  grain(t + 0.02, {f0:340, f1:180, q:0.8, a:d*0.35, dur:d*0.6,
+            gain:0.1*g, pan:(o.pan||0)*0.6, verb:0.16, sweep:d});
+  cardLand(t + d * 0.92, {gain:0.55*g, soft:0.95, pan:o.pan||0, verb:0.24});
+}
+
+/* 一疊牌被放下（收進墩堆、收桌）。比單張重、低頻多、脆的部分少。 */
+function pack(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, pan = o.pan || 0;
+  grain(t, {f0:1250, f1:520, q:1.1, a:0.0016, dur:0.072, gain:0.5*g, pan:pan, verb:0.2});
+  grain(t + 0.006, {f0:2900, f1:1600, q:0.8, a:0.001, dur:0.03, gain:0.13*g, pan:pan, verb:0.12, pink:false});
+  thump(t + 0.002, {f:88, dur:0.12, gain:0.2*g, pan:pan*0.5, verb:0.14, bend:0.6});
+}
+
+/* ---------------- 骰子 ----------------
+   一顆塑膠骰子丟在絨布上：彈幾下，間隔越來越短，最後停住。
+   骰子本身有共振（角、面、內部空腔），所以每一下不是單純的噪音，
+   是三條高 Q 的帶通在響；絨布把它們壓得很短。 */
+function dieRoll(t, o){
+  o = o || {};
+  var g = o.gain === undefined ? 1 : o.gain, pan = o.pan || 0;
+  var verb = o.verb === undefined ? 0.18 : o.verb;
+  var k = rnd(0.93, 1.08);
+  var res = [1180 * k, 2460 * k, 4050 * k];
+  var gap = rnd(0.1, 0.13), at = t, amp = 1;
+  var bounces = 3 + Math.floor(Math.random() * 3);
+  for(var i=0;i<bounces;i++){
+    for(var r=0;r<res.length;r++){
+      grain(at, {
+        f0:res[r] * rnd(0.97, 1.03), q:rnd(5, 9), a:0.0008,
+        dur:(0.052 - r * 0.012) * rnd(0.8, 1.2),
+        gain:(0.66 - r * 0.16) * g * amp, pan:pan + rnd(-0.05, 0.05),
+        verb:verb, hp:500, pink:false
+      });
+    }
+    thump(at + 0.001, {f:132 * k, dur:0.04, gain:0.12 * g * amp, pan:pan*0.5, verb:verb*0.5});
+    at += gap; gap *= rnd(0.6, 0.74); amp *= rnd(0.55, 0.72);
+  }
+  /* 停住之前在布上蹭的那一小下 */
+  grain(at, {f0:2200, f1:900, q:1.2, a:0.004, dur:0.05, gain:0.08*g, pan:pan, verb:verb});
+}
+
+/* ---------------- 音階 ----------------
+   全部落在 F 大調九和弦的世界裡：暖、鬆、不宣告勝負，
+   像有人在隔壁房間彈了一下。 */
+function nf(semis){ return 440 * Math.pow(2, semis / 12); }
+var N = {
+  F2:nf(-28), Bb2:nf(-23), C3:nf(-21), D3:nf(-19), F3:nf(-16), G3:nf(-14),
+  A3:nf(-12), C4:nf(-9), D4:nf(-7), E4:nf(-5), F4:nf(-4), G4:nf(-2),
+  A4:nf(0), C5:nf(3), D5:nf(5), E5:nf(7), F5:nf(8), A5:nf(12), C6:nf(15)
+};
+
+/* ---------------- 事件 ---------------- */
+var SFX = {};
+
+/* 洗牌。發生在上一局打完到下一局開始的那段空檔——
+   畫面上那時什麼都沒動，正是荷官收牌、洗牌的時間。
+   開局第一次沒有空檔可用，就墊在發牌前面。 */
+SFX.shuffle = function(delay, gain){
+  if(!live()) return 0;
+  riffle(now() + (delay || 0.02), {gain:gain === undefined ? 0.9 : gain});
+  return 0.62;
+};
+
+/* 一張一張發。count 是這一局實際會發出去的張數，span 是視覺上發完要多久，
+   pre 是幾秒之後才開始（立體版換局時牌要先飛回牌庫，發牌是等它們回去才開始的）。
+   聲音跟著畫面走：平面只演我自己那幾張，立體繞整桌一圈，兩邊時間不一樣。 */
+SFX.deal = function(count, span, pre){
+  if(!live()) return 0;
+  var t0 = now() + 0.02 + (pre || 0);
+  var n = Math.max(1, Math.min(72, count));
+  var step = span / Math.max(1, n);
+  for(var i=0;i<n;i++){
+    cardDeal(t0 + i * step + rnd(-0.008, 0.008), {
+      gain:0.5 * (1 - Math.min(0.4, n / 220)), pan:rnd(-0.34, 0.34),
+      soft:i < n / 2 ? 0.2 : 0.5
+    });
+  }
+  return (pre || 0) + span;      /* 發完是什麼時候（秒） */
+};
+
+/* 換局時桌上的牌飛回牌庫（只有立體版演得出來）：一陣拖過絨布的聲音，
+   末尾是整副牌頓在牌庫上。 */
+SFX.gather = function(count, span){
+  if(!live()) return 0;
+  var t = now() + 0.02;
+  sweep(t, {dur:Math.max(0.18, span * 0.7), gain:0.6, pan:0});
+  var n = Math.max(1, Math.min(40, count)), step = span / n;
+  for(var i=0;i<n;i++)
+    cardLand(t + i * step + rnd(-0.01, 0.01), {gain:0.18, soft:0.9,
+             pan:rnd(-0.25, 0.25), verb:0.22});
+  pack(t + span, {gain:0.5, pan:0});
+  return span;
+};
+
+/* 翻王牌：抬起來、在半空翻正、放回牌庫頂端。 */
+SFX.flip = function(delay){
+  if(!live()) return;
+  var t = now() + (delay || 0);
+  cardSlide(t, {gain:0.55, len:0.06, pan:0.1});
+  grain(t + 0.16, {f0:2600, f1:4200, q:0.6, a:0.09, dur:0.08, gain:0.075, pan:0.1, verb:0.18, sweep:0.2});
+  cardLand(t + 0.42, {gain:0.72, soft:0.6, pan:0.1, verb:0.24});
+  /* 王牌定了，桌子換色——給一顆很輕的低音當註腳 */
+  rhodes(t + 0.44, {f:N.F3, dur:1.2, gain:0.045, pan:0, verb:0.45, index:1.9, lp:2600});
+};
+
+/* 有人放骰子 */
+SFX.bid = function(pan){ if(live()) dieRoll(now() + 0.01, {pan:pan || 0, gain:0.85}); };
+
+/* 出牌：飛過去，然後落在檯面上。fly 是飛行時間（毫秒），跟畫面同一個數字。 */
+SFX.play = function(o){
+  if(!live()) return;
+  o = o || {};
+  var t = now() + 0.01, fly = (o.fly || 340) / 1000;
+  whoosh(t, {dur:fly, gain:o.mine ? 1 : 0.7, pan:(o.pan || 0) * 0.7});
+  if(o.mine) cardSlide(t, {gain:0.5, len:0.05, pan:0});       /* 從手上抽出來 */
+  cardLand(t + fly * 0.93, {
+    gain:o.mine ? 0.95 : 0.8 * (1 - 0.22 * (o.far || 0)),
+    pan:o.pan || 0, soft:Math.min(0.7, (o.stack || 0) * 0.2),
+    verb:0.16 + 0.12 * (o.far || 0)
+  });
+};
+
+/* 這一墩定了：贏的那張往贏家推出去一小段 */
+SFX.push = function(pan){
+  if(!live()) return;
+  var t = now() + 0.01;
+  grain(t, {f0:1500, f1:700, q:0.8, a:0.02, dur:0.09, gain:0.46, pan:pan||0, verb:0.22, sweep:0.12});
+  thump(t + 0.03, {f:112, dur:0.07, gain:0.07, pan:(pan||0)*0.5, verb:0.1});
+};
+
+/* 收墩：整疊拖向贏家；是我贏的就多一顆暖音 */
+SFX.collect = function(o){
+  if(!live()) return;
+  o = o || {};
+  var t = now() + 0.01, d = (o.dur || 300) / 1000;
+  sweep(t, {dur:d, gain:0.9, pan:(o.pan || 0) * 0.8});
+  if(o.mine){
+    pack(t + d + 0.04, {gain:0.7, pan:o.pan || 0.5});
+    rhodes(t + d + 0.05, {f:N.C5, dur:0.85, gain:0.075, pan:0.12, verb:0.4, index:2.2});
+    rhodes(t + d + 0.055, {f:N.F4, dur:1.0, gain:0.06, pan:-0.06, verb:0.4, index:2.0, mallet:false});
+  }
+};
+
+/* 輪到你了。連線的時候這顆最重要——人不會一直盯著螢幕。
+   兩個音往上走五度，音量壓得很低，殘響給多，像從房間另一頭傳來。
+   音高刻意放在 A4／E5：手機和筆電的喇叭在 300Hz 以下幾乎不出聲，
+   原本寫在 A3／E4 的時候，在桌機上很好聽，在手機上等於沒有這顆。 */
+SFX.turn = function(){
+  if(!live() || !gate("turn", 1200)) return;
+  var t = now() + 0.01;
+  rhodes(t,        {f:N.A4, dur:0.9,  gain:0.062, pan:-0.1, verb:0.5, index:2.0, lp:4200});
+  rhodes(t + 0.1,  {f:N.E5, dur:1.15, gain:0.07,  pan:0.1,  verb:0.55, index:2.2, lp:4800});
+  rhodes(t,        {f:N.A3, dur:1.0,  gain:0.05,  pan:0,    verb:0.45, index:1.6, lp:2200, mallet:false});
+};
+
+/* 一局結束：叫中就是一串上行的九和弦，沒叫中就往下掉一個小三度。
+   沒叫中的那顆不是「錯誤音」——是低了一點、暗了一點，就這樣。 */
+SFX.round = function(hit){
+  if(!live()) return;
+  var t = now() + 0.02;
+  sweep(t, {dur:0.34, gain:0.5, pan:0});
+  if(hit){
+    var arp = [[N.F4, -0.18], [N.A4, 0.0], [N.C5, 0.14], [N.E5, -0.08]];
+    for(var i=0;i<arp.length;i++)
+      rhodes(t + 0.3 + i * 0.075, {
+        f:arp[i][0], dur:1.4 - i * 0.12, gain:0.115 - i * 0.012,
+        pan:arp[i][1], verb:0.42, index:2.4
+      });
+    rhodes(t + 0.3, {f:N.F2, dur:1.7, gain:0.07, pan:0, verb:0.3, index:1.2, lp:900, mallet:false});
+  }else{
+    rhodes(t + 0.3,  {f:N.F4, dur:1.0, gain:0.08,  pan:-0.06, verb:0.4,  index:1.7, lp:2200});
+    rhodes(t + 0.39, {f:N.D4, dur:1.5, gain:0.075, pan:0.06,  verb:0.42, index:1.5, lp:1900});
+    rhodes(t + 0.39, {f:N.D3, dur:1.6, gain:0.055, pan:0,     verb:0.35, index:1.2, lp:900, mallet:false});
+  }
+};
+
+/* 收桌 */
+SFX.over = function(win){
+  if(!live()) return;
+  var t = now() + 0.03;
+  sweep(t, {dur:0.42, gain:0.85});
+  pack(t + 0.46, {gain:0.95, pan:-0.1});
+  var base = t + 0.6;
+  var chord = win ? [[N.F3,0,0],[N.C4,0.085,-0.14],[N.A4,0.17,0.12],[N.E5,0.255,-0.08],[N.A5,0.34,0.16],[N.C6,0.43,0]]
+                  : [[N.F3,0,0],[N.C4,0.09,-0.12],[N.G4,0.18,0.1],[N.D5,0.27,-0.06]];
+  for(var i=0;i<chord.length;i++)
+    rhodes(base + chord[i][1], {
+      f:chord[i][0], dur:2.6 - i * 0.18, gain:(win ? 0.125 : 0.1) - i * 0.011,
+      pan:chord[i][2], verb:0.55, index:2.3
+    });
+  rhodes(base, {f:N.Bb2, dur:3.0, gain:0.075, pan:0, verb:0.35, index:1.1, lp:800, mallet:false});
+};
+
+/* 有人入座／加入房間 */
+SFX.join = function(){
+  if(!live() || !gate("join", 400)) return;
+  var t = now() + 0.01;
+  rhodes(t,       {f:N.C4, dur:0.7, gain:0.06, pan:-0.08, verb:0.45, index:2.0, lp:3600});
+  rhodes(t + 0.09,{f:N.G4, dur:0.9, gain:0.065, pan:0.08, verb:0.5, index:2.2, lp:4000});
+};
+
+/* 不能出的牌、伺服器回絕：一顆悶掉的低音，不刺耳 */
+SFX.no = function(){
+  if(!live() || !gate("no", 260)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:700, f1:380, q:1.4, a:0.001, dur:0.05, gain:0.5, pan:0, verb:0.12, pink:false});
+  /* 悶歸悶，還是得在手機喇叭上聽得到：中頻補一小顆短的，不然這顆等於不存在 */
+  grain(t, {f0:1250, f1:820, q:2.2, a:0.001, dur:0.028, gain:0.34, pan:0, verb:0.1, pink:false});
+  rhodes(t, {f:N.F3, dur:0.4, gain:0.11, pan:0, verb:0.2, index:1.1, lp:760, mallet:false});
+  rhodes(t + 0.06, {f:N.F4, dur:0.3, gain:0.055, pan:0, verb:0.18, index:1.0, lp:1100, mallet:false});
+};
+
+/* ---------------- 介面 ----------------
+   桌沿是胡桃木，按鈕的聲音就照木頭做：短、低、乾。 */
+SFX.tap = function(){
+  if(!live() || !gate("tap", 45)) return;
+  var t = now() + 0.005, k = rnd(0.94, 1.07);
+  grain(t, {f0:1150*k, f1:680*k, q:1.6, a:0.001, dur:0.028, gain:0.85, pan:0, verb:0.12, pink:false});
+  grain(t, {f0:2400*k, f1:1600*k, q:2.4, a:0.0008, dur:0.014, gain:0.3, pan:0, verb:0.1, pink:false});
+  thump(t, {f:196*k, dur:0.034, gain:0.13, pan:0, verb:0.08});
+};
+SFX.open = function(){
+  if(!live() || !gate("ov", 120)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:430, f1:2400, q:0.6, a:0.11, dur:0.1, gain:0.26, pan:0, verb:0.28, sweep:0.2});
+  rhodes(t + 0.05, {f:N.C5, dur:0.5, gain:0.06, pan:0, verb:0.4, index:1.4, lp:3000, mallet:false});
+};
+SFX.close = function(){
+  if(!live() || !gate("ov", 120)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:2000, f1:430, q:0.6, a:0.02, dur:0.15, gain:0.19, pan:0, verb:0.22, sweep:0.17, pink:false});
+  thump(t + 0.1, {f:150, dur:0.08, gain:0.055, pan:0, verb:0.1});
+};
+/* 平面／立體：整個房間換一次 */
+SFX.toggle = function(){
+  if(!live() || !gate("tg", 200)) return;
+  var t = now() + 0.005;
+  grain(t, {f0:240, f1:1500, q:0.5, a:0.13, dur:0.22, gain:0.1, pan:0, verb:0.35, sweep:0.28});
+  thump(t + 0.02, {f:62, dur:0.4, gain:0.11, pan:0, verb:0.2, bend:1.45});
+  rhodes(t + 0.14, {f:N.F4, dur:0.8, gain:0.045, pan:0, verb:0.45, index:2.0, lp:3600, mallet:false});
+};
+
+/* ---------------- 開關 ---------------- */
+SFX.enabled = function(){ return PREF.on; };
+SFX.set = function(on){
+  PREF.on = !!on; savePref();
+  if(!ctx){ if(PREF.on) unlock(); return; }
+  unlock();
+  master.gain.cancelScheduledValues(ctx.currentTime);
+  master.gain.setTargetAtTime(PREF.on ? PREF.vol : 0, ctx.currentTime, 0.02);
+  if(PREF.on) setTimeout(function(){ SFX.tap(); }, 40);
+};
+SFX.volume = function(v){
+  if(v === undefined) return PREF.vol;
+  PREF.vol = Math.max(0, Math.min(1, v)); savePref();
+  if(ctx && PREF.on) master.gain.setTargetAtTime(PREF.vol, ctx.currentTime, 0.02);
+};
+
+/* ---------------- 牌局狀態差分 ----------------
+   render() 每畫一次就把 G 遞進來一次（連線模式每 420ms 一次）。
+   這裡跟上一次比對，只有「真的變了」才發聲。
+   照的是引擎的狀態，不是 DOM，所以平面與立體共用這一份。 */
+var M = {ri:-1, phase:"", played:-1, tn:-1, flip:-1, bids:{}, log:0, myTurn:false, n:0, seats:"",
+         shuffleAt:0};
+
+/* 座位在耳朵裡的位置：自己在正前方（不偏），對面也在正中間但遠。
+   越遠的乾聲越小、殘響越多——這是距離，不是音量。 */
+function seatAudio(i, me, n){
+  if(i < 0 || me < 0 || !n) return {pan:0, far:0.4};
+  var k = ((i - me) % n + n) % n;
+  var a = k * Math.PI * 2 / n;
+  return {pan:Math.sin(a) * 0.6, far:(1 - Math.cos(a)) / 2};
+}
+
+SFX.frame = function(G, me, best, o){
+  if(!G) return;
+  LASTG = G;
+  o = o || {};
+  /* 這裡從頁面一載入就開始跑，不等音訊解鎖——每一顆聲音自己會檢查 live()。
+     這樣做的理由：使用者第一次點擊之前，牌局已經發過牌、可能也叫過幾輪了。
+     如果等到解鎖才開始比對，第一次點擊會突然補放一整串早就過去的事。
+     狀態一路跟著走、聲音才等許可，接上的那一刻就只會聽到「接下來」發生的事。 */
+  var n = G.cfg ? G.cfg.n : 0;
+  var is3d = document.body.classList.contains("is3d");
+  var sp = o.speed || 1200;
+
+  /* 換人數／重開一桌：把記憶清掉，別把新桌子的第一手當成舊桌子的變化 */
+  if(n !== M.n){ M.n = n; M.ri = -1; M.phase = ""; M.played = -1; M.tn = -1; M.flip = -1; M.bids = {}; M.log = G.log ? G.log.length : 0; }
+
+  /* ---- 新的一局：洗牌 + 發牌 + 翻王牌 ---- */
+  if(G.ri !== M.ri){
+    var firstDeal = M.ri < 0;
+    M.ri = G.ri; M.bids = {}; M.played = -1; M.tn = -1;
+    /* 上一局的洗牌還沒放到就換局了（有人按「馬上開始」）：取消它，別蓋到新局的發牌 */
+    if(M.shuffleAt){ clearTimeout(M.shuffleAt); M.shuffleAt = 0; }
+    if(G.ri >= 0 && G.phase !== "lobby" && G.hs > 0){
+      /* 發牌要多久：跟著畫面。平面只演我手上那幾張，立體繞整桌一圈；
+         立體版換局時桌上的牌要先飛回牌庫，發牌是等它們回去才開始的 */
+      var cards, span, pre = 0;
+      if(is3d){
+        var step = Math.min(95, Math.max(38, sp * 0.11)) / 1000;
+        var back = G.ri > 0 && G.ladder ? n * (G.ladder[G.ri - 1] || 0) : 0;
+        if(back){ pre = 0.42 + back * 0.014; SFX.gather(back, pre); }
+        cards = n * G.hs; span = Math.max(0.2, (cards - 1) * step);
+      }else{
+        cards = G.hs; span = Math.max(0.12, (G.hs - 1) * 0.034);
+      }
+      /* 第一局沒有「上一局的空檔」可以洗牌，只好墊在發牌前面 */
+      if(firstDeal || G.ri === 0) pre += SFX.shuffle(0.02);
+      var after = SFX.deal(cards, span, pre);
+      if(G.trumpCard){
+        M.flip = G.ri;
+        SFX.flip(is3d ? after + 0.42 : Math.max(0.05, pre));
+      }
+    }
+  }
+  /* 王牌是後來才出現的（連線模式先收到 lobby 再收到牌） */
+  if(G.trumpCard && M.flip !== G.ri && G.ri >= 0){ M.flip = G.ri; SFX.flip(0.05); }
+
+  /* ---- 骰子 ---- */
+  if(G.bids) for(var i=0;i<n;i++){
+    var v = G.bids[i];
+    if(v === null || v === undefined) continue;
+    if(M.bids[i] === v) continue;
+    M.bids[i] = v;
+    /* 最後一個人叫完，phase 同一輪就變成 play 了——不能拿「還在叫牌階段」當條件，
+       否則整局只有最後那顆骰子是無聲的 */
+    SFX.bid(seatAudio(i, me, n).pan);
+  }
+
+  /* ---- 出牌 ---- */
+  var tn = G.trick ? G.trick.length : 0;
+  if(tn > M.tn && tn > 0 && M.tn >= 0){
+    for(var j = Math.max(0, M.tn); j < tn; j++){
+      var t = G.trick[j], sa = seatAudio(t.p, me, n);
+      SFX.play({
+        mine:t.p === me, pan:sa.pan, far:sa.far, stack:j,
+        fly:t.p === me ? Math.min(460, Math.max(240, sp * 0.62))
+                       : (is3d ? Math.min(480, Math.max(230, sp * 0.62)) : 340)
+      });
+    }
+  }
+  if(tn !== M.tn) M.tn = tn;
+
+  /* ---- 一墩打完：定格、收墩 ---- */
+  if(G.phase !== M.phase){
+    var was = M.phase;
+    M.phase = G.phase;
+    if(G.phase === "trickend" && best >= 0 && G.trick && G.trick[best]){
+      var w = G.trick[best].p, b = o.beats || {land:400, push:0, hold:900, sweep:260};
+      var wa = seatAudio(w, me, n);
+      setTimeout(function(){ SFX.push(wa.pan); }, b.land);
+      setTimeout(function(){ SFX.collect({mine:w === me, pan:wa.pan, dur:b.sweep}); },
+                 b.land + b.push + b.hold);
+      M.tn = -1;                                  /* 下一墩從頭數 */
+    }
+    if(G.phase === "roundend" && G.log && G.log.length){
+      var row = G.log[G.log.length - 1];
+      var cell = me >= 0 && row.cells ? row.cells[me] : null;
+      var lag = (o.beats ? o.beats.sweep : 460) + 120;
+      setTimeout(function(){ SFX.round(cell ? cell.hit : true); }, lag);
+      /* 這一局的分算完了，桌上安靜下來——荷官在收牌、洗牌，下一局才開始。
+         這段空檔（roundGap，至少 2.2 秒）本來完全沒有聲音 */
+      if(G.ri + 1 < G.ladder.length)
+        M.shuffleAt = setTimeout(function(){ M.shuffleAt = 0; SFX.shuffle(0.02, 0.8); }, lag + 1000);
+      M.log = G.log.length;
+    }
+    if(G.phase === "over") setTimeout(function(){
+      var top = Math.max.apply(null, G.score), mine = me >= 0 ? G.score[me] : -Infinity;
+      SFX.over(mine === top);
+    }, 320);
+    if(was === "lobby" && G.phase === "bid") { /* 開局：發牌聲已經在上面發過了 */ }
+  }
+
+  /* ---- 輪到我 ---- */
+  var mine = me >= 0 && G.turn === me && (G.phase === "bid" || G.phase === "play");
+  if(mine && !M.myTurn) SFX.turn();
+  M.myTurn = mine;
+
+  /* ---- 有人入座 ---- */
+  if(G.seats){
+    var key = G.seats.map(function(s){ return s.cid || ""; }).join("|");
+    if(M.seats && key !== M.seats && G.phase === "lobby") SFX.join();
+    M.seats = key;
+  }
+};
+
+/* ---------------- 介面的聲音 ----------------
+   用事件委派，不去改任何一個 onclick——那些 handler 是別人的地盤。 */
+var OPENERS = {btnRules:1, btnPref:1, btnRoom:1, btnFinal:1, btnLobby:1,
+               btnMe:1, rmMe:1, lbMe:1, lbRules:1, lbPref:1};
+var CLOSERS = {pgX:1, endClose:1, endClose2:1, endBack:1, scoreClose:1};
+document.addEventListener("click", function(e){
+  var el = e.target.closest ? e.target.closest("button, .opt, .bidbtn, [data-net]") : null;
+  if(!el) return;
+  if(el.closest("[data-nosfx]")) return;      /* 想自己管聲音的地方掛這個屬性 */
+  if(el.id && OPENERS[el.id]) return SFX.open();
+  if(el.id && CLOSERS[el.id]) return SFX.close();
+  if(el.closest("#optSfx")) return;                          /* 開關自己會出聲 */
+  if(el.id === "btnScore")
+    return setTimeout(function(){
+      document.body.classList.contains("score-open") ? SFX.open() : SFX.close();
+    }, 0);
+  if(el.closest("#optDim")) return SFX.toggle();
+  if(el.dataset && el.dataset.net) return el.dataset.net === "close" ? SFX.close() : SFX.tap();
+  if(el.hasAttribute && el.hasAttribute("data-card")){
+    if(el.disabled) return SFX.no();
+    return;                                                   /* 出牌的聲音由 frame() 負責 */
+  }
+  SFX.tap();
+}, true);
+
+/* ---------------- 換成錄音 ----------------
+   哪天要把某幾顆換成真的錄音（例如買了商用音效庫），在頁面載入後呼叫：
+     SFX.load({ play:["sfx/card_a.wav","sfx/card_b.wav"], bid:["sfx/die.wav"] })
+   給幾個檔就會輪流用（round-robin），避免同一個檔連放聽起來很假。
+   有錄音的那顆就走錄音，其餘照舊合成，不用一次換完。 */
+var SAMP = {};
+SFX.load = function(map){
+  boot();
+  Object.keys(map).forEach(function(k){
+    var urls = [].concat(map[k]);
+    Promise.all(urls.map(function(u){
+      return fetch(u).then(function(r){ return r.arrayBuffer(); })
+                     .then(function(a){ return ctx.decodeAudioData(a); });
+    })).then(function(bufs){
+      SAMP[k] = {bufs:bufs, i:0};
+      var orig = SFX[k];
+      SFX[k] = function(o){
+        if(!live()) return;
+        o = o || {};
+        var s = SAMP[k];
+        var src = ctx.createBufferSource();
+        src.buffer = s.bufs[s.i++ % s.bufs.length];
+        src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.06;   /* 每次一點點不一樣 */
+        var g = ctx.createGain();
+        g.gain.value = (o.gain === undefined ? 1 : o.gain) * 0.9;
+        src.connect(g);
+        out(g, o.pan || 0, o.verb === undefined ? 0.12 : o.verb);
+        src.start(now() + 0.005);
+      };
+      SFX[k].synth = orig;
+    }).catch(function(){});
+  });
+};
+
+/* 把某一顆離線算成一段音訊。用途有兩個：
+     · 開發時量它到底長什麼樣（峰值、時值、頻譜重心）
+     · 想把合成的結果導成 wav 交給別人接手，也是從這裡出去
+   SFX.bounce("play", {mine:true}, 1.2).then(buf => ...) */
+SFX.bounce = function(name, arg, sec){
+  var OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if(!OC || typeof SFX[name] !== "function") return Promise.reject(new Error("no " + name));
+  var keep = [ctx, bus, wet, send, master, ready, noiseBuf, pinkBuf, unlocked, offline, PREF.on];
+  ctx = null; ready = false; unlocked = true; PREF.on = true; lastAt = {};
+  var oc = new OC(2, Math.ceil((sec || 2) * 44100), 44100);
+  boot(oc);
+  master.gain.value = 0.8;
+  try{ (SFX[name].synth || SFX[name]).apply(null, [].concat(arg === undefined ? [] : arg)); }catch(e){}
+  return oc.startRendering().then(function(b){
+    ctx = keep[0]; bus = keep[1]; wet = keep[2]; send = keep[3]; master = keep[4];
+    ready = keep[5]; noiseBuf = keep[6]; pinkBuf = keep[7]; unlocked = keep[8];
+    offline = keep[9]; PREF.on = keep[10]; lastAt = {};
+    return b;
+  });
+};
+
+/* console 裡想單獨試某一顆：SFX.demo("round", true) */
+SFX.demo = function(name, a){ unlock(); if(typeof SFX[name] === "function") SFX[name](a); };
+
+/* 原型用：把原件露出來給 G 案的頒獎音效（正式版是寫在這個 IIFE 裡面，不需要這一行） */
+SFX._prim = {grain:grain, thump:thump, rhodes:rhodes, cardLand:cardLand, cardSlide:cardSlide, pack:pack, sweep:sweep,
+  out:out, now:now, live:live, rnd:rnd, N:N, ctx:function(){ return ctx; }, unlock:unlock};
+window.SFX = SFX;
+})();
+
+</script>
+<script>
+/* ═══ 頒獎的聲音：全部 chiptune ═══════════════════════════════════════════
+   方波與三角波、硬的包絡（attack 0、瞬間收）、沒有殘響——這是一台街機。
+   照節拍表排在 AudioContext 的時間軸上。正式版搬進音效層那個 IIFE。 */
+(function(){
+  if(!window.SFX || !SFX._prim) return;
+  var P = SFX._prim, out = P.out, now = P.now, live = P.live, ctx = P.ctx;
+  var nf = function(semis){ return 440 * Math.pow(2, semis / 12); };
+  var C3 = nf(-21), G3 = nf(-14), C5 = nf(3), E5 = nf(7), G5 = nf(10), C6 = nf(15), E6 = nf(19), G6 = nf(22), B5 = nf(14), A6 = nf(24), E7 = nf(31), C7 = nf(27), D7 = nf(29), G7 = nf(34), B4 = nf(2), F5 = nf(8);
+  /* 一顆 8-bit 音：wave 方波或三角波，f→f1 是滑音，dur 之後瞬間收 */
+  function chip(t, o){
+    var c = ctx(), osc = c.createOscillator(); osc.type = o.wave || "square";
+    osc.frequency.setValueAtTime(o.f, t);
+    if(o.f1) osc.frequency.linearRampToValueAtTime(o.f1, t + o.dur);
+    var g = c.createGain(), v = o.gain || 0.05;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.004);
+    g.gain.setValueAtTime(v, t + o.dur - 0.006); g.gain.linearRampToValueAtTime(0, t + o.dur);
+    osc.connect(g); out(g, o.pan || 0, 0);
+    osc.start(t); osc.stop(t + o.dur + 0.01);
+  }
+  var tick = function(t, pan, f){ chip(t, {f:f || 220, dur:0.03, gain:0.045, pan:pan}); };
+  var blip = function(t, pan){ chip(t, {f:300, f1:900, dur:0.12, gain:0.07, pan:pan}); };
+  var land = function(t, pan){ chip(t, {f:80, dur:0.08, gain:0.09, wave:"triangle", pan:pan}); chip(t, {f:160, dur:0.03, gain:0.03, pan:pan}); };
+  var coin = function(t, pan, hi){ chip(t, {f:hi ? E6 : B5, dur:0.08, gain:0.075, pan:pan}); chip(t + 0.08, {f:hi ? A6 : E6, dur:0.3, gain:0.07, pan:pan}); };
+
+  SFX.gag = function(B, rate, o){
+    if(!live()) return;
+    rate = rate || 1; o = o || {};
+    var t0 = now() + 0.03, p1 = o.pan1 || 0, p2 = o.pan2 || -0.35, p3 = o.pan3 || 0.35;
+    var T = function(name, plus){ return t0 + (B[name] + (plus || 0)) / rate; };
+    var i, s;
+    /* 跑進來 */
+    for(i = 0, s = B.run; s < B.crouch - 0.02; s += 0.12, i++) tick(t0 + s / rate, p3 + 0.1, i % 2 ? 220 : 196);
+    /* 第一跳：頭撞方塊，方塊被頂起、金幣冒出、+100 */
+    blip(T("jump1"), p3);
+    chip(T("bonk"), {f:110, dur:0.06, gain:0.08, pan:p3});
+    chip(T("bonk", 0.01), {f:330, f1:520, dur:0.05, gain:0.04, wave:"triangle", pan:p3});
+    coin(T("bonk", 0.04), p3);
+    land(T("land1"), p3);
+    /* 第二跳：站上 3RD，撿到獎盃 */
+    blip(T("jump2"), p3);
+    land(T("land2"), p3);
+    coin(T("grab", 0.02), p3, true);
+    [C6, E6, G6].forEach(function(f, j){ chip(T("grab", 0.4 + j * 0.05), {f:f, dur:0.045, gain:0.05, pan:p3}); });
+    /* 跳過 1ST 到 2ND，再跳回 1ST */
+    blip(T("jump3"), (p3 + p2) / 2); land(T("land3"), p2);
+    blip(T("jump4"), (p2 + p1) / 2); land(T("land4"), p1);
+    /* WINNER!：琶音、長音、三角波低音；分數 +999 逐位跳、再跳回來 */
+    [C5, E5, G5, C6].forEach(function(f, j){ chip(T("present", 0.1 + j * 0.09), {f:f, dur:0.085, gain:0.065, pan:p1}); });
+    chip(T("present", 0.46), {f:C6, dur:0.5, gain:0.06, pan:p1});
+    chip(T("present", 0.1), {f:C3, dur:0.36, gain:0.06, wave:"triangle", pan:p1});
+    chip(T("present", 0.46), {f:G3, dur:0.5, gain:0.06, wave:"triangle", pan:p1});
+    for(i = 0; i < 12; i++) chip(T("score", i * 0.04), {f:1200 + i * 40, dur:0.015, gain:0.03, pan:p1});
+    for(i = 0; i < 3; i++) chip(T("score", 0.9 + i * 0.05), {f:900 - i * 200, dur:0.03, gain:0.035, pan:p1});
+    /* 往右跑、踩空（「？」兩聲）、死亡音、掉下去、1UP */
+    for(i = 0, s = B.run2; s < B.air - 0.02; s += 0.12, i++) tick(t0 + s / rate, p1 + 0.15, i % 2 ? 220 : 196);
+    chip(T("air", 0.05), {f:880, dur:0.05, gain:0.04, pan:p1 + 0.2}); chip(T("air", 0.15), {f:880, dur:0.05, gain:0.04, pan:p1 + 0.2});
+    chip(T("fall"), {f:B4, dur:0.1, gain:0.07, pan:p1 + 0.2});
+    [0.2, 0.3, 0.4].forEach(function(d){ chip(T("fall", d), {f:F5, dur:0.09, gain:0.065, pan:p1 + 0.2}); });
+    chip(T("fall", 0.55), {f:660, f1:110, dur:0.45, gain:0.07, pan:p1 + 0.2});
+    [E6, G6, E7, C7, D7, G7].forEach(function(f, j){ chip(T("end", 0.15 + j * 0.07), {f:f, dur:0.065, gain:0.05, pan:0}); });
+  };
+})();
+</script>
+<script>
+/* ═══ 頒獎（Mario 邏輯）═══════════════════════════════════════════════════
+   引擎跟 g.def 同一套：節拍表、每個零件一條 WAAPI 軌、x 等速、y 走階梯（steps）拋物線、位置從 DOM 量。
+   ?slow 慢動作；?t=節拍名+秒 停格；重播頒獎（有聲）不重新載入。 */
+(function(){
+  const q = new URLSearchParams(location.search);
+  const $ = function(id){ return document.getElementById(id); };
+  const stage = $("stage"), tom = $("tom"), cup = $("cup"), coin = $("coin");
+  const p1 = document.querySelector(".stack.p1 .pile"), p2 = document.querySelector(".stack.p2 .pile"), p3 = document.querySelector(".stack.p3 .pile");
+  if(!p1 || !p3) return;
+  const S = stage.getBoundingClientRect();
+  const R = function(el){ const r = el.getBoundingClientRect(); return {l:r.left - S.left, r:r.right - S.left, t:r.top - S.top, b:r.bottom - S.top, cx:(r.left + r.right) / 2 - S.left, cy:(r.top + r.bottom) / 2 - S.top}; };
+  /* 方塊還在冒出來的路上（translateY），量它們最後的位置：用 .stack 的底減方塊高 */
+  const blk = function(pile){ const st = R(pile.parentNode), h = pile.offsetHeight; return {l:st.l, r:st.r, cx:st.cx, t:st.b - h, b:st.b}; };
+  const F = R($("floor")).t, P1 = blk(p1), P2 = blk(p2 || p1), P3 = blk(p3), W = S.width;
+  const faces = R(document.querySelector(".stack.p1 .faces"));
+  const k = parseFloat(getComputedStyle(tom).getPropertyValue("--k")) || 1;
+  const LIN = "linear", STEP = "steps(1,end)", EO = "cubic-bezier(.16,1,.3,1)";
+  const HEAD = 196 * k;                                    /* 頭頂（腳底算起） */
+  const SLOW = q.has("slow");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ── 站位 ── */
+  const x0 = W + 90 * k;                                   /* 畫面外右邊跑進來 */
+  const xJ = P3.r + 34 * k;                                /* 在 3RD 右邊起跳 */
+  const on3 = {x:P3.cx, y:P3.t}, on2 = {x:P2.cx, y:P2.t}, on1 = {x:P1.r - 10 * k, y:P1.t};
+  const cupStart = {x:P3.cx, y:P3.t};                      /* 獎盃一開始就放在 3RD 上，像關卡裡的道具 */
+  const cupGiven = {x:Math.max(faces.l - 30 * k, 22 * k), y:faces.cy + 20 * k};
+  const overHead = function(){ return -(HEAD + 10 * k); };
+
+  /* ── 節拍表（秒） ── */
+  const B = {}; let t = 0;
+  const at = function(name, dur){ B[name] = t; t += dur; return B[name]; };
+  at("run", 1.0);        /* 從右邊跑進來 */
+  at("crouch", .12);
+  at("jump1", .32);      /* 第一跳：頭撞到 3RD */
+  at("bonk", .1);        /* 方塊被頂起、金幣、+100 */
+  at("fall1", .3);
+  at("land1", .22);
+  at("jump2", .4);       /* 第二跳：站上 3RD */
+  at("land2", .18);
+  at("grab", .55);       /* 獎盃冒出來、飄到頭上 */
+  at("jump3", .6);       /* 跳過 1ST 落在 2ND */
+  at("land3", .28);
+  at("jump4", .48);      /* 跳回 1ST */
+  at("land4", .26);
+  at("present", .95);    /* 獎盃飛給冠軍、WINNER! 閃三下 */
+  at("score", 1.1);      /* 冠軍分數 +999 跳上去、再跳回來 */
+  at("run2", .42);       /* 往右跑，跑出方塊邊 */
+  at("air", .3);         /* 踩空：停一拍 */
+  at("fall", 1.0);       /* 死亡音，轉圈掉下去 */
+  at("end", .7);         /* 1UP */
+  const TOTAL = t;
+  const off = function(s){ return Math.min(1, Math.max(0, s / TOTAL)); };
+
+  const tracks = {tx:[], ty:[], body:[], legL:[], legR:[], armL:[], armR:[], cx:[], cy:[], cupr:[], tomo:[], cupo:[], coinx:[], coiny:[], coino:[], win:[], plus:[], plusy:[], oneup:[]};
+  const K = function(tr, s, tf, ease, extra){ const f = {offset:off(s), easing:ease || LIN}; if(tf != null) f.transform = tf; if(extra) Object.assign(f, extra); tracks[tr].push(f); };
+  const X = function(s, x, e){ K("tx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const Y = function(s, y, e){ K("ty", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const BODY = function(s, rot, bob, e){ K("body", s, "translateY(" + (bob || 0) + "px) rotate(" + rot + "deg)", e); };
+  const LEG = function(s, l, r, e){ K("legL", s, "rotate(" + l + "deg)", e || STEP); K("legR", s, "rotate(" + r + "deg)", e || STEP); };
+  const ARM = function(s, l, r, e){ K("armL", s, "rotate(" + l + "deg)", e || STEP); K("armR", s, "rotate(" + r + "deg)", e || STEP); };
+  const CX = function(s, x, e){ K("cx", s, "translateX(" + x.toFixed(1) + "px)", e); };
+  const CY = function(s, y, e){ K("cy", s, "translateY(" + y.toFixed(1) + "px)", e); };
+  const CUPR = function(s, d, e, sc){ K("cupr", s, "rotate(" + d + "deg)" + (sc ? " scale(" + sc + ")" : ""), e); };
+  /* 跑步：兩格交替，每格硬切 */
+  const walk = function(t0, t1, step){
+    let i = 0;
+    for(let s = t0; s < t1 - 1e-6; s += step, i++){ const a = i % 2 ? 32 : -32; LEG(s, a, -a); ARM(s, -a * 1.2, a * 1.2); BODY(s, 0, i % 2 ? -2 : 0, STEP); }
+  };
+  /* 拋物線：x 等速；y 取 n 格、每格硬切（8-bit 的弧線） */
+  const hop = function(t0, t1, from, to, clear, n){
+    n = n || 9;
+    X(t0, from.x, LIN); X(t1, to.x, LIN);
+    const amp = Math.abs(to.y - from.y) / 2 + clear;
+    for(let i = 0; i <= n; i++){ const u = i / n; Y(t0 + (t1 - t0) * u, from.y + (to.y - from.y) * u - amp * 4 * u * (1 - u), STEP); }
+  };
+  const carry = function(t0, t1, from, to, clear, n){
+    n = n || 9;
+    CX(t0, from.x, LIN); CX(t1, to.x, LIN);
+    const amp = Math.abs(to.y - from.y) / 2 + clear;
+    for(let i = 0; i <= n; i++){ const u = i / n; CY(t0 + (t1 - t0) * u, from.y + (to.y - from.y) * u - amp * 4 * u * (1 - u) + overHead(), STEP); }
+  };
+
+  /* ── 0 跑進來 ── */
+  K("tomo", 0, null, LIN, {opacity:1}); K("cupo", 0, null, LIN, {opacity:1});
+  K("coino", 0, null, STEP, {opacity:0}); K("win", 0, null, STEP, {opacity:0}); K("plus", 0, null, STEP, {opacity:0}); K("oneup", 0, null, STEP, {opacity:0});
+  X(0, x0, LIN); Y(0, F, LIN); X(B.crouch, xJ, LIN);
+  walk(0, B.crouch, .12);
+  CX(0, cupStart.x, LIN); CY(0, cupStart.y, LIN); CUPR(0, 0, LIN);
+  K("coinx", 0, "translateX(" + P3.cx.toFixed(1) + "px)", LIN); K("coiny", 0, "translateY(" + P3.t.toFixed(1) + "px)", LIN);
+  /* ── 1 第一跳：頭撞到 3RD，掉回地上 ── */
+  LEG(B.crouch, 40, -40); ARM(B.crouch, 30, -30); BODY(B.crouch, 0, 6, STEP);
+  BODY(B.jump1, 0, 0, STEP); LEG(B.jump1, -20, 30); ARM(B.jump1, 150, -150);
+  X(B.jump1, xJ, LIN); X(B.bonk, P3.r - 6 * k, LIN);
+  (function(){ const n = 5, apex = F - 64 * k; for(let i = 0; i <= n; i++){ const u = i / n; Y(B.jump1 + (B.bonk - B.jump1) * u, F - (apex < F ? (F - apex) : 0) * (1 - (1 - u) * (1 - u)), STEP); } })();
+  X(B.bonk, P3.r - 6 * k, LIN); X(B.fall1, P3.r + 24 * k, LIN); X(B.land1, xJ, LIN);
+  Y(B.bonk, F - 64 * k, STEP); Y(B.bonk + .06, F - 58 * k, STEP);
+  (function(){ const n = 5; for(let i = 0; i <= n; i++){ const u = i / n; Y(B.fall1 + (B.land1 - B.fall1) * u, F - 58 * k * (1 - u * u), STEP); } })();
+  LEG(B.fall1, 30, -20); ARM(B.fall1, 120, -120);
+  LEG(B.land1, 36, -36); ARM(B.land1, 20, -20); BODY(B.land1, 0, 6, STEP); BODY(B.land1 + .1, 0, 0, STEP); LEG(B.land1 + .1, 4, -4);
+  /* 金幣：從方塊頂彈出去、往上飛、消失；+100 往上飄 */
+  K("coino", B.bonk, null, STEP, {opacity:0}); K("coino", B.bonk + .01, null, STEP, {opacity:1}); K("coino", B.bonk + .5, null, STEP, {opacity:1}); K("coino", B.bonk + .52, null, STEP, {opacity:0});
+  (function(){ const n = 6; for(let i = 0; i <= n; i++){ const u = i / n; K("coiny", B.bonk + .5 * u, "translateY(" + (P3.t - 110 * k * (1 - (1 - u) * (1 - u))).toFixed(1) + "px)", STEP); } })();
+  K("plus", B.bonk + .1, null, STEP, {opacity:0}); K("plus", B.bonk + .11, null, STEP, {opacity:1}); K("plus", B.bonk + .9, null, "steps(4,end)", {opacity:1}); K("plus", B.bonk + 1.2, null, STEP, {opacity:0});
+  K("plusy", 0, "translate(-50%,-50%) translateY(0)", LIN); K("plusy", B.bonk + .1, "translate(-50%,-50%) translateY(0)", LIN); K("plusy", B.bonk + 1.2, "translate(-50%,-50%) translateY(-70px)", LIN);
+  /* ── 2 第二跳：站上 3RD；獎盃冒出來、飄到頭上 ── */
+  LEG(B.jump2 - .06, 40, -40); BODY(B.jump2 - .06, 0, 6, STEP); BODY(B.jump2, 0, 0, STEP);
+  LEG(B.jump2, -20, 30); ARM(B.jump2, 150, -150);
+  hop(B.jump2, B.land2, {x:xJ, y:F}, on3, 36 * k, 8);
+  LEG(B.land2, 36, -36); ARM(B.land2, 20, -20); LEG(B.land2 + .1, 4, -4);
+  CX(B.grab, cupStart.x, LIN); CY(B.grab, cupStart.y, STEP);
+  (function(){ const n = 6; for(let i = 0; i <= n; i++){ const u = i / n; CY(B.grab + .05 + .3 * u, on3.y + (overHead() - 30 * k) * u * (2 - u), STEP); } })();
+  CY(B.grab + .4, on3.y + overHead() - 30 * k, STEP); CY(B.grab + .5, on3.y + overHead(), STEP);
+  CUPR(B.grab, 0, STEP); CUPR(B.grab + .1, 90, STEP); CUPR(B.grab + .2, 180, STEP); CUPR(B.grab + .3, 270, STEP); CUPR(B.grab + .4, 360, STEP);
+  ARM(B.grab + .1, 170, -170); ARM(B.grab + .45, 20, -20);
+  X(B.grab, on3.x, LIN); Y(B.grab, on3.y, LIN);
+  /* ── 3 跳過 1ST 落在 2ND，再跳回 1ST ── */
+  LEG(B.jump3 - .06, 40, -40); BODY(B.jump3 - .06, 0, 6, STEP); BODY(B.jump3, 0, 0, STEP);
+  X(B.jump3 - .06, on3.x, LIN); Y(B.jump3 - .06, on3.y, LIN); CX(B.jump3 - .06, on3.x, LIN); CY(B.jump3 - .06, on3.y + overHead(), LIN);
+  LEG(B.jump3, -20, 30); ARM(B.jump3, 150, -150);
+  hop(B.jump3, B.land3, on3, on2, 150 * k, 11); carry(B.jump3, B.land3, on3, on2, 150 * k, 11);
+  LEG(B.land3, 36, -36); ARM(B.land3, 20, -20); LEG(B.land3 + .1, 4, -4);
+  LEG(B.jump4 - .06, 40, -40); BODY(B.jump4 - .06, 0, 6, STEP); BODY(B.jump4, 0, 0, STEP);
+  X(B.jump4 - .06, on2.x, LIN); Y(B.jump4 - .06, on2.y, LIN); CX(B.jump4 - .06, on2.x, LIN); CY(B.jump4 - .06, on2.y + overHead(), LIN);
+  LEG(B.jump4, -20, 30); ARM(B.jump4, 150, -150);
+  hop(B.jump4, B.land4, on2, on1, 60 * k, 9); carry(B.jump4, B.land4, on2, on1, 60 * k, 9);
+  LEG(B.land4, 36, -36); ARM(B.land4, 20, -20); LEG(B.land4 + .1, 4, -4);
+  /* ── 4 頒獎：獎盃飛到冠軍旁邊（階梯弧線），WINNER! 閃三下 ── */
+  X(B.present, on1.x, LIN); Y(B.present, on1.y, LIN);
+  ARM(B.present, 170, -170); ARM(B.present + .5, 20, -20);
+  (function(){ const n = 7, t0 = B.present + .05, t1 = B.present + .45, from = {x:on1.x, y:on1.y + overHead()}, to = cupGiven;
+    CX(t0, from.x, LIN); CX(t1, to.x, LIN);
+    for(let i = 0; i <= n; i++){ const u = i / n; CY(t0 + (t1 - t0) * u, from.y + (to.y - from.y) * u - 40 * k * 4 * u * (1 - u), STEP); } })();
+  CUPR(B.present + .05, 0, STEP); CUPR(B.present + .45, 0, STEP);
+  [0, .16, .32].forEach(function(d){ K("win", B.present + .5 + d, null, STEP, {opacity:1}); K("win", B.present + .5 + d + .09, null, STEP, {opacity:0}); });
+  K("win", B.present + .98, null, STEP, {opacity:1});
+  K("win", B.score + 1.0, null, STEP, {opacity:1}); K("win", B.score + 1.02, null, STEP, {opacity:0}); K("win", 1e9, null, STEP, {opacity:0});
+  CX(1e9, cupGiven.x, LIN); CY(1e9, cupGiven.y, LIN);
+  /* ── 5 往右跑、踩空、掉下去（轉圈） ── */
+  X(B.run2, on1.x, LIN); X(B.air, P1.r + 40 * k, LIN); walk(B.run2, B.air, .12);
+  Y(B.run2, on1.y, LIN); Y(B.fall, on1.y, STEP);
+  LEG(B.air, 4, -4); ARM(B.air, 60, -60);
+  X(B.fall, P1.r + 40 * k, LIN); X(B.end, P1.r + 40 * k, LIN);
+  (function(){ const n = 10, t0 = B.fall + .55, t1 = B.end + .1; for(let i = 0; i <= n; i++){ const u = i / n; Y(t0 + (t1 - t0) * u, on1.y + (F - on1.y + 240 * k) * u * u, STEP); } })();
+  Y(B.fall + .55, on1.y, STEP);
+  /* 死亡音那一拍：先往上彈一下（Mario 死掉就是這樣），再轉圈掉下去 */
+  Y(B.fall + .05, on1.y - 30 * k, STEP); Y(B.fall + .55, on1.y - 30 * k, STEP);
+  [0, 90, 180, 270, 360, 450, 540].forEach(function(d, i){ BODY(B.fall + .55 + i * .12, d, 0, STEP); });
+  LEG(B.fall, 30, -30); ARM(B.fall, 160, -160);
+  K("tomo", B.end + .3, null, LIN, {opacity:1}); K("tomo", B.end + .32, null, LIN, {opacity:0});
+  /* 1UP */
+  [0, .14, .28].forEach(function(d){ K("oneup", B.end + .1 + d, null, STEP, {opacity:1}); K("oneup", B.end + .1 + d + .07, null, STEP, {opacity:0}); });
+  K("oneup", B.end + .5, null, STEP, {opacity:1}); K("oneup", 1e9, null, STEP, {opacity:1});
+
+  /* 字幕的位置 */
+  const win = $("pxWin"), plus = $("pxPlus"), oneup = $("pxUp");
+  win.style.left = Math.max(60 * k, faces.l - 30 * k) + "px"; win.style.top = (faces.t - 28 * k) + "px";
+  plus.style.left = (P3.cx + 30 * k) + "px"; plus.style.top = (P3.t - 30 * k) + "px";
+  oneup.style.left = (W - 48) + "px"; oneup.style.top = (F - 22) + "px";
+
+  /* ── 收尾：每一軌補上 offset 1 的定格 ── */
+  const parts = {tx:tom, ty:$("ty"), body:$("body"), legL:$("legL"), legR:$("legR"), armL:$("armL"), armR:$("armR"), cx:cup, cy:$("cupy"), cupr:cup.querySelector("svg"), tomo:tom, cupo:cup, coinx:coin, coiny:coin.querySelector("svg"), coino:coin, win:win, plus:plus, plusy:plus, oneup:oneup};
+  const anims = [];
+  Object.keys(tracks).forEach(function(name){
+    let fr = tracks[name];
+    fr.sort(function(a, b){ return a.offset - b.offset; });
+    fr = fr.filter(function(f, i){ return !(i + 1 < fr.length && Math.abs(fr[i + 1].offset - f.offset) < 1e-6); });
+    if(fr.length && fr[fr.length - 1].offset < 1) fr.push(Object.assign({}, fr[fr.length - 1], {offset:1}));
+    if(fr.length && fr[0].offset > 0) fr.unshift(Object.assign({}, fr[0], {offset:0}));
+    if(!fr.length) return;
+    anims.push({el:parts[name], fr:fr});
+  });
+
+  const bump = function(pile){ pile.animate([{transform:"translateY(0)"}, {transform:"translateY(-10px)", offset:.3}, {transform:"translateY(0)"}], {duration:240, easing:"steps(3,end)"}); };
+  const winnerNod = function(){
+    document.querySelectorAll(".stack.p1 .faces").forEach(function(f){
+      f.animate([{transform:"none"}, {transform:"translateY(-8px)", offset:.4}, {transform:"none"}], {duration:400, easing:"steps(2,end)"});
+    });
+  };
+  /* 冠軍分數 +999 逐位跳上去、停一下、再跳回真的 */
+  const scoreGag = function(){
+    const el = document.querySelector(".stack.p1 .sc"); if(!el) return;
+    const v = parseInt(el.dataset.v, 10); let i = 0;
+    const iv = setInterval(function(){ i++; const cur = v + Math.round(999 * i / 12); el.textContent = (cur > 0 ? "+" : "") + cur; if(i >= 12) clearInterval(iv); }, 40 / rate);
+    timers.push(setTimeout(function(){ let j = 0; const iv2 = setInterval(function(){ j++; const cur = v + Math.round(999 * (1 - j / 3)); el.textContent = (cur > 0 ? "+" : "") + cur; if(j >= 3) clearInterval(iv2); }, 50 / rate); }, 900 / rate));
+  };
+
+  const start = (window.DEAL_END || 1.4) + .5;
+  if(reduce){
+    tom.classList.add("still"); cup.classList.add("still");
+    tom.style.transform = "translateX(" + on1.x + "px)"; $("ty").style.transform = "translateY(" + on1.y + "px)";
+    cup.style.transform = "translateX(" + cupGiven.x + "px)"; $("cupy").style.transform = "translateY(" + cupGiven.y + "px)";
+    setTimeout(function(){ tom.style.opacity = 1; cup.style.opacity = 1; win.style.opacity = 1; }, start * 1000);
+    return;
+  }
+  const rate = SLOW ? .35 : 1, A = [], timers = [];
+  const seekTo = (function(){ if(!q.has("t")) return NaN; const raw = q.get("t").replace(" ", "+"), m = /^([a-z0-9]+)([+-][\d.]+)?$/.exec(raw); if(m && B[m[1]] != null) return B[m[1]] + parseFloat(m[2] || 0); return parseFloat(raw); })();
+  const seek = function(sec){ A.forEach(function(an){ an.pause(); an.currentTime = Math.max(0, Math.min(TOTAL, sec)) * 1000; }); };
+  const pan = function(x){ return Math.max(-.5, Math.min(.5, (x - W / 2) / W)); };
+  const run = function(){
+    A.forEach(function(an){ an.cancel(); }); A.length = 0;
+    timers.forEach(clearTimeout); timers.length = 0;
+    const dur = TOTAL * 1000;
+    anims.forEach(function(a){ const an = a.el.animate(a.fr, {duration:dur, fill:"forwards"}); an.playbackRate = rate; A.push(an); });
+    if(!isNaN(seekTo)){ seek(seekTo); return; }
+    if(window.SFX && SFX.gag) SFX.gag(B, rate, {pan1:pan(P1.cx), pan2:pan(P2.cx), pan3:pan(P3.cx)});
+    const at = function(sec, fn){ timers.push(setTimeout(fn, sec * 1000 / rate)); };
+    at(B.bonk, function(){ bump(p3); });
+    at(B.land2, function(){ bump(p3); });
+    at(B.land3, function(){ bump(p2); });
+    at(B.land4, function(){ bump(p1); });
+    at(B.present + .45, winnerNod);
+    at(B.score, scoreGag);
+  };
+  setTimeout(run, isNaN(seekTo) ? start * 1000 : 0);
+  window.TOM = {B:B, TOTAL:TOTAL, seek:seek, A:A, run:run};
+
+  const dev = $("dev");
+  if(dev && !q.has("nodev")){
+    const mk = function(label, key, on){
+      const b = document.createElement("button"); b.textContent = label; b.setAttribute("aria-pressed", on);
+      b.onclick = function(){ const u = new URL(location.href); if(u.searchParams.has(key)) u.searchParams.delete(key); else u.searchParams.set(key, ""); location.href = u.pathname + (u.search ? u.search.replace(/=(&|$)/g, "$1") : ""); };
+      return b;
+    };
+    const sep = document.createElement("i"); dev.appendChild(sep);
+    dev.appendChild(mk("慢動作", "slow", SLOW));
+    const rp = document.createElement("button"); rp.textContent = "重播頒獎（有聲）"; rp.onclick = run; dev.appendChild(rp);
+    const sep2 = document.createElement("i"); dev.appendChild(sep2);
+    const rg = document.createElement("input"); rg.type = "range"; rg.min = 0; rg.max = TOTAL.toFixed(2); rg.step = .01; rg.value = 0; rg.style.width = "160px"; rg.title = "時間軸";
+    rg.oninput = function(){ seek(parseFloat(rg.value)); };
+    const play = document.createElement("button"); play.textContent = "播";
+    play.onclick = function(){ A.forEach(function(an){ an.play(); }); };
+    dev.appendChild(rg); dev.appendChild(play);
+    const tick = function(){ if(A.length && A[0].playState === "running") rg.value = (A[0].currentTime / 1000).toFixed(2); requestAnimationFrame(tick); }; tick();
+  }
+})();
+</script>
+    <p class="mine" id="endMine" hidden></p>
+    <div class="acts">
+      <button class="go" id="btnAgain">再來一局</button>
+      <div class="ft"><button id="btnRoom">返回房間</button><i></i><button id="btnLedger2">看計分表</button></div>
+    </div>
+  </main>
+</div>
+
+<nav class="dev" id="dev">
+  <a href="a.html" data-v="A">A 獎台</a><a href="b.html" data-v="B">B 翻牌</a><a href="c.html" data-v="C">C 獎章</a><i></i><a href="d.html" data-v="D">D 木階</a><a href="e.html" data-v="E">E 牌疊</a><a href="f.html" data-v="F">F 聚光燈</a><i></i><a href="g.html" data-v="G">G 頒獎</a><a href="h.html" data-v="H">H 巨獸</a><a href="i.html" data-v="I">I 紙偶戲</a><a href="j.html" data-v="J">J 電玩</a>
+  <i></i><button id="devTie">同分</button><button id="devMe">我贏</button><button id="devSolo">單人</button>
+  <i></i><button id="devReplay">重播</button>
+</nav>
+
+<script>
+(function(){
+  const q = new URLSearchParams(location.search);
+  const $ = function(id){ return document.getElementById(id); };
+  const TIE = q.has("tie"), ME = q.has("me"), SOLO = q.has("solo");
+  const me = END.me, onBoard = END.tiers.some(function(t){ return t.who.indexOf(me) >= 0; });
+  $("endMine").hidden = onBoard;
+  if(!onBoard) $("endMine").innerHTML = "你第 <b>" + me.pos + "</b> / " + END.P.length + " · <b>" + (me.sc > 0 ? "+" : "") + me.sc + "</b> 分";
+
+  /* 原型切換器 */
+  if(q.has("nodev")) $("dev").hidden = true;
+  document.querySelectorAll("#dev a").forEach(function(a){
+    a.setAttribute("aria-current", a.dataset.v === "J" ? "page" : "false");
+    a.href = a.getAttribute("href") + location.search;
+  });
+  const flip = function(k){
+    const u = new URL(location.href);
+    if(u.searchParams.has(k)) u.searchParams.delete(k); else u.searchParams.set(k, "");
+    location.href = u.pathname + (u.search ? u.search.replace(/=(&|$)/g, "$1") : "");
+  };
+  $("devTie").setAttribute("aria-pressed", TIE); $("devMe").setAttribute("aria-pressed", ME); $("devSolo").setAttribute("aria-pressed", SOLO);
+  $("devTie").onclick = function(){ flip("tie"); };
+  $("devMe").onclick = function(){ flip("me"); };
+  $("devSolo").onclick = function(){ flip("solo"); };
+  $("devReplay").onclick = function(){ location.reload(); };
+  /* 圖上那幾顆按鈕在原型裡不接東西 */
+  ["btnLedger","btnLedger2","btnRoom","btnAgain"].forEach(function(id){ $(id).onclick = function(e){ e.preventDefault(); }; });
+})();
+</script>
+
+</body>
+</html>
