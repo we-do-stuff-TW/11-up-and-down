@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>計分表 · 總分不再被切到</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:opsz,wght@6..96,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --felt:#1E3A2E; --felt-deep:#0E1F18;
+  --ink:#F2EDE3; --ink-2:#CFC8B8; --ink-3:#8E9A90;
+  --brass:#C4A15A; --bad:#E08B72;
+  --hair:rgba(242,237,227,.10); --hair-2:rgba(242,237,227,.055);
+  --bg:#0B1713;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Archivo",system-ui,"PingFang TC","Noto Sans TC",sans-serif;
+  -webkit-font-smoothing:antialiased}
+body{padding:48px clamp(20px,4vw,56px) 120px}
+
+header{max-width:900px;margin:0 0 44px}
+h1{font-family:"Bodoni Moda",Georgia,serif;font-weight:600;font-size:clamp(30px,3.4vw,46px);
+  letter-spacing:-.01em;margin:0 0 18px;line-height:1.1}
+.sub{color:var(--ink-2);font-size:16px;line-height:1.85;margin:0 0 14px;max-width:72ch}
+.sub b{color:var(--ink);font-weight:600}
+code{font-family:"IBM Plex Mono",monospace;font-size:.92em;color:var(--brass)}
+
+/* ---- 工具列：釘在上面，整頁一起切修改前／修改後 ---- */
+.bar{position:sticky;top:0;z-index:9;display:flex;flex-wrap:wrap;align-items:center;gap:14px;
+  margin:0 -12px 34px;padding:14px 12px;background:rgba(11,23,19,.92);
+  backdrop-filter:blur(10px);border-bottom:1px solid var(--hair)}
+.seg{display:inline-flex;border:1px solid var(--hair);border-radius:99px;overflow:hidden}
+.seg button{appearance:none;background:none;border:0;color:var(--ink-3);cursor:pointer;
+  font:inherit;font-size:13px;font-weight:500;letter-spacing:.04em;padding:8px 18px}
+.seg button[aria-pressed="true"]{background:var(--brass);color:#14201A;font-weight:600}
+.hint{color:var(--ink-3);font-size:13px;letter-spacing:.02em}
+
+section{margin:0 0 62px}
+h2{font-size:17px;font-weight:600;letter-spacing:.02em;margin:0 0 8px;
+  display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+h2 .tag{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);border:1px solid var(--hair);border-radius:99px;padding:3px 10px}
+h2 .tag.ok{color:var(--brass);border-color:rgba(196,161,90,.4)}
+.note{color:var(--ink-2);font-size:14.5px;line-height:1.75;margin:0 0 16px;max-width:76ch}
+.num{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink-3);
+  margin:0 0 16px;line-height:1.9}
+.num s{color:var(--bad);text-decoration-color:rgba(224,139,114,.5)}
+.num em{color:var(--brass);font-style:normal}
+
+/* ---- 圖：整張畫面，不裁切。1:1 是把 2 倍圖縮回實際大小，字就是真的那麼大 ---- */
+.frame{position:relative;overflow-x:auto;border:1px solid var(--hair);border-radius:10px;
+  background:#000;line-height:0}
+.frame img{display:block;height:auto;max-width:none}
+body[data-fit="1"] .frame img{width:100%!important}
+.frame .lbl{position:absolute;top:10px;left:12px;z-index:2;
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+  padding:4px 10px;border-radius:99px;background:rgba(11,23,19,.82);border:1px solid var(--hair);color:var(--ink-3)}
+.frame[data-state="after"] .lbl{color:var(--brass);border-color:rgba(196,161,90,.4)}
+.pair img{display:none}
+.pair[data-state="before"] img.b, .pair[data-state="after"] img.a{display:block}
+
+.why{max-width:78ch;margin:56px 0 0;padding:26px 28px;border:1px solid var(--hair);border-radius:12px;
+  background:rgba(242,237,227,.025)}
+.why h3{margin:0 0 12px;font-size:15px;font-weight:600;letter-spacing:.03em}
+.why p{color:var(--ink-2);font-size:14.5px;line-height:1.8;margin:0 0 12px}
+.why p:last-child{margin-bottom:0}
+.why ul{color:var(--ink-2);font-size:14.5px;line-height:1.8;margin:0 0 12px;padding-left:1.15em}
+.why li{margin-bottom:6px}
+.ask{border-color:rgba(196,161,90,.35);background:rgba(196,161,90,.06)}
+.ask h3{color:var(--brass)}
+</style>
+</head>
+<body data-fit="0">
+
+<header>
+  <h1>計分表：多人的時候，總分不會再互相疊上去</h1>
+  <p class="sub">Francis 回報的是 6 人局，表頭那排大數字被切掉。查下去比看起來嚴重一點：
+  <b>總分的字級（3.4em）是寫死的，欄寬卻是「表寬 ÷ 人數」</b>——所以人一多、或分數長到三位數，
+  數字就放不下。它又是靠右對齊的，溢出來的部分往左邊那一欄跑，被隔壁欄的底色蓋住一半，
+  看起來就像被切掉。</p>
+  <p class="sub">量到的門檻：1440 寬的螢幕，<b>6 人局連「−12」這種兩位數總分都已經爆了</b>
+  （要 53px，欄裡只有 38px）；10 人局是 9 欄同時爆。
+  現在字級不寫死，改成照那一欄實際有多寬自己收——欄夠寬時跟原本一模一樣。</p>
+</header>
+
+<div class="bar">
+  <div class="seg" role="group" aria-label="切換修改前後">
+    <button type="button" data-set="before">修改前</button>
+    <button type="button" data-set="after" aria-pressed="true">修改後</button>
+  </div>
+  <div class="seg" role="group" aria-label="切換尺寸">
+    <button type="button" data-fit="0" aria-pressed="true">1:1（字是真的那麼大）</button>
+    <button type="button" data-fit="1">縮到整頁寬</button>
+  </div>
+  <span class="hint">每張都是整個畫面，沒有裁切。左右可以捲。</span>
+</div>
+
+<section>
+  <h2>六人・兩位數分數 <span class="tag">1440 × 900 · 平面</span> <span class="tag">最常見的一桌</span></h2>
+  <p class="note">這是平常就會碰到的狀態，跟分數大不大無關——6 人的欄寬只有 52px，
+  扣掉左右留白剩 38px，而 34px 的 Bodoni 寫「−12」要 53px。</p>
+  <p class="num">修改前：總分 <s>34px</s>，4 欄溢出 &nbsp;·&nbsp; 修改後：總分 <em>22.4px</em>、格子 <em>17.0px</em>，沒有溢出</p>
+  <div class="frame pair" data-state="after"><span class="lbl">修改後</span>
+    <img class="b" src="shots/BEFORE_small_n6_w1440.png" alt="修改前：六人兩位數">
+    <img class="a" src="shots/small_n6_w1440.png" alt="修改後：六人兩位數"></div>
+</section>
+
+<section>
+  <h2>六人・三位數分數 <span class="tag">1440 × 900 · 平面</span> <span class="tag">Francis 截圖那一種</span></h2>
+  <p class="note">打到後段、或用「10＋叫²」那套規則（一局最多 131 分），總分就是三位數。
+  修改前六欄全部溢出，數字互相壓在一起。</p>
+  <p class="num">修改前：總分 <s>34px</s>，6 欄全溢出（「−108」要 73px，欄裡 38px）&nbsp;·&nbsp; 修改後：總分 <em>16.4px</em>、格子 <em>12.5px</em></p>
+  <div class="frame pair" data-state="after"><span class="lbl">修改後</span>
+    <img class="b" src="shots/BEFORE_big_n6_w1440.png" alt="修改前：六人三位數">
+    <img class="a" src="shots/b_n6_w1440.png" alt="修改後：六人三位數"></div>
+</section>
+
+<section>
+  <h2>十人・三位數分數 <span class="tag">1440 × 900 · 平面</span> <span class="tag">最擠的一桌</span></h2>
+  <p class="note">十人局的欄寬只剩 32px。原本靠 <code>tighter</code> 把總分降到 19px，還是不夠——九欄溢出。</p>
+  <p class="num">修改前：總分 <s>19px</s>，9 欄溢出 &nbsp;·&nbsp; 修改後：總分 <em>11.4px</em>、格子 <em>9.1px</em></p>
+  <div class="frame pair" data-state="after"><span class="lbl">修改後</span>
+    <img class="b" src="shots/BEFORE_big_n10_w1440.png" alt="修改前：十人三位數">
+    <img class="a" src="shots/big_n10_w1440.png" alt="修改後：十人三位數"></div>
+</section>
+
+<section>
+  <h2>四人・兩位數分數 <span class="tag ok">完全沒動到</span> <span class="tag">1440 × 900 · 平面</span></h2>
+  <p class="note">欄夠寬的時候，算出來的上限比 3.4em 大，取小的就還是 3.4em——
+  切「修改前／修改後」看不出差別，這是對的。</p>
+  <p class="num">修改前：總分 34px、格子 19px &nbsp;·&nbsp; 修改後：總分 <em>34px</em>、格子 <em>19px</em>（同一組數字）</p>
+  <div class="frame pair" data-state="after"><span class="lbl">修改後</span>
+    <img class="b" src="shots/BEFORE_small_n4_w1440.png" alt="修改前：四人">
+    <img class="a" src="shots/small_n4_w1440.png" alt="修改後：四人"></div>
+</section>
+
+<section>
+  <h2>手機・六人・三位數 <span class="tag">390 × 844 · 浮層</span></h2>
+  <p class="note">窄螢幕的計分表是整頁浮層，尺度改看視窗。同一套算法，一樣不會被切。</p>
+  <p class="num">修改前：總分 <s>34px</s>，6 欄全溢出 &nbsp;·&nbsp; 修改後：總分 <em>15.6px</em>、格子 <em>11.7px</em></p>
+  <div class="frame pair" data-state="after"><span class="lbl">修改後</span>
+    <img class="b" src="shots/BEFORE_phone_n6.png" alt="修改前：手機六人">
+    <img class="a" src="shots/phone_n6.png" alt="修改後：手機六人"></div>
+</section>
+
+<section>
+  <h2>立體牌桌 <span class="tag ok">兩種桌都看過</span> <span class="tag">1440 × 900 · 六人三位數</span></h2>
+  <p class="note">計分表是平面／立體共用的同一份 DOM，右欄的行為一致。這張是立體模式實際跑出來的。</p>
+  <p class="num">修改後：總分 <em>16.4px</em>、格子 <em>12.5px</em>，沒有溢出（跟平面同一組數字）</p>
+  <div class="frame"><span class="lbl">修改後 · 立體</span>
+    <img src="shots/dim3_n6_w1440.png" alt="立體牌桌六人"></div>
+</section>
+
+<section>
+  <h2>其他量過的尺寸 <span class="tag">都沒有溢出</span></h2>
+  <p class="num">八人 1440：總分 12.5px、格子 10.0px &nbsp;·&nbsp;
+     六人 1280：總分 13.2px、格子 9.9px &nbsp;·&nbsp;
+     六人 1920：總分 23.0px、格子 17.5px</p>
+  <div class="frame"><span class="lbl">八人 · 1440</span><img src="shots/big_n8_w1440.png" alt="八人 1440"></div>
+  <div style="height:14px"></div>
+  <div class="frame"><span class="lbl">六人 · 1920</span><img src="shots/big_n6_w1920.png" alt="六人 1920"></div>
+</section>
+
+<div class="why">
+  <h3>做法</h3>
+  <p>字級不寫死，改成「這一欄有多寬，數字就多大」，跟原本的 3.4em 取小的。
+  欄寬只有版面自己知道（表寬跟著視窗走），所以用 container query：
+  表頭與格子裡各包一層 <code>.cq</code>，<code>100cqw</code> 就是欄寬扣掉左右留白。
+  （包一層是因為 containment 對 <code>table-cell</code> 無效，寫在 <code>&lt;th&gt;</code> 上不會生效。）</p>
+  <p><code>renderLedger()</code> 只多算一件事：這張表最長的那個數字佔幾個 em
+  （Bodoni 的數字 .616em、負號 .467em；格子是等寬體，每個字 .6em），
+  寫成 <code>--totw</code> / <code>--cellw</code> 兩個變數。整張表共用同一個字級，欄跟欄才會齊。</p>
+  <p>格子還多守一條：<b>不准追上總分</b>。總分被欄寬壓小的時候格子要跟著讓
+  （原本 3.4 ÷ 1.9 ≒ 1.8 的落差，這裡守住 1.25），不然會出現「表頭比內文還小」，
+  「整張表只有這一排是亮的」就不成立了。</p>
+  <p>另外留了一行舊寫法在前面，不認得 <code>cqw</code> 的瀏覽器會落回原本的固定字級。</p>
+</div>
+
+<div class="why ask">
+  <h3>要你拍板的一件事</h3>
+  <p>現在沒有東西會壞掉了，但<b>十人局的總分只剩 11.4px</b>——不是 bug，是右欄真的不夠寬：
+  28vw 在 1440 上是 403px，扣掉局數欄之後十個人分 312px，一欄 32px。</p>
+  <ul>
+    <li><b>就這樣</b>：十人局本來就是極端狀況，讀得到就好。（我先做到這裡）</li>
+    <li><b>人多時右欄加寬</b>：例如 7 人以上把 28vw 放到 32–34vw。代價是牌桌那半邊變窄，
+      而十人局的牌桌本來也擠。</li>
+    <li><b>人多時改版面</b>：例如總分改成兩行、或十人局的計分表改成可捲的橫向表。動得比較大。</li>
+  </ul>
+  <p>另外順手發現一個小歪：表頭的「局」比底下的列號往左 3px（<code>th</code> 的
+  <code>padding-left</code> 是 .7em、<code>td</code> 是 1em）。這次沒動它，要的話下次一起修。</p>
+</div>
+
+<script>
+const body = document.body;
+document.querySelectorAll("[data-set]").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    const v = btn.dataset.set;
+    document.querySelectorAll("[data-set]").forEach(function(b){
+      b.setAttribute("aria-pressed", String(b.dataset.set === v));
+    });
+    document.querySelectorAll(".pair").forEach(function(p){
+      p.dataset.state = v;
+      p.querySelector(".lbl").textContent = v === "before" ? "修改前" : "修改後";
+    });
+  });
+});
+document.querySelectorAll("[data-fit]").forEach(function(btn){
+  if(!btn.dataset.fit || btn.tagName !== "BUTTON") return;
+  btn.addEventListener("click", function(){
+    const v = btn.dataset.fit;
+    document.querySelectorAll("button[data-fit]").forEach(function(b){
+      b.setAttribute("aria-pressed", String(b.dataset.fit === v));
+    });
+    body.dataset.fit = v;
+  });
+});
+/* 2 倍圖：預設用一半的寬度顯示，字就是螢幕上真正的大小 */
+document.querySelectorAll(".frame img").forEach(function(img){
+  function fit(){ img.style.width = (img.naturalWidth / 2) + "px"; }
+  img.complete ? fit() : img.addEventListener("load", fit);
+});
+</script>
+</body>
+</html>

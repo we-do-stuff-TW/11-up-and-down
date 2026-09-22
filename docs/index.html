@@ -687,6 +687,10 @@ table.score thead th{
   box-shadow:inset 0 -1px 0 var(--hair);
   padding:.6em .7em 1.3em;text-align:right;white-space:nowrap;
 }
+/* 一欄到底有多寬，只有版面自己知道（表寬 ÷ 人數，而表寬跟著視窗走）。
+   .cq 就是拿來問這件事的容器——欄寬扣掉 th 的左右留白＝100cqw。
+   包一層是因為 containment 對 table-cell 無效，container-type 寫在 th 上不會生效。 */
+table.score thead th .cq, table.score td .cq{display:block;container-type:inline-size}
 table.score thead th .nm{
   display:block;font-family:"Archivo",sans-serif;font-size:1.05em;font-weight:500;
   letter-spacing:.06em;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;
@@ -695,10 +699,17 @@ table.score thead th .nm{
 table.score thead th.me .nm{color:var(--ink)}
 table.score thead th.gut{text-align:left}
 table.score thead th.gut .nm{font-size:.95em;letter-spacing:.2em;text-transform:uppercase}
+/* 總分不寫死字級。分數會長到三、四位數，而欄寬是 (表寬 − 局數欄) ÷ 人數——
+   六個人就已經放不下 3.4em 的三位數了，寫死的下場是數字互相疊在一起（右對齊，往左邊那一欄溢）。
+   --totw 是這張表最長的那個總分佔幾個 em（renderLedger 算：Bodoni 數字 .616em、負號 .467em），
+   欄寬除以它就是「剛好放得下」的字級，再跟 3.4em 取小的——欄夠寬時跟原本一模一樣。
+   第一行是給不認得 cqw 的瀏覽器的退路。 */
 table.score thead th .tot{
   display:block;font-family:"Bodoni Moda",Georgia,serif;font-weight:600;
-  font-size:3.4em;line-height:1.05;letter-spacing:-.015em;color:var(--ink);
+  line-height:1.05;letter-spacing:-.015em;color:var(--ink);
   font-variant-numeric:tabular-nums;
+  font-size:3.4em;
+  font-size:min(3.4em, calc(100cqw / var(--totw, 1.232)));
 }
 table.score thead th .tot.lead{color:var(--brass)}
 table.score thead th .tot.up{animation:tot .5s var(--e-out)}
@@ -718,8 +729,16 @@ td.gut .nt{position:relative;margin-left:.6em;font-size:1em;letter-spacing:.1em;
   position:absolute;left:1em;bottom:.7em;height:.2em;width:calc(var(--w) * .1em);
   border-radius:1px;background:oklch(.90 .02 92 / .22);
 }
-/* 正的一定是叫中、負的一定是沒中——正負號已經說完，不再另外標記號、也不上綠色 */
-.p{font-size:1.9em;color:var(--ink-2);letter-spacing:-.01em}
+/* 正的一定是叫中、負的一定是沒中——正負號已經說完，不再另外標記號、也不上綠色。
+   字級跟總分同一套辦法，但要取三個上限裡最小的：原本的字級、這一欄放得下的
+   （--cellw＝最長的那一格佔幾個 em，等寬體每個字 .6em、正負號一定有），
+   以及「不准追上總分」——總分被欄寬壓小的時候格子要跟著讓，
+   不然表頭就不再是整張表最亮最大的那一排了（3.4 ÷ 1.9 ≒ 1.8 是原本的落差，這裡守住 1.25）。 */
+.p{
+  color:var(--ink-2);letter-spacing:-.01em;
+  font-size:1.9em;
+  font-size:min(1.9em, calc(100cqw / var(--cellw, 1.8)), calc(100cqw / var(--totw, 1.232) / 1.25));
+}
 .p.neg{color:var(--bad)}
 .p.best{color:var(--ink)}          /* 那一局賺最多的人：只提亮一階，不加底也不加框 */
 /* 還沒打到的那幾局：借頂列那顆連線圓點的形狀，尺寸跟著表走 */
@@ -739,13 +758,13 @@ table.score tbody tr:hover td{background:oklch(.90 .02 92 / .035)}
 
 /* 人一多欄就窄，字級跟著降一階。一格只有一個數字，所以降到十個人還讀得完 */
 table.score.tight td{padding:0 .5em;height:3.7em}
-table.score.tight .p{font-size:1.55em}
+table.score.tight .p{font-size:1.55em;font-size:min(1.55em, calc(100cqw / var(--cellw, 1.8)), calc(100cqw / var(--totw, 1.232) / 1.25))}
 table.score.tight thead th{padding:.6em .5em 1.1em}
-table.score.tight thead th .tot{font-size:2.5em}
+table.score.tight thead th .tot{font-size:2.5em;font-size:min(2.5em, calc(100cqw / var(--totw, 1.232)))}
 table.score.tighter td{padding:0 .3em;height:3.4em}
-table.score.tighter .p{font-size:1.35em}
+table.score.tighter .p{font-size:1.35em;font-size:min(1.35em, calc(100cqw / var(--cellw, 1.8)), calc(100cqw / var(--totw, 1.232) / 1.25))}
 table.score.tighter thead th{padding:.6em .3em 1em}
-table.score.tighter thead th .tot{font-size:1.9em}
+table.score.tighter thead th .tot{font-size:1.9em;font-size:min(1.9em, calc(100cqw / var(--totw, 1.232)))}
 table.score.tighter thead th .nm{font-size:.95em;letter-spacing:0}
 table.score.tighter col.c-gut{width:5.4em}
 .tsuit{width:10px;height:10px;fill:var(--ink-3)}
@@ -5633,12 +5652,32 @@ function renderLedger(){
   sc.classList.toggle("tight", n >= 7);
   sc.classList.toggle("tighter", n >= 9);
 
+  /* 一欄放一個數字，欄寬是 (表寬 − 局數欄) ÷ 人數。分數會長到三、四位數
+     （10＋叫² 那套規則一局就能拿 131 分），人一多欄寬就不夠——數字寫死字級會互相疊上去。
+     字級交給 CSS 照欄寬收，這裡只要算出「最長的那個數字佔幾個 em」。
+     量出來的 advance（含 letter-spacing）：Bodoni 數字 .601、減號 .345；等寬體一律 .59。
+     底下用的是 .616 / .467 / .6，刻意寬一點——留給退路字型 Georgia（.607 / .364）跟日後換字型的餘裕。
+     註：表頭的負號是 String(-108) 的 ASCII「-」，格子那邊是 U+2212，本來就不是同一個字。 */
+  let wTot = 1.232, wCell = 1.8;          /* 兩位數、正負號＋兩位數＝原本那一版的寬度 */
+  for(let i=0;i<n;i++){
+    const v = G.score[i] || 0;
+    wTot = Math.max(wTot, (v < 0 ? .467 : 0) + String(Math.abs(v)).length * .616);
+  }
+  G.log.forEach(function(row){
+    if(!row) return;
+    row.cells.forEach(function(c){
+      wCell = Math.max(wCell, (1 + String(Math.abs(c.pts)).length) * .6);
+    });
+  });
+  sc.style.setProperty("--totw", wTot);
+  sc.style.setProperty("--cellw", wCell);
+
   let h = '<colgroup><col class="c-gut"><col span="' + n + '"></colgroup>' +
     '<thead><tr><th class="gut"><span class="nm">局</span></th>';
   for(let i=0;i<n;i++)
-    h += '<th' + (i === me ? ' class="me"' : '') + '><span class="nm">' +
+    h += '<th' + (i === me ? ' class="me"' : '') + '><span class="cq"><span class="nm">' +
       seatBare(i) + '</span><span class="tot' +
-      (G.log.length && (G.score[i]||0) === top ? " lead" : "") + '">' + (G.score[i]||0) + '</span></th>';
+      (G.log.length && (G.score[i]||0) === top ? " lead" : "") + '">' + (G.score[i]||0) + '</span></span></th>';
   h += '</tr></thead><tbody>';
   G.ladder.forEach(function(size, i){
     const row = G.log[i], now = i === G.ri;
@@ -5653,8 +5692,8 @@ function renderLedger(){
     for(let k=0;k<n;k++){
       if(!row){ h += '<td><span class="dot">·</span></td>'; continue; }
       const p = row.cells[k].pts;
-      h += '<td><span class="p' + (p < 0 ? " neg" : p === best ? " best" : "") + '">' +
-        (p >= 0 ? "+" : "−") + Math.abs(p) + '</span></td>';
+      h += '<td><span class="cq"><span class="p' + (p < 0 ? " neg" : p === best ? " best" : "") + '">' +
+        (p >= 0 ? "+" : "−") + Math.abs(p) + '</span></span></td>';
     }
     h += '</tr>';
   });
