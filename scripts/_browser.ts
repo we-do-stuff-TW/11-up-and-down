@@ -45,6 +45,7 @@ async function serve(hooks: boolean): Promise<{ port: number; stop: () => Promis
   const types: Record<string, string> = {
     html: "text/html; charset=utf-8", js: "text/javascript", css: "text/css",
     svg: "image/svg+xml", json: "application/json", png: "image/png",
+    jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
   };
   const srv = Deno.serve({ port: 0, onListen: () => {} }, async (req) => {
     const path = new URL(req.url).pathname;

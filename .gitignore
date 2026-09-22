@@ -11,5 +11,5 @@ design/i18n/_fail-*.png
 design/thanks/
 # 收桌頒獎原型用的頭像：symlink 到 design/thanks/_avatar.jpg，同一個理由不進版控
 design/end/_tom.jpg
-# 收桌頒獎的 Thomas 頭像：先用 symlink 指到 design/thanks，Francis 決定「進不進公開 repo」之前不進版控
-docs/img/tom.jpg
+# 註：docs/img/tom.jpg（收桌頒獎的 Thomas 頭像）2026-09-22 由 Francis 拍板進公開 repo，所以不在這裡。
+#     design/thanks/ 與 design/end/_tom.jpg 的原始檔照舊不進版控。

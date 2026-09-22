@@ -2,7 +2,7 @@
 // 跑法：DIM=2 deno run -A gag_test.ts   /  DIM=3（立體）/  PHONE=1（390 寬）
 import { Browser } from "./_browser.ts";
 const DIM = Deno.env.get("DIM") ?? "2", PHONE = !!Deno.env.get("PHONE");
-const OUT = new URL("../design/end/shots/", import.meta.url).pathname;
+const OUT = decodeURIComponent(new URL("../design/end/shots/", import.meta.url).pathname);   /* 路徑有空白，不解碼會寫到 11%20Up&Down */
 const tag = `live${DIM}${PHONE ? "p" : ""}`;
 const b = await Browser.start({ gl: DIM === "3" });
 const fails: string[] = [];
