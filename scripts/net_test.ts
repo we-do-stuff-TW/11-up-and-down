@@ -298,6 +298,48 @@ try {
   await new Promise((r) => setTimeout(r, 900));
   ok(await b.eval<boolean>(`return __T.calls.indexOf("next") >= 0`), "一局打完 ticker 不在，其他人卻沒有補敲 next——這就是「一輪結束卡著不動」");
   await b.eval(`UD.G.at = Date.now(); return 1`);
+
+  /* ── 十五、即時那條線斷了要知道，接回來要補問 ──
+     2026-10-08 房間 5527：一晚上即時訂閱重接十幾次，斷著的那段推播不會補送。
+     以前客端不聽 subscribe 的狀態，接回來以後畫面停在斷線前那一格——「輪到你」看不到。
+     這裡走真的 subscribe()，只把 supabase 的 channel 換成假的，斷線、接上由測試來喊。
+     輪到我（活著的真人）出牌，ticker 不會敲，通道上只會有心跳與補問。 */
+  const states = () => b.eval<number>(`return __T.calls.filter(function(a){ return a === "state"; }).length`);
+  await b.eval(`
+    __T.reply = {ok:true};
+    UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false;
+    const r = __T.row(__T.g, 100); r.seen = {me:Date.now()};
+    UD.__t.applyRow(r, __T.clone(__T.g.hands[0]));
+    __T.subs = []; __T.removed = 0;
+    UD.__t.NET.sb = {
+      channel:function(){
+        const c = {on:function(){ return c; }, send:function(){},
+                   subscribe:function(cb){ __T.subs.push(cb); return c; }};
+        return c;
+      },
+      removeChannel:function(){ __T.removed++; }
+    };
+    UD.__t.subscribe("TEST");
+    __T.calls.length = 0;
+    return 1`);
+  await new Promise((r) => setTimeout(r, 4500));
+  ok(await states() >= 2, `還沒接上（斷著）的 4.5 秒裡只問了 ${await states()} 次——斷線時還在等 10 秒一次的心跳`);
+  /* 接上的那一刻：就算通道上有東西在排隊，也要問一次（背景那道門不能擋） */
+  await b.eval(`__T.calls.length = 0; UD.__t.NET.queued = 1; __T.subs[0]("SUBSCRIBED"); return 1`);
+  await new Promise((r) => setTimeout(r, 150));
+  ok(await states() === 1, `重新接上之後沒有補問狀態（state ${await states()} 次）——漏掉的那段永遠補不回來`);
+  await b.eval(`UD.__t.NET.queued = 0; __T.calls.length = 0; return 1`);
+  await new Promise((r) => setTimeout(r, 3500));
+  ok(await states() === 0, `接上之後還在 2 秒一次地問（${await states()} 次）——線是好的就該回到 10 秒`);
+  /* 又斷了 */
+  await b.eval(`__T.calls.length = 0; __T.subs[0]("CHANNEL_ERROR"); return 1`);
+  await new Promise((r) => setTimeout(r, 2500));
+  ok(await states() >= 1, "斷線（CHANNEL_ERROR）之後沒有加快問狀態");
+  /* 換一條新的：舊的那條被拆掉時回報的 CLOSED 不能把新的標成斷線 */
+  const rt = await b.eval<string>(`UD.__t.subscribe("TEST"); __T.subs[1]("SUBSCRIBED"); __T.subs[0]("CLOSED");
+    return UD.__t.NET.rt + "/" + __T.removed`);
+  ok(rt === "SUBSCRIBED/1", `舊訂閱拆掉時的 CLOSED 蓋到新的那條上了（${rt}）`);
+  await b.eval(`UD.__t.NET.sb = null; UD.__t.NET.chan = null; UD.__t.NET.rt = ""; return 1`);
 } catch (e) {
   fails.push("測試中途爆掉：" + (e as Error).message);
 } finally {
@@ -306,7 +348,7 @@ try {
 
 const ms = Math.round(performance.now() - t0);
 console.log("11 Up & Down — 連線那一段的測試（無頭 Chrome ＋ 假伺服器）");
-console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點、手牌對帳、逾時、補敲");
+console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點、手牌對帳、逾時、補敲、斷線補問");
 console.log(`  ${checks} 項，${ms} 毫秒`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);

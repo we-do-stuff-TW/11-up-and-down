@@ -3851,7 +3851,7 @@ const MY = {
   pid:null,
   name:(function(){ try{ return localStorage.getItem("ud.name") || ""; }catch(e){ return ""; } })()
 };
-const NET = {code:null, chan:null, sb:null, state:"ok", err:"", busy:false, queued:0, tail:null};
+const NET = {code:null, chan:null, rt:"", sb:null, state:"ok", err:"", busy:false, queued:0, tail:null};
 /* 登入用的 access token 存一份在記憶體裡，快過期了才回去換（見 accessToken） */
 const TOK = {v:null, exp:0};
 /* 關掉分頁不等於離開房間——座位、手牌、分數都還在伺服器上，只是三十秒後換 AI 代打。
@@ -4011,10 +4011,18 @@ setInterval(function(){
   else api("tick", {code:NET.code, speed:SPEED, gap:trickGap()});
 }, 420);
 
-/* 心跳：告訴大家我還在（不然 30 秒後我的位子會被 AI 接手） */
+/* 心跳：告訴大家我還在（不然 30 秒後我的位子會被 AI 接手）。
+   即時那條線斷著的時候（見 chanStatus），這一趟也是唯一知道「輪到我了」的管道，改成 2 秒問一次。
+   沒有訂閱（NET.chan 是空的：單人、還沒進房、測試）不算斷線，照 10 秒。 */
+let beatAt = 0;
 setInterval(function(){
-  if(MODE === "net" && NET.code && !NET.busy) api("state", {code:NET.code});
-}, 10000);
+  if(MODE !== "net" || !NET.code) return;
+  const deaf = !!NET.chan && NET.rt !== "SUBSCRIBED";
+  const now = Date.now();
+  if(now - beatAt < (deaf ? 2000 : 10000)) return;
+  beatAt = now;
+  if(!NET.busy) api("state", {code:NET.code});
+}, 1000);
 
 /* ================= 伺服器 ================= */
 /* 玩家按下去的那一下永遠不能消失。
@@ -4272,12 +4280,30 @@ function subscribe(code){
   NET.code = code;
   rememberRoom(code);
   if(!NET.sb) return;
-  NET.chan = NET.sb.channel("room-" + code, {config:{broadcast:{self:false}}})
-    .on("postgres_changes",
+  const ch = NET.sb.channel("room-" + code, {config:{broadcast:{self:false}}});
+  NET.chan = ch;
+  NET.rt = "";
+  ch.on("postgres_changes",
         {event:"*", schema:"public", table:"rooms", filter:"code=eq." + code},
         function(p){ if(p && p.new) applyRow(p.new); })
     .on("broadcast", {event:"move"}, function(p){ peerMove(p && p.payload); })
-    .subscribe();
+    /* 換房、離房之後，舊的那條會被拆掉並回報 CLOSED——那是舊房間的事，不能把現在這條標成斷線 */
+    .subscribe(function(st){ if(NET.chan === ch) chanStatus(st); });
+}
+/* ⚠️ 即時那條線斷了，以前沒有人知道。
+   2026-10-08 房間 5527（六個真人）：那一桌的即時訂閱全部是打到一半重新接上的，
+   23:41–00:01 二十分鐘裡至少重接 10 次——鎖螢幕、切去 LINE 都會斷。斷著的那段推播不會補送，
+   接回來以後畫面停在斷線前那一格，要等下一列剛好推過來、或自己 10 秒一次的心跳問到（忙的話那次還會跳過）。
+   這段時間「輪到你」看不到：按鈕不出來、牌是暗的，人只好一直點。
+   supabase-js 其實每次都有說：subscribe 的 callback 斷線時給 CHANNEL_ERROR／TIMED_OUT／CLOSED，
+   接回來給 SUBSCRIBED（2.116.0 查過：phoenix 重接是重送同一個 joinPush，reset() 不清 'ok' 的鉤子，所以每次重接都會再響）。
+   所以：接上（含每一次重接）的那一刻問一次狀態；斷著的時候心跳改成 2 秒一次。
+   這一趟要 force——背景那道門會在「通道上有東西」時把 state 跳過，而那個東西多半是斷線中發出去的，
+   它帶回來的那一列讀在重接之前，可能就是漏掉的那一段。 */
+function chanStatus(st){
+  if(TRACE.on) TRACE.log("rt", st);
+  NET.rt = st;
+  if(st === "SUBSCRIBED" && MODE === "net" && NET.code) api("state", {code:NET.code}, true);
 }
 /* 對手的畫面：資料庫那一列要繞一圈（寫進去、WAL、realtime 再推出來）才會到別人那邊，
    差不多一秒。broadcast 不碰資料庫，五十毫秒就到。所以按下去的同時也直接喊一聲，

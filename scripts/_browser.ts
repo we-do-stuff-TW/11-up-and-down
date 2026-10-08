@@ -39,7 +39,7 @@ async function serve(hooks: boolean): Promise<{ port: number; stop: () => Promis
     html = html
       .replace(swap, "  const run = function(){ return (window.__call || call)(action, args); };")
       .replace(expose, "  __t:{applyRow:applyRow, peerMove:peerMove, INBOX:INBOX, " +
-        "snapshot:snapshot, MY:MY, NET:NET},\n  engine:{");
+        "snapshot:snapshot, MY:MY, NET:NET, subscribe:subscribe},\n  engine:{");
   }
 
   const types: Record<string, string> = {
