@@ -1,0 +1,262 @@
+<title>牌桌改版方向</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* 版面：上面一排「現在」＋四個方向並排比，往下每個方向一段（圖在左、說明在右，手機上疊起來）。
+   固定單一淺色（Francis 的規矩：給他看的頁面不跟系統深淺色走）。 */
+:root{
+  color-scheme:light;
+  --bg:#F1F3F0;      /* 頁底：帶一點桌布綠的淺灰 */
+  --sheet:#FFFFFF;
+  --ink:#18201D;
+  --ink-2:#56615B;
+  --rule:#D5DBD6;
+  --felt:#1E5A46;    /* 桌布綠：唯一的強調色 */
+  --felt-soft:#E1ECE6;
+  --warn:#8A4B12;
+  --warn-soft:#F6EBDD;
+  --f-body:"Noto Sans TC",-apple-system,"PingFang TC",system-ui,sans-serif;
+  --f-mark:"Bodoni Moda",Didot,Georgia,serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 var(--f-body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:20px;padding-block:28px 64px}
+h1{margin:0;font-size:28px;line-height:1.25;font-weight:700;text-wrap:balance}
+h1 .mark{font-family:var(--f-mark);font-weight:700;letter-spacing:-.01em}
+h2{margin:0;font-size:22px;line-height:1.3;text-wrap:balance}
+h3{margin:0 0 6px;font-size:14px;font-weight:700;color:var(--ink-2);letter-spacing:.04em}
+p{margin:0}
+.lede{margin-top:10px;max-width:62ch;color:var(--ink-2)}
+.num{font-variant-numeric:tabular-nums}
+::selection{background:var(--felt);color:#fff}
+a{color:var(--felt);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--felt);outline-offset:3px;border-radius:4px}
+
+/* 並排：現在＋四個方向 */
+.strip{margin-top:26px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.strip figure{margin:0;display:flex;flex-direction:column;gap:8px}
+.strip button{all:unset;cursor:zoom-in;display:block;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(24,32,29,.12),0 8px 22px rgba(24,32,29,.10)}
+.strip button:focus-visible{outline:2px solid var(--felt);outline-offset:3px}
+.strip img{display:block;width:100%;height:auto;aspect-ratio:390/844;background:#ddd}
+.strip figcaption{font-size:13.5px;line-height:1.4}
+.strip figcaption b{display:block;font-size:15px}
+.strip figcaption span{color:var(--ink-2)}
+.strip .now img{filter:saturate(.85)}
+.tagline{display:inline-block;font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--felt);background:var(--felt-soft);padding:1px 8px;border-radius:6px;margin-bottom:3px}
+.tagline.gray{color:var(--ink-2);background:#E6E9E6}
+
+/* 四個方向共同的地方 */
+.common{margin-top:30px;background:var(--sheet);border:1px solid var(--rule);border-radius:16px;padding:20px 22px}
+.common ul{margin:8px 0 0;padding-left:1.2em;display:grid;gap:6px;max-width:75ch}
+.note{margin-top:12px;font-size:13.5px;color:var(--ink-2);max-width:75ch}
+
+/* 每個方向一段 */
+.dir{margin-top:36px;display:grid;grid-template-columns:300px minmax(0,1fr);gap:28px;align-items:start}
+.dir > button{all:unset;cursor:zoom-in;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(24,32,29,.12),0 10px 26px rgba(24,32,29,.12);position:sticky;top:16px}
+.dir > button img{display:block;width:100%;height:auto}
+.body{min-width:0;display:grid;gap:16px}
+.thesis{font-size:17px;line-height:1.6;max-width:60ch}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-2);background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:3px 9px 3px 4px}
+.chip i{width:18px;height:18px;border-radius:5px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.facts{display:grid;gap:12px;max-width:68ch}
+.facts ul{margin:0;padding-left:1.2em;display:grid;gap:4px}
+.risk{background:var(--warn-soft);border-radius:12px;padding:12px 14px;color:#4A2A0A;max-width:68ch}
+.risk h3{color:var(--warn)}
+.raise{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.raise li{display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:10px;font-size:14px}
+.raise li b{color:var(--ink-2);font-weight:500}
+hr{border:0;border-top:1px solid var(--rule);margin:40px 0 0}
+
+/* 沒選上的五個 */
+.declined{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.declined div{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.55}
+.declined b{display:block;font-size:14.5px;margin-bottom:2px}
+.declined span{color:var(--ink-2)}
+
+.ask{margin-top:40px;background:var(--felt);color:#F2F7F4;border-radius:16px;padding:22px 24px}
+.ask h2{color:#fff}
+.ask p{margin-top:8px;max-width:68ch}
+
+/* 放大看 */
+.lb{position:fixed;inset:0;background:rgba(16,22,19,.86);display:grid;place-items:center;padding:16px;cursor:zoom-out;z-index:10}
+.lb[hidden]{display:none}
+.lb img{max-height:calc(100vh - 32px);max-width:100%;width:auto;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+
+@media (max-width:860px){
+  .strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .dir{grid-template-columns:minmax(0,1fr)}
+  .dir > button{position:static;max-width:320px;justify-self:center;width:100%}
+}
+@media (max-width:520px){
+  .wrap{padding-inline:16px}
+  h1{font-size:24px}
+  .strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .raise li{grid-template-columns:minmax(0,1fr);gap:0}
+}
+@media (prefers-reduced-motion:no-preference){ .strip button,.dir > button{transition:transform .18s ease-out} .strip button:hover,.dir > button:hover{transform:translateY(-2px)} }
+</style>
+
+<div class="wrap">
+  <h1><span class="mark">11 Up &amp; Down</span> 牌桌改版：四個方向</h1>
+  <p class="lede">你說手牌太小、手牌下面留白太多，也想看看不一樣的感覺。四個方向畫的是同一刻：6 個人、第 8 局、輪到你出第 3 墩，阿明、Kelly、小美已經出牌。點圖可以放大。</p>
+
+  <div class="strip">
+    <figure class="now"><button type="button" data-zoom="IMG_NOW" aria-label="放大：現在"><img src="IMG_NOW" alt="現在的立體牌桌，6 人、輪到你出牌"></button>
+      <figcaption><span class="tagline gray">現在</span><b>現在的牌桌</b><span>同樣 6 個人、輪到你出牌</span></figcaption></figure>
+    <figure><button type="button" data-zoom="IMG_A" aria-label="放大：群組通話"><img src="IMG_A" alt="方向 A 群組通話的示意圖"></button>
+      <figcaption><span class="tagline">A · 抽到的</span><b>群組通話</b><span>每人一格，輪到誰誰亮</span></figcaption></figure>
+    <figure><button type="button" data-zoom="IMG_B" aria-label="放大：自動麻將桌"><img src="IMG_B" alt="方向 B 自動麻將桌的示意圖"></button>
+      <figcaption><span class="tagline">B · 我最推</span><b>自動麻將桌</b><span>桌子自己當裁判</span></figcaption></figure>
+    <figure><button type="button" data-zoom="IMG_C" aria-label="放大：翻牌看板"><img src="IMG_C" alt="方向 C 翻牌看板的示意圖"></button>
+      <figcaption><span class="tagline">C · 挑戰者</span><b>翻牌看板</b><span>數字寫在車站看板上</span></figcaption></figure>
+    <figure><button type="button" data-zoom="IMG_D" aria-label="放大：撲克 app 的標準樣子"><img src="IMG_D" alt="方向 D 撲克 app 標準樣子的示意圖"></button>
+      <figcaption><span class="tagline gray">D · 業界標準</span><b>撲克 app 的樣子</b><span>大家都看過的那種</span></figcaption></figure>
+  </div>
+
+  <section class="common">
+    <h2>四個方向都一樣的地方</h2>
+    <ul>
+      <li><b>手牌變大，而且每一局都一樣大。</b>1 張和 11 張的牌一樣大，只改疊多少。手牌下緣貼著畫面底，不留白。</li>
+      <li><b>頂上那一大塊縮成一行。</b>房號、第幾局、王牌留著；計分、設定、規則、帳號收進右上角的選單。</li>
+      <li><b>能出的牌浮起來，不能出的變暗。</b>輪到你的時候一眼看得出能出哪幾張。</li>
+      <li><b>你說一定要留的都留著：</b>立體牌桌、丟骰子叫墩、現在的牌面。圖裡的牌是從遊戲裡截下來的真牌。</li>
+    </ul>
+    <p class="note">這些是示意圖：立體桌是用平面畫出來的，不是成品。你挑定之後，我再做成可以點的樣品（手機、iPad、電腦三種大小）給你看，看過才改進遊戲。平面模式你說不一定要留，這次只設計立體的。</p>
+  </section>
+
+  <p class="note" style="margin-top:22px">怎麼來的：設計流程會先列出跟你們生活有關的七個方向，再<b>隨機抽一個當主案</b>（A），避免每次都做出最順手的那一種；我自己最推的另外放一張（B）；另外抽了六個外來的風格來挑戰主案，只有一個留下來（C）；D 是一般撲克 app 的樣子，固定放著當退路，不是我的建議。</p>
+
+  <!-- A -->
+  <section class="dir" id="a">
+    <button type="button" data-zoom="IMG_A" aria-label="放大：群組通話"><img src="IMG_A" alt="方向 A 群組通話的示意圖"></button>
+    <div class="body">
+      <div><span class="tagline">A · 抽到的方向</span><h2>群組通話</h2></div>
+      <p class="thesis">大家各自在家，這一桌就是一通群組通話：每個人一格，輪到誰，誰那一格就亮起來，像通話裡正在說話的人。</p>
+      <div class="chips">
+        <span class="chip"><i style="background:#0E1218"></i>夜裡的底</span>
+        <span class="chip"><i style="background:#171C24"></i>每人一格</span>
+        <span class="chip"><i style="background:#21443D"></i>桌布</span>
+        <span class="chip"><i style="background:#F2B13A"></i>輪到誰（只有這件事用這個色）</span>
+        <span class="chip"><i style="background:#E2725B"></i><i style="background:#6E93C8"></i><i style="background:#B79AD8"></i>每人一個認人的顏色</span>
+      </div>
+      <div class="facts">
+        <div><h3>畫面上</h3><ul>
+          <li>五個對手的方格左右對稱圍著立體桌：大頭貼、名字、叫墩的骰子、拿了幾墩。</li>
+          <li>最下面三分之一是「你自己的畫面」：名字、叫幾拿幾，和一把大牌。</li>
+          <li>桌上出的牌，角落貼一顆出牌人的小圓章，顏色跟他的格子一樣，誰出了什麼不用猜。</li>
+        </ul></div>
+        <div><h3>輪到你的時候</h3><p>你那一格的框變成琥珀色，右上寫「輪到你出牌」。輪到別人時，亮的是他那一格。</p></div>
+        <div><h3>從沒選上的方向借來的</h3><ul class="raise">
+          <li><b>植物圖鑑</b><span>每一局手牌一樣大（圖鑑每一頁都同一個比例）。</span></li>
+          <li><b>捷運路線圖</b><span>每個人一個固定顏色，格子、桌上的牌、計分表都用同一個顏色認人。</span></li>
+          <li><b>日式資訊網頁</b><span>所有資訊塊用同一種框，同圓角、同細線，不各長各的。</span></li>
+          <li><b>同人展目錄</b><span>「被選中」只用一種記號：琥珀色只拿來表示輪到誰。</span></li>
+          <li><b>舞譜</b><span>座位左右對稱，你永遠在正下方中間。</span></li>
+        </ul></div>
+      </div>
+      <div class="risk"><h3>風險</h3><p>可能太像通話 app、少了牌桌的味道（你說的「太素」）。遊戲本身沒有語音或視訊，格子不能讓人以為按了可以講話。</p></div>
+    </div>
+  </section>
+
+  <!-- B -->
+  <section class="dir" id="b">
+    <button type="button" data-zoom="IMG_B" aria-label="放大：自動麻將桌"><img src="IMG_B" alt="方向 B 自動麻將桌的示意圖"></button>
+    <div class="body">
+      <div><span class="tagline">B · 我最推的</span><h2>自動麻將桌</h2></div>
+      <p class="thesis">桌子本身就是裁判。跟家裡那張自動麻將桌一樣：中間的控制台丟骰子、亮燈指著輪到誰、LED 寫第幾局。</p>
+      <div class="chips">
+        <span class="chip"><i style="background:#4A2D1F"></i>胡桃木框</span>
+        <span class="chip"><i style="background:#2B6A66"></i>藍綠桌墊</span>
+        <span class="chip"><i style="background:#ECE5D6"></i>控制台</span>
+        <span class="chip"><i style="background:#FF4B2E"></i>LED 數字</span>
+        <span class="chip"><i style="background:#FFB23E"></i>輪到誰的燈</span>
+      </div>
+      <div class="facts">
+        <div><h3>畫面上</h3><ul>
+          <li>方桌、胡桃木框、藍綠桌墊。每個人面前一排牌架，插著牌背；名牌貼在桌緣。</li>
+          <li>出的牌放在<b>自己面前</b>，像打麻將丟牌，誰出了什麼一眼就知道。</li>
+          <li>你的牌站著插在最下面那條木頭牌架上，很大，架子剛好接住畫面底。</li>
+          <li>叫墩的骰子在控制台的透明圓罩裡滾；局數和王牌是控制台前的 LED。</li>
+        </ul></div>
+        <div><h3>輪到你的時候</h3><p>控制台朝你的那盞燈亮，你牌架上緣亮一條琥珀色，能出的牌自己從架子上浮起來。</p></div>
+      </div>
+      <div class="risk"><h3>風險</h3><p>方桌坐 10 個人會很擠，人多時可能要改成長桌或八角桌。可能讓人第一眼以為是麻將遊戲。另外，這是我最推的，但也是「台灣的牌桌」最容易想到的那一個，熟悉是優點也是缺點。</p></div>
+    </div>
+  </section>
+
+  <!-- C -->
+  <section class="dir" id="c">
+    <button type="button" data-zoom="IMG_C" aria-label="放大：翻牌看板"><img src="IMG_C" alt="方向 C 翻牌看板的示意圖"></button>
+    <div class="body">
+      <div><span class="tagline">C · 挑戰者</span><h2>翻牌看板</h2></div>
+      <p class="thesis">局數、王牌、每個人叫幾墩拿幾墩，都寫在一塊車站的翻牌看板上。有人叫墩，看板那一格就啪啦翻過去。</p>
+      <div class="chips">
+        <span class="chip"><i style="background:#161616"></i>翻牌</span>
+        <span class="chip"><i style="background:#F2F0EA"></i>白字</span>
+        <span class="chip"><i style="background:#8E9398"></i>鋼框</span>
+        <span class="chip"><i style="background:#F5A524"></i>燈</span>
+        <span class="chip"><i style="background:#1E4C3D"></i>桌布（現在那張綠桌）</span>
+      </div>
+      <div class="facts">
+        <div><h3>畫面上</h3><ul>
+          <li>頂上一條鋼框黑看板：局 08/15、王牌 ♠J、墩 2/8。</li>
+          <li>每個人頭上一塊小翻牌，兩格：叫幾、拿幾。</li>
+          <li>桌子還是現在那張綠桌；手牌上面一列翻牌字。</li>
+        </ul></div>
+        <div><h3>輪到你的時候</h3><p>手牌上面那一列翻成「輪到你出牌」，左邊的燈亮。</p></div>
+        <div><h3>為什麼沒當主案</h3><p>數字最清楚，叫墩那一下有儀式感；但它是車站不是牌桌，「大家坐在一起」的感覺比群組通話弱。</p></div>
+      </div>
+      <div class="risk"><h3>風險</h3><p>翻牌的聲音和動畫做不好會很吵。年輕一點的人不一定看過翻牌看板。</p></div>
+    </div>
+  </section>
+
+  <!-- D -->
+  <section class="dir" id="d">
+    <button type="button" data-zoom="IMG_D" aria-label="放大：撲克 app 的標準樣子"><img src="IMG_D" alt="方向 D 撲克 app 標準樣子的示意圖"></button>
+    <div class="body">
+      <div><span class="tagline gray">D · 業界標準</span><h2>撲克 app 的樣子</h2></div>
+      <p class="thesis">線上撲克 app 大家都看過的那種：從上往下看的綠色牌桌、金邊、圓形大頭貼圍一圈、手牌扇形攤開。</p>
+      <div class="chips">
+        <span class="chip"><i style="background:#1F6A47"></i>綠桌</span>
+        <span class="chip"><i style="background:#0F3D29"></i>深綠</span>
+        <span class="chip"><i style="background:#D2AE5B"></i>金</span>
+        <span class="chip"><i style="background:#F4F1E8"></i>字</span>
+      </div>
+      <div class="facts">
+        <div><h3>輪到你的時候</h3><p>金色的「輪到你出牌」，你的頭貼套金框。</p></div>
+      </div>
+      <div class="risk"><h3>風險</h3><p>跟其他撲克 app 長得一樣，也最接近現在的感覺。你說想看不一樣的感覺，這張大概最不符合。它固定放在這裡當退路，不是我的建議。</p></div>
+    </div>
+  </section>
+
+  <hr>
+  <h2 style="margin-top:28px">沒選上的五個外來風格</h2>
+  <p class="note">它們都輸給主案，但各留下一點東西，已經寫進 A 的「借來的」那一欄。</p>
+  <div class="declined">
+    <div><b>捷運路線圖</b><span>局數 1→11→1 很像一條路線，但牌桌不是地圖。留下：每人一個固定顏色。</span></div>
+    <div><b>同人展目錄</b><span>密密麻麻的小格子，跟「手牌要大」相反。留下：被選中只用一種記號。</span></div>
+    <div><b>日式資訊網頁</b><span>字太小、格子太多。留下：所有資訊塊同一種框。</span></div>
+    <div><b>植物圖鑑</b><span>跟牌局沒關係。留下：每一局手牌同一個大小。</span></div>
+    <div><b>舞譜</b><span>太抽象。留下：座位左右對稱。</span></div>
+  </div>
+
+  <section class="ask">
+    <h2>你挑哪一個？</h2>
+    <p>回我 A、B、C 或 D 就好。也可以混搭（例如「B 的桌子＋C 的看板」），或說「都不要，再抽一次」，要我往熟悉一點或大膽一點的方向抽也可以講。</p>
+  </section>
+</div>
+
+<div class="lb" id="lb" hidden><img alt="" id="lbimg"></div>
+<script>
+(function(){
+  var lb = document.getElementById("lb"), im = document.getElementById("lbimg");
+  document.addEventListener("click", function(e){
+    var b = e.target.closest("[data-zoom]");
+    if(b){ im.src = b.querySelector("img").src; im.alt = b.getAttribute("aria-label") || ""; lb.hidden = false; return; }
+    if(!lb.hidden && e.target.closest("#lb")) lb.hidden = true;
+  });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") lb.hidden = true; });
+})();
+</script>

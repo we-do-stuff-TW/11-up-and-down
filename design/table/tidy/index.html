@@ -1,0 +1,224 @@
+<title>牌桌縮小對照</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* 版面：上面一條切換列（裝置／時刻／大小），下面一大張截圖；寬螢幕左邊固定放「現在」對照。
+   截圖下面是四種大小的差別、這次動了什麼、要他決定的三件事。
+   固定單一淺色（Francis 的規矩：給他看的頁面不跟系統深淺色走）。 */
+:root{
+  color-scheme:light;
+  --bg:#F1F3F0;      /* 頁底：帶一點桌布綠的淺灰 */
+  --sheet:#FFFFFF;
+  --ink:#18201D;
+  --ink-2:#56615B;
+  --rule:#D5DBD6;
+  --felt:#1E5A46;    /* 桌布綠：唯一的強調色 */
+  --felt-soft:#E1ECE6;
+  --stage:#20201E;   /* 截圖底下的暗台，讓深色截圖的邊看得出來 */
+  --f-body:"Noto Sans TC",-apple-system,"PingFang TC",system-ui,sans-serif;
+  --f-mark:"Bodoni Moda",Didot,Georgia,serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 var(--f-body);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:24px 64px}
+h1{margin:0;font-size:26px;line-height:1.3;font-weight:700;text-wrap:balance}
+h2{margin:0 0 12px;font-size:19px;line-height:1.35;text-wrap:balance}
+p{margin:0}
+.eyebrow{font-size:13px;color:var(--ink-2);letter-spacing:.06em;margin-bottom:6px}
+.eyebrow .mark{font-family:var(--f-mark);font-weight:700;letter-spacing:0;color:var(--ink)}
+.lede{margin-top:10px;max-width:62ch;color:var(--ink-2)}
+.lede b{color:var(--ink)}
+
+/* 切換列：捲下去也跟著，翻大小時不用捲回來 */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin-top:20px;padding-block:10px;
+  background:var(--bg);border-bottom:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.grp{display:flex;align-items:center;gap:8px;min-width:0}
+.grp .lb{font-size:12px;color:var(--ink-2);letter-spacing:.06em;white-space:nowrap}
+.seg{display:flex;flex-wrap:wrap;gap:4px;padding:3px;border-radius:10px;background:var(--sheet);border:1px solid var(--rule)}
+.seg button{font:inherit;font-size:14px;line-height:1;padding:9px 12px;border:0;border-radius:7px;background:transparent;color:var(--ink);cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--felt);color:#fff;font-weight:700}
+.seg button:focus-visible{outline:2px solid var(--felt);outline-offset:2px}
+.seg button small{font-size:11px;margin-left:4px;opacity:.8;font-weight:500}
+
+/* 截圖：直式兩張並排、橫式上下疊；手機上只放選的那一張 */
+.view{margin-top:16px;display:grid;gap:14px;grid-template-columns:1fr}
+.pane{margin:0;min-width:0;display:flex;flex-direction:column;gap:8px}
+.pane figcaption{font-size:13px;color:var(--ink-2);display:flex;gap:8px;align-items:baseline}
+.pane figcaption b{color:var(--ink);font-size:15px}
+.pane .shot{background:var(--stage);border-radius:12px;padding:8px;display:grid;place-items:center}
+.pane img{display:block;max-width:100%;height:auto;border-radius:6px;cursor:zoom-in}
+.portrait .pane img{max-height:78vh;width:auto}
+.view .now{display:none}
+@media (min-width:860px){
+  .view.portrait.both{grid-template-columns:1fr 1fr}
+  .view.both .now{display:flex}
+}
+.hint{margin-top:10px;font-size:13px;color:var(--ink-2)}
+@media (min-width:860px){ .hint.narrow{display:none} }
+
+section{margin-top:40px}
+.rows{display:grid;gap:0;border-top:1px solid var(--rule)}
+.row{display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:4px 16px;padding-block:12px;border-bottom:1px solid var(--rule)}
+.row .k{font-weight:700}
+.row .k small{display:block;font-size:12px;font-weight:500;color:var(--felt)}
+.row.pick{background:linear-gradient(90deg,var(--felt-soft),transparent 70%)}
+.row.pick .k{padding-left:8px}
+@media (max-width:520px){ .row{grid-template-columns:1fr} .row.pick .k{padding-left:0} }
+
+.two{display:grid;gap:20px;grid-template-columns:1fr}
+@media (min-width:760px){ .two{grid-template-columns:1fr 1fr} }
+.two h3{margin:0 0 6px;font-size:14px;color:var(--ink-2);letter-spacing:.04em}
+.two ul{margin:0;padding-left:1.2em;display:grid;gap:4px}
+.note{margin-top:14px;max-width:68ch}
+
+.done{margin-top:22px;background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:18px 16px;display:grid;gap:12px}
+.done h2{margin:0}
+.done p{max-width:66ch}
+.pair{display:grid;gap:12px;grid-template-columns:1fr 1fr;max-width:640px}
+.pair figure{margin:0;min-width:0;display:grid;gap:6px}
+.pair figcaption{font-size:13px;color:var(--ink-2)}
+.pair figcaption b{color:var(--ink)}
+.pair img{display:block;width:100%;height:auto;border-radius:8px;background:var(--stage);cursor:zoom-in}
+
+footer{margin-top:28px;font-size:12.5px;color:var(--ink-2);max-width:72ch;display:grid;gap:4px}
+
+/* 點圖放大（class 別叫 .lb：切換列的標籤已經用了） */
+.zoom{position:fixed;inset:0;z-index:20;background:rgba(10,12,11,.92);display:grid;place-items:center;padding:12px;cursor:zoom-out}
+.zoom[hidden]{display:none}
+.zoom img{max-width:100%;max-height:100%;width:auto;height:auto;border-radius:6px}
+</style>
+
+<main class="wrap">
+  <header>
+    <p class="eyebrow"><span class="mark">11 Up &amp; Down</span> · 立體牌桌</p>
+    <h1>桌上的牌縮小，手牌不動</h1>
+    <p class="lede">桌上<b>別人的牌、牌堆和王牌、這一墩、贏到的墩、骰子</b>一起縮小；你的手牌、名牌、上面那條資訊列都沒動。每張都是真的遊戲截圖，同一副牌、同一刻，只差大小。</p>
+  </header>
+
+  <section class="done" id="done">
+    <h2>定案：只有手機縮成七成</h2>
+    <p>手機直拿、橫拿都縮；iPad 和電腦維持原本的大小，名牌和平面模式都沒動。已經寫進遊戲，還沒推上線。做進去之後在 iPhone 上拍的畫面，跟下面「七成」那張一模一樣。</p>
+    <div class="pair">
+      <figure><figcaption><b>10 人局</b>・現在</figcaption><img src="img/iphone-play-k1-n10.webp" alt="10 人局，現在的手機畫面"></figure>
+      <figure><figcaption><b>10 人局</b>・七成（做進遊戲後拍的）</figcaption><img src="img/iphone-play-real-n10.webp" alt="10 人局，縮成七成後的手機畫面"></figure>
+    </div>
+    <p>人多的時候差最多：現在這一墩會蓋到「輪到你出牌」那行字和旁邊的骰子，七成就不會。</p>
+  </section>
+
+  <div class="bar">
+    <div class="grp"><span class="lb">裝置</span>
+      <div class="seg" id="dev">
+        <button type="button" id="dev-iphone" data-v="iphone">iPhone</button>
+        <button type="button" id="dev-ipad" data-v="ipad">iPad</button>
+        <button type="button" id="dev-mac" data-v="mac">電腦</button>
+      </div></div>
+    <div class="grp"><span class="lb">時刻</span>
+      <div class="seg" id="mom">
+        <button type="button" id="mom-play" data-v="play">出牌</button>
+        <button type="button" id="mom-bid" data-v="bid">叫墩</button>
+      </div></div>
+    <div class="grp"><span class="lb">大小</span>
+      <div class="seg" id="size">
+        <button type="button" id="size-1" data-v="k1">現在</button>
+        <button type="button" id="size-70" data-v="k0.7d0.85t">七成<small>你選的</small></button>
+        <button type="button" id="size-55" data-v="k0.55d0.75t">五成半</button>
+        <button type="button" id="size-45" data-v="k0.45d0.65t">四成半</button>
+      </div></div>
+  </div>
+
+  <div class="view portrait both" id="view">
+    <figure class="pane now"><figcaption><b>現在</b></figcaption><div class="shot"><img id="imgNow" alt="現在的立體牌桌"></div></figure>
+    <figure class="pane pick"><figcaption><b id="capPick">七成</b><span id="capNote">你選的</span></figcaption><div class="shot"><img id="imgPick" alt="桌上的牌縮小後的立體牌桌"></div></figure>
+  </div>
+  <p class="hint narrow">點上面的「現在」和「七成」來回切，最容易看出差別。點圖可以放大。</p>
+  <p class="hint">寬螢幕上左邊固定是「現在」。點圖可以放大。</p>
+
+  <section>
+    <h2>四種大小</h2>
+    <div class="rows">
+      <div class="row"><div class="k">現在</div><p>對手的牌背跟你的手牌差不多大，左下角的牌堆和王牌佔掉一大塊。電腦上，這一墩會壓到「輪到你出牌」那行字。</p></div>
+      <div class="row pick"><div class="k">七成<small>你選的，只用在手機</small></div><p>鬆一點，但桌上還是滿的。電腦上，這一墩剛好貼在那行字上方。</p></div>
+      <div class="row"><div class="k">五成半</div><p>對手的牌、牌堆、骰子都退成小東西，這一墩聚在桌子正中間，一眼看完。iPhone 上 K、Q、J 的人像還認得出來。</p></div>
+      <div class="row"><div class="k">四成半</div><p>最空。但在 iPhone 上，這一墩的人像要湊近才看得清楚，牌堆上的王牌也只剩一小張。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>這次動了什麼</h2>
+    <div class="two">
+      <div>
+        <h3>一起縮小</h3>
+        <ul>
+          <li>別人手上的牌背</li>
+          <li>牌堆和翻開的王牌</li>
+          <li>桌子中間這一墩</li>
+          <li>每個人贏到的墩</li>
+          <li>發牌時先落在你面前的那一疊</li>
+          <li>骰子：少縮一點（七成那版的骰子是八成五），叫墩時丟進金色圈裡還要看得清楚</li>
+        </ul>
+      </div>
+      <div>
+        <h3>沒動</h3>
+        <ul>
+          <li>你的手牌</li>
+          <li>名牌（Kelly、Tom 那幾塊黑底的）</li>
+          <li>上面的資訊列和按鈕</li>
+          <li>叫墩的金色圈</li>
+          <li>平面模式</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">另外，這一墩往桌子中間收攏了。牌變小之後如果還照原本那一圈排，五張會散成五個點，看不出是同一墩；收攏之後才聚成一堆。</p>
+  </section>
+
+
+  <footer>
+    <p>截圖條件：6 人局、第 5 局、每人 5 張、輪到你。iPhone 390×844、iPad 820×1180、電腦 1440×860。</p>
+    <p>四種大小的圖，是把大小暫時改在記憶體裡拍的示範。最上面那張七成，是做進遊戲之後拍的。</p>
+    <p>「手機」看的是裝置本身：手機直拿、橫拿都縮；iPad（連 iPad mini）和電腦一律維持原本大小，電腦把視窗拉窄也一樣。</p>
+  </footer>
+</main>
+
+<div class="zoom" id="lb" hidden><img id="lbImg" alt=""></div>
+
+<script>
+(function(){
+  var NOTE = {"k1":"", "k0.7d0.85t":"你選的", "k0.55d0.75t":"", "k0.45d0.65t":""};
+  var st = {dev:"iphone", mom:"play", size:"k0.7d0.85t"};
+  try{ var s = JSON.parse(localStorage.getItem("tidy-view2") || "null"); if(s && s.dev) st = s; }catch(e){}
+  var src = function(size){ return "img/" + st.dev + "-" + st.mom + "-" + size + ".webp"; };
+  var view = document.getElementById("view");
+  function paint(){
+    ["dev", "mom", "size"].forEach(function(g){
+      document.querySelectorAll("#" + g + " button").forEach(function(b){ b.setAttribute("aria-pressed", String(b.dataset.v === st[g])); });
+    });
+    view.classList.toggle("portrait", st.dev !== "mac");
+    view.classList.toggle("both", st.size !== "k1");
+    document.getElementById("imgNow").src = src("k1");
+    document.getElementById("imgPick").src = src(st.size);
+    var on = document.querySelector('#size button[data-v="' + st.size + '"]');
+    document.getElementById("capPick").textContent = on.firstChild.textContent;
+    document.getElementById("capNote").textContent = NOTE[st.size];
+    /* 同一組的四張先載好，來回切的時候不會閃白 */
+    Object.keys(NOTE).forEach(function(k){ var im = new Image(); im.src = src(k); });
+    try{ localStorage.setItem("tidy-view2", JSON.stringify(st)); }catch(e){}
+  }
+  ["dev", "mom", "size"].forEach(function(g){
+    document.getElementById(g).addEventListener("click", function(e){
+      var b = e.target.closest("button"); if(!b) return;
+      st[g] = b.dataset.v; paint();
+    });
+  });
+  var lb = document.getElementById("lb"), lbImg = document.getElementById("lbImg");
+  function zoom(e){
+    if(e.target.tagName !== "IMG") return;
+    lbImg.src = e.target.src; lbImg.alt = e.target.alt; lb.hidden = false;
+  }
+  view.addEventListener("click", zoom);
+  document.getElementById("done").addEventListener("click", zoom);
+  lb.addEventListener("click", function(){ lb.hidden = true; });
+  document.addEventListener("keydown", function(e){ if(e.key === "Escape") lb.hidden = true; });
+  paint();
+})();
+</script>

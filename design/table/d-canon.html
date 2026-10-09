@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>D 撲克 app 的標準樣子</title>
+<style>
+:root{--felt:#1F6A47; --felt-2:#0F3D29; --deep:#0A2318; --gold:#D2AE5B; --gold-2:#8C6F2E; --txt:#F4F1E8; --mut:#B9C7BE}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--deep)}
+body{position:relative;width:390px;height:844px;overflow:clip;color:var(--txt);
+  background:radial-gradient(ellipse 80% 60% at 50% 42%, #2A7F57 0%, var(--felt) 35%, var(--felt-2) 75%, var(--deep) 100%);
+  font:14px/1.3 -apple-system,"PingFang TC","Noto Sans TC",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums}
+.top{position:absolute;left:0;right:0;top:0;height:52px;display:flex;align-items:center;gap:10px;padding:0 12px;
+  background:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.15));border-bottom:1px solid rgba(210,174,91,.35)}
+.top .ic{width:34px;height:34px;border-radius:50%;border:1px solid var(--gold-2);display:grid;place-items:center}
+.top .info{flex:1;display:flex;justify-content:center;gap:14px;font-size:12.5px;color:var(--mut)}
+.top .info b{color:var(--txt);font-size:14px}
+/* 桌子：從正上方看的跑道形，金邊 */
+.rim{position:absolute;left:26px;right:26px;top:88px;height:440px;border-radius:170px;
+  box-shadow:0 0 0 2px rgba(210,174,91,.55), inset 0 0 0 10px rgba(0,0,0,.18), inset 0 0 60px rgba(0,0,0,.35)}
+.rim > *{position:absolute}
+.rim .cd{box-shadow:0 3px 6px rgba(0,0,0,.45)}
+.rim .die{filter:drop-shadow(0 2px 2px rgba(0,0,0,.4))}
+.p{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px}
+.p .av{width:54px;height:54px;border-radius:50%;background:linear-gradient(160deg,#3a4a42,#1c2a24);display:grid;place-items:center;font-size:20px;font-weight:700;
+  box-shadow:0 0 0 2px var(--gold), 0 6px 12px rgba(0,0,0,.5)}
+.p .nm{font-size:12px;font-weight:600;padding:2px 9px;border-radius:10px;background:rgba(0,0,0,.55)}
+.p .b{display:flex;gap:4px;font-size:11px}
+.p .b span{padding:1px 7px;border-radius:9px;background:rgba(0,0,0,.45);color:var(--mut)}
+.p .b b{color:var(--gold)}
+.hand{position:absolute;left:0;top:0;width:390px;height:844px;pointer-events:none}
+.hand .cd{position:absolute;box-shadow:0 6px 16px rgba(0,0,0,.5);transform-origin:50% 140%}
+.hand .cd.no{filter:brightness(.62) saturate(.75)}
+.turn{position:absolute;right:14px;top:556px;padding:6px 18px;border-radius:18px;
+  background:linear-gradient(180deg,#E8C772,var(--gold));color:#2A1E05;font-weight:800;font-size:15px;box-shadow:0 6px 14px rgba(0,0,0,.4)}
+.mine{position:absolute;left:12px;top:552px;display:flex;align-items:center;gap:8px}
+.mine .av{width:40px;height:40px;border-radius:50%;background:linear-gradient(160deg,#3a4a42,#1c2a24);display:grid;place-items:center;font-weight:700;box-shadow:0 0 0 3px var(--gold)}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="ic"><svg width="10" height="16" viewBox="0 0 10 16"><path d="M8 2 2 8l6 6" stroke="#D2AE5B" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg></div>
+  <div class="info"><span>房 <b class="num">5527</b></span><span>第 <b class="num">8</b>/15 局</span><span id="tr">王牌 </span></div>
+  <div class="ic"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 1h14M1 6h14M1 11h14" stroke="#D2AE5B" stroke-width="2" stroke-linecap="round"/></svg></div>
+</div>
+<div class="rim" id="rim"></div>
+<div id="ps"></div>
+<div class="turn">輪到你出牌</div>
+<div class="hand" id="hand"></div>
+<script src="_kit.js"></script>
+<script>
+const K = KIT;
+document.getElementById("tr").innerHTML += K.suit("S", 13, "#F4F1E8") + ' <b>J</b>';
+const SPOT = {1:[350, 360], 2:[330, 120], 3:[195, 62], 4:[60, 120], 5:[40, 360]};
+let ps = "";
+for(let s = 1; s < 6; s++){ const p = K.P[s], a = SPOT[s];
+  ps += '<div class="p" style="left:' + a[0] + 'px;top:' + a[1] + 'px"><div class="av">' + p.i + '</div><div class="nm">' + p.n + '</div>' +
+    '<div class="b"><span>叫 <b class="num">' + p.bid + '</b></span><span>拿 <b class="num">' + p.won + '</b></span></div></div>'; }
+document.getElementById("ps").innerHTML = ps;
+let r = "";
+const TRICK_AT = {3:[150, 120, -4], 4:[96, 176, -14], 5:[110, 260, 10]};
+K.TRICK.forEach(function(t){ const a = TRICK_AT[t.p]; r += '<div style="left:' + a[0] + 'px;top:' + a[1] + 'px;transform:rotate(' + a[2] + 'deg)">' + K.card(t.c, 70) + '</div>'; });
+const DICE_AT = {1:[262, 280], 2:[232, 90], 4:[84, 96], 5:[48, 280], 0:[160, 390]};
+for(const s in DICE_AT){ const p = K.P[s], a = DICE_AT[s]; if(p.bid > 0) r += '<div style="left:' + a[0] + 'px;top:' + a[1] + 'px;display:flex;gap:4px">' + (p.bid > 2 ? K.die(2, 22) + K.die(p.bid - 2, 22) : K.die(p.bid, 22)) + '</div>'; }
+document.getElementById("rim").innerHTML = r;
+const W = 128, pos = K.fan(K.HAND.length, W, 390 - 40, {spread:22, arc:26});
+let h = "";
+K.HAND.forEach(function(id, k){ const ok = K.LEGAL[id], p = pos[k];
+  h += K.card(id, W, 'left:' + (20 + p.x).toFixed(1) + 'px;top:' + (628 + p.dy - (ok ? 24 : 0)).toFixed(1) + 'px;transform:rotate(' + p.rot.toFixed(1) + 'deg)').replace('class="cd"', 'class="cd' + (ok ? '' : ' no') + '"'); });
+h += '<div class="mine" style="pointer-events:none"><div class="av">F</div><div><div style="font-weight:700">Francis（你）</div><div style="font-size:12px;color:#B9C7BE">叫 <b style="color:#D2AE5B">2</b> · 拿 <b style="color:#D2AE5B">1</b></div></div></div>';
+document.getElementById("hand").innerHTML = h;
+</script>
+</body>
+</html>

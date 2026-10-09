@@ -7547,6 +7547,19 @@ function stepTweens(t){
 const HAND_Y = .60, HAND_Z = 3.02, HAND_PITCH = -1.04, HAND_S = .72;
 const R_SEAT = 4.32, R_PLAY = 1.06, R_FAN = 3.16, R_DECK = 3.66;
 const FELT_R = 4.46;
+/* 手機上桌面的東西縮成七成：別人的牌背、牌庫與王牌、檯面那一墩、贏的墩、發牌時落在我面前那一疊；
+   骰子縮成八成五（叫墩時丟進環裡還要看得清楚）。我的手牌不縮。
+   Francis 10-09 看了四種大小的真實截圖（現在／七成／五成半／四成半，design/table/tidy.ts 拍的），原話：
+   「ipad、電腦原本的大小可以啊。我在說的是手機。手機七成。」——病根是 iPhone 直拿時桌上太亂太雜，
+   對手的牌背跟我的手牌差不多大。
+   同日他再補一句：「只有手機需要縮小，其他都維持原本大小。」——說的是裝置，不是視窗：
+   手機橫拿也是手機，電腦把視窗拉窄也還是電腦。所以看的是這台裝置螢幕的短邊（isPhone()），
+   不能用大廳那條「視窗寬 ≤ 760px」：那條量視窗，手機一橫拿就超過、iPad mini 直拿（744）反而算進來。
+   縮多少由 resize() 寫進 S.tableS／S.diceS，每個擺位函式都乘它——漏乘一處，那樣東西在手機上就會比旁邊的大一截 */
+const PHONE_TABLE_S = .70, PHONE_DICE_S = .85;
+/* 螢幕短邊 < 600 才是手機：Android 分手機／平板就是這條線（sw600dp）。iPhone 最大的短邊是 440，
+   iPad 最小的（mini）是 744。screen 量的是整台裝置，不跟視窗大小、也不跟直拿橫拿變 */
+const isPhone = () => Math.min(screen.width, screen.height) < 600;
 /* 贏得的墩：不疊成塔，一墩一疊、每疊錯開約半張排成一列，一眼數得出來；
    一列的長度與疊數由那個座位分到多寬的空檔決定（見 pileGeom），排滿就往桌子中央再起一列 */
 const R_PILE = 2.42, PILE_S = .70, PILE_SMIN = .46, PILE_COLS = 6;
@@ -7619,19 +7632,20 @@ function seatAnchor(i){
    哪張是誰出的，由「從他手上飛過來」與收墩時整墩飛向贏家交代，不靠位置。 */
 function playSlot(i, k){
   const n = UD.G.cfg.n, a = seatNo(i) * Math.PI * 2 / n;
-  const p = polarR(Math.max(R_PLAY, .72 / (Math.PI * 2 / n)), a);
+  /* 半徑跟著牌一起縮：牌小了還照原本那一圈排，一墩會散成一圈各自的點，看不出是同一墩 */
+  const p = polarR(Math.max(R_PLAY, .72 / (Math.PI * 2 / n)) * S.tableS, a);
   return {x:p.x, y:Y0 + THICK/2 + k * (THICK + .0015), z:p.z,
-          rx:-Math.PI/2, ry:Math.sin(a) * .5 + (((i * 37) % 9) - 4) * .014, rz:0, flip:0, s:1};
+          rx:-Math.PI/2, ry:Math.sin(a) * .5 + (((i * 37) % 9) - 4) * .014, rz:0, flip:0, s:S.tableS};
 }
 function fanSlot(i, k, n){
   const a = ang(i), p = polar(R_FAN, a), sd = side(a);
   /* 整把牌不越過自己那半個扇形，兩邊各再留一點縫：人多時才不會跟隔壁的牌交疊。
      7 人以上才會壓到這條線，人少時維持原本的張法 */
-  const room = Math.max(.12, Math.min(gapL(i), gapR(i)) * R_FAN - 1.0);
-  const dx = Math.min(.19, 1.45 / Math.max(n, 1), room / Math.max(n - 1, 1));
+  const room = Math.max(.12, Math.min(gapL(i), gapR(i)) * R_FAN - 1.0 * S.tableS);
+  const dx = Math.min(Math.min(.19, 1.45 / Math.max(n, 1)) * S.tableS, room / Math.max(n - 1, 1));
   const off = (k - (n - 1) / 2) * dx;
   return {x:p.x + sd.x * off, y:Y0 + THICK/2 + k * .0025, z:p.z + sd.z * off,
-          rx:-Math.PI/2, ry:a + off * .13, rz:0, flip:Math.PI, s:.74};
+          rx:-Math.PI/2, ry:a + off * .13, rz:0, flip:Math.PI, s:.74 * S.tableS};
 }
 /* 贏得的墩收在自己的右手邊：一墩一疊平放在桌布上，排成一列、每疊錯開約半張，
    數得出來，也看得出每疊的厚度就是那一墩的張數；一列排滿就往桌子中央再起一列。
@@ -7647,7 +7661,7 @@ function pileGeom(i){
      自己的從手牌右緣（HAND_ARC）起算往右排——自己那塊扇形的另一半是握著的牌 */
   const me = i === S.me, g = gapR(i), a0 = me ? HAND_ARC : g / 2;
   const room = R_PILE * (me ? g - HAND_ARC : g);   /* 這一列可以佔多長的弧 */
-  const s = Math.min(PILE_S, Math.max(PILE_SMIN, room / 2.9));
+  const s = Math.min(PILE_S * S.tableS, Math.max(PILE_SMIN * S.tableS, room / 2.9));
   /* 擺不下就少幾疊、多一列；最擠也不讓兩疊疊掉四分之三以上，不然數不出來 */
   const cols = Math.max(1, Math.min(want, Math.floor((room - s) / (s * .26)) + 1));
   const step = cols > 1 ? Math.min(s * .52, (room - s) / (cols - 1)) : s * .52;
@@ -7708,10 +7722,10 @@ const PICKUP_DUR = 520;
 const TRUMP_GAP = PICKUP_GAP + PICKUP_DUR + 160;   /* 牌拿起來扇好了，才翻王牌——真的牌桌就是這個順序 */
 function dealSlot(k, n){
   const a = ang(S.me), p = polar(R_DEAL, a), sd = side(a);
-  const step = Math.min(.20, 1.7 / Math.max(1, n));      /* 張數多就疊緊一點，整疊寬度大致不變 */
+  const step = Math.min(.20, 1.7 / Math.max(1, n)) * S.tableS;      /* 張數多就疊緊一點，整疊寬度大致不變 */
   const off = (k - (n - 1) / 2) * step;
   return {x:p.x + sd.x * off, y:Y0 + THICK/2 + k * THICK, z:p.z + sd.z * off,
-          rx:-Math.PI/2, ry:a + (k - (n - 1) / 2) * .045, rz:0, flip:Math.PI, s:1};
+          rx:-Math.PI/2, ry:a + (k - (n - 1) / 2) * .045, rz:0, flip:Math.PI, s:S.tableS};
 }
 
 /* ================= 場景 ================= */
@@ -8702,7 +8716,7 @@ function build(){
   return {r, scene, camera, table, felt, feltMat, rim, woodMat, floor, room, chairs:[], lamp, fill, glowMat, glowGeo, glowCue:null, glowCard:null,
           fillBase:fill.intensity, envBase:scene.environmentIntensity,
           xs:1, handSpan:3.15, handDx:.56, plateY:.46, plateBack:0,
-          mePlate:[3.15,.50,2.85], portrait:false,
+          mePlate:[3.15,.50,2.85], portrait:false, tableS:1, diceS:1,
           maxAniso: r.capabilities.getMaxAnisotropy(),
           cards:new Map(), me:0, round:-2, playedN:-1, sweep:null,
           dirty:6, lampBase:88, atlas:null, backTex:null, mats:new Map(),
@@ -8853,7 +8867,7 @@ const cardKey = id => "c:" + (UD.G ? UD.G.ri : 0) + ":" + id;
 
 function deckTop(stack){
   const d = deckSpot();
-  return {x:d.x, y:Y0 + THICK/2 + (stack == null ? 12 : stack) * THICK + .004, z:d.z, rx:-Math.PI/2, ry:d.ry, rz:0, flip:Math.PI, s:1};
+  return {x:d.x, y:Y0 + THICK/2 + (stack == null ? 12 : stack) * THICK + .004, z:d.z, rx:-Math.PI/2, ry:d.ry, rz:0, flip:Math.PI, s:S.tableS};
 }
 
 /* ================= 叫墩：骰子計數環 =================
@@ -9019,7 +9033,7 @@ function bidMark(i, cnt){
   const mine = i === S.me;
   const a = ang(i) - (mine ? A_MARK_ME : 0);
   const p = polar(mine ? R_MARK_ME : R_FAN - .85, a), sd = side(a), out = [];
-  for(let j = 0; j < cnt; j++){ const off = (j - (cnt - 1) / 2) * .40; out.push({x:p.x + sd.x * off, z:p.z + sd.z * off}); }
+  for(let j = 0; j < cnt; j++){ const off = (j - (cnt - 1) / 2) * .40 * S.diceS; out.push({x:p.x + sd.x * off, z:p.z + sd.z * off}); }
   return out;
 }
 /* 叫 7 以上用兩顆：一顆 6 加一顆餘數，跟座位牌上那對骰子同一個規矩。
@@ -9037,8 +9051,9 @@ function bidThrow(i, v, n, delay, instant){
   const d = {seat:i, v, before:B.sum, lit:0, land:0, at:0, parts:[]};
   faces.forEach((f, k) => {
     const mesh = dieMesh(f); S.scene.add(mesh);
-    const off = two ? (k ? .22 : -.22) : 0;
-    d.parts.push({mesh, s:1, x:p.x + sd.x * off, y:DIE_A/2, z:p.z + BID_Z + sd.z * off,
+    const off = two ? (k ? .22 : -.22) * S.diceS : 0;
+    /* 手機上骰子縮小（PHONE_DICE_S）：網格只建一次，所以縮的是每顆的 s，不是 DIE_A */
+    d.parts.push({mesh, s:S.diceS, x:p.x + sd.x * off, y:DIE_A * S.diceS / 2, z:p.z + BID_Z + sd.z * off,
                   rx:0, ry:a + (Math.random() - .5) * .9, rz:0});
   });
   B.sum += v;
@@ -9054,7 +9069,7 @@ function bidThrow(i, v, n, delay, instant){
     /* 空中翻幾圈：兩軸各給整數圈再加一點，落地才不會像被人擺上去的 */
     const spin = 2 + Math.floor(Math.random() * 2);
     const tilt = (Math.random() < .5 ? 1 : -1) * (1 + Math.floor(Math.random() * 2));
-    Object.assign(q, from, {x:from.x + sd.x * (two ? (k ? .14 : -.14) : 0),
+    Object.assign(q, from, {x:from.x + sd.x * (two ? (k ? .14 : -.14) * S.diceS : 0),
       rx:-Math.PI * 2 * spin, ry:q.ry - Math.PI * 2 * (k ? 1.5 : 1), rz:Math.PI * 2 * tilt});
     tween(q, to, {dur, delay:(delay || 0) + k * 90, ease:easeIO, bump:{y:1.05 + k * .1},
       onEnd:() => {
@@ -9103,7 +9118,7 @@ function bidVerdict(){
   let k = 0;
   for(const d of B.dice.values()){
     const m = bidMark(d.seat, d.parts.length);
-    d.parts.forEach((q, j) => tween(q, {x:m[j].x, y:DIE_A/2, z:m[j].z, rx:0, rz:0, ry:q.ry + (Math.random() - .5) * 1.2},
+    d.parts.forEach((q, j) => tween(q, {x:m[j].x, y:DIE_A * S.diceS / 2, z:m[j].z, rx:0, rz:0, ry:q.ry + (Math.random() - .5) * 1.2},
       {dur:560, delay:shake ? 0 : 120 + k * 60 + j * 40, queue:shake, ease:easeIO, bump:{y:.25}}));
     k++;
   }
@@ -9149,7 +9164,7 @@ function bidSync(G, fresh, lastDeal){
       /* 叫墩早就結束了（叫完才切進立體、或重排）：不演，每個人的骰子直接放到各自的記號位 */
       for(let i = 0; i < n; i++){
         const d = bidThrow(i, G.bids[i], n, 0, true), m = bidMark(i, d.parts.length);
-        d.parts.forEach((q, j) => { q.x = m[j].x; q.y = DIE_A/2; q.z = m[j].z; });
+        d.parts.forEach((q, j) => { q.x = m[j].x; q.y = DIE_A * S.diceS / 2; q.z = m[j].z; });
         d.lit = d.v;
       }
       B.state = "gone";
@@ -9313,7 +9328,7 @@ function sync(){
   const jit = (k, salt) => (((k * 2654435761 + salt * 40503) >>> 0) % 1000) / 1000 - .5;
   for(let k = 0; k < stack; k++)
     place("dk:" + k, null, {x:ds.x + jit(k, 1) * .022, y:Y0 + THICK/2 + k * THICK, z:ds.z + jit(k, 2) * .022,
-      rx:-Math.PI/2, ry:ds.ry + jit(k, 3) * .022, rz:0, flip:Math.PI, s:1}, {slot:"deck:" + k});
+      rx:-Math.PI/2, ry:ds.ry + jit(k, 3) * .022, rz:0, flip:Math.PI, s:S.tableS}, {slot:"deck:" + k});
   /* ---- 我的手牌 ---- */
   /* 發牌照真的牌桌：一張一張推到我面前，背面朝上疊在桌上；整輪發完了才一起拿起來翻正、扇開。
      兩段是同一顆 t 上前後接著的補間（place 的 via），中間停 PICKUP_GAP 那一下就是「發完了」的停頓。 */
@@ -9360,7 +9375,7 @@ function sync(){
   /* ---- 王牌：發完才翻，翻的是牌庫最上面那一張 ---- */
   /* 牌庫最上面那張抬起來、在半空翻正、再整整齊齊放回牌庫頂端，正面朝上 */
   if(G.trumpCard){
-    const top = {x:ds.x, y:Y0 + THICK/2 + stack * THICK, z:ds.z, rx:-Math.PI/2, ry:ds.ry, rz:0, s:1};
+    const top = {x:ds.x, y:Y0 + THICK/2 + stack * THICK, z:ds.z, rx:-Math.PI/2, ry:ds.ry, rz:0, s:S.tableS};
     place("tc", G.trumpCard, Object.assign({flip:0}, top), {
       slot:"trump:" + G.ri,
       from:Object.assign({flip:Math.PI}, top),
@@ -9384,7 +9399,7 @@ function sync(){
       eases:{s:easeBack, flip:easeFlip},          /* 對手的牌在半空翻正；落地時微微拍一下 */
       from: t.p === seat ? null : (function(){
         const f = fanSlot(t.p, UD.handCount(t.p), UD.handCount(t.p) + 1);
-        f.s = .96; return f;
+        f.s = .96 * S.tableS; return f;
       })()
     });
     if(gathering && k === bi) S.last = {win:t.card.id, card:t.card};   /* 收墩時要從這張接手 */
@@ -9399,7 +9414,7 @@ function sync(){
     G.trick.forEach(function(t, k){
       const c = placed[k]; if(!c) return;
       const heap = {x:0, y:Y0 + THICK/2 + (k === bi ? G.trick.length : k) * (THICK + .0015), z:.03,
-        rx:-Math.PI/2, ry:ang(t.p) * .22 + (((k * 53) % 11) - 5) * .028, rz:0, flip:0, s:1};
+        rx:-Math.PI/2, ry:ang(t.p) * .22 + (((k * 53) % 11) - 5) * .028, rz:0, flip:0, s:S.tableS};
       tween(c.t, heap, {queue:true, delay:(wait - remaining(c.t)) + bt.push + bt.hold, dur:bt.sweep, ease:easeIO});
     });
     S.glowCue = {t0:nowMs() + wait, up:bt.push, hold:bt.hold, down:bt.sweep, key:cardKey(G.trick[bi].card.id)};
@@ -9416,7 +9431,7 @@ function sync(){
       if(isNew){
         const old = S.last && S.cards.get(cardKey(S.last.win));
         if(old){ from = Object.assign({}, old.t); card = old.card; kill(old, null); }
-        else from = {x:0, y:Y0 + .22, z:.03, rx:-Math.PI/2, ry:0, rz:0, flip:Math.PI, s:1};
+        else from = {x:0, y:Y0 + .22, z:.03, rx:-Math.PI/2, ry:0, rz:0, flip:Math.PI, s:S.tableS};
       }
       place("p:" + i + ":" + k, card, pileSlot(i, k, n), {
         slot:"pile:" + i + ":" + k, depth:THICK * n,
@@ -9431,7 +9446,7 @@ function sync(){
     if(live.has(c.key)) continue;
     if(fresh){
       /* 換局：一張張翻背飛回牌庫頂端，到了才消失——牌庫本來就在那裡，看不出接縫 */
-      kill(c, {x:ds.x, y:Y0 + THICK/2 + stack * THICK, z:ds.z, rx:-Math.PI/2, ry:ds.ry, rz:0, flip:Math.PI, s:1},
+      kill(c, {x:ds.x, y:Y0 + THICK/2 + stack * THICK, z:ds.z, rx:-Math.PI/2, ry:ds.ry, rz:0, flip:Math.PI, s:S.tableS},
         380, {delay:(ret++) * 14, bump:{y:.26}, eases:{flip:easeFlip}});
     }else if(S.sweep && /^(gather|play)/.test(c.slot)){
       /* 收墩：其餘幾張跟贏的那張走同一條路、同一個節奏，落定即消失 */
@@ -9790,6 +9805,10 @@ function resize(){
   const asp = w / h, portrait = asp < 1.06;
   S.portrait = portrait;
   S.boxW = w; S.boxH = h;
+  /* 手機上桌面的東西縮小（理由在 PHONE_TABLE_S）。要寫在 fitCamera 之前，取景量的是縮過的位置 */
+  const phone = isPhone();
+  S.tableS = phone ? PHONE_TABLE_S : 1;
+  S.diceS  = phone ? PHONE_DICE_S : 1;
   /* 直式：桌子壓成橢圓、手牌收窄、名牌抬高，讓內容的長寬比接近畫面的長寬比。
      不這樣做的話一定有一邊留下大片空桌。 */
   S.xs       = portrait ? Math.max(.62, Math.min(1, asp * 1.20)) : 1;
