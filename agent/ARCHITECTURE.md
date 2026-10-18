@@ -43,7 +43,12 @@
 - 本專案「沒有」使用者帳號系統,不要假設有 login。
 - 模組 X 「不會」直接讀資料庫,一律經過 Y。
 -->
-- (尚未記錄——第一次發現 Claude 誤以為某功能存在時,就補進來)
+- 伺服器（`supabase/functions/game/index.ts`）**不會**在 `game_commit` 之外寫牌局：房間與手牌一律
+  `game_load` 一句讀進來 → 只在記憶體裡套規則 → `game_commit` 一個交易寫回（`supabase/migrations/0007_one_step.sql`）。
+  唯一的例外是 `create` 開新房那一句 insert。不要加 `from("hands")`、不要拿 `from("rooms")` 做 update——
+  0007 之前手牌就是這樣寫在樂觀鎖外面，鎖屏補敲讓人少一張牌、整桌卡死（plan 0006）。`server_test` 十段會擋。
+- 報到（`seen`）**不跟**牌局一起覆寫：`game_commit` 只合併「這一步是誰」那一格，心跳走 `game_seen`（不動 rev）。
+- 狀態列**沒有**「房主不在就停」這回事：牌局由伺服器推，誰都推得動。房主只管開局與規則。
 
 ## 去哪改 X
 

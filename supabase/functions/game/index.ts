@@ -180,10 +180,13 @@ type Room = {
   match: number;
 };
 
+/* 一步寫回去的欄位。⚠️ `seen` 刻意不在這裡：它是報到，不是牌局。
+   以前整份 seen 跟著牌局一起覆寫，讀房間到寫回去之間別人報的到會被蓋回舊值（健檢探針量到 0.7–2.6%）。
+   現在只由 game_commit／game_seen 把「自己那一格」合併進去（migrations/0007）。 */
 const PERSIST = [
   "cfg", "ladder", "seats", "phase", "ri", "hs", "starter", "trump", "trump_card",
   "leader", "turn", "led", "played", "trick", "bids", "won", "score", "log",
-  "host_pid", "seen", "step_at", "match",
+  "host_pid", "step_at", "match",
 ] as const;
 
 function trickBest(R: Room): number {
@@ -213,33 +216,34 @@ function canDirect(R: Room, pid: string): boolean {
 }
 
 /* ════════════ 手牌（只有這裡碰得到）════════════ */
-/* 這一回合的手牌，進來的時候跟房間同一趟並行抓齊。之後誰要用就從這裡拿——
-   同一個請求裡讀第二次，不該再飛一趟新加坡。
-   只有「拿得到」才算數：裡面沒有的座位一律回去查資料庫。這樣萬一抓手牌的時候
-   剛好有人在發下一局（ri 對不上），最壞也只是慢一趟，不會把空手牌當成真的。 */
-type Hands = { ri: number; rows: Map<number, Card[]> };
+/* ⚠️ 一步牌局：承諾點在資料庫裡，不在這支函式裡。
+   以前的一步是：rooms 與 hands 各讀一趟（不是同一刻）→ 算規則 → 先寫 hands → 再用 rev 樂觀鎖寫 rooms。
+   hands 的寫入全在鎖外，搶頁輸了 rooms 沒動、hands 卻已經改了。2026-10-17 架構健檢的探針重演出兩種死法：
+   · 輪到的人鎖屏 30 秒，全桌同一刻補敲 tick，好幾發同時替他出牌——每一發都從他手上扣一張，
+     只有一發上桌 → 他少一張牌 → 那局最後一墩輪到他時手上沒牌，整桌永久卡死（6 人 67%；補敲上線之前 0%）
+   · 兩發 next 同時 deal()，互相刪插 → hands 留輸家那副、rooms 的王牌是贏家那副（間隔 120–200ms 時 100%）
+   現在一步＝ game_load（房間＋這一桌全部手牌，一句 SELECT＝同一個快照）→ 規則只動記憶體 →
+   game_commit（鎖 rev、改房間、改手牌，同一個交易；rev 不對就整包不寫）。三支 SQL 在 migrations/0007。
+   所以這一段以下沒有任何一行會寫資料庫——要寫，就是 commit() 那一句。 */
+type HandRow = { cards: Card[]; bid: number | null };
+type Hands = {
+  ri: number;                    // 這份手牌屬於第幾局；跟 R.ri 對不上就一張都不算
+  rows: Map<number, HandRow>;    // 座位 → 那個座位的手牌（同時叫墩的暗數字也在這裡）
+  dirty: Set<number>;            // 這一步改過的座位：提交時只寫這幾列
+  reset: boolean;                // 發了新的一局、或回到等待房間：整桌的手牌先清掉再寫
+};
+type Snap = { R: Room; H: Hands };
 
-async function readHand(
-  sb: SupabaseClient, code: string, ri: number, seat: number, H?: Hands,
-): Promise<Card[]> {
-  if (H && H.ri === ri) {
-    const hit = H.rows.get(seat);
-    if (hit) return hit;
-  }
-  const { data } = await sb.from("hands").select("cards")
-    .eq("code", code).eq("ri", ri).eq("seat", seat).maybeSingle();
-  const cards = (data?.cards as Card[]) ?? [];
-  if (H && H.ri === ri && data) H.rows.set(seat, cards);
-  return cards;
+function readHand(H: Hands, ri: number, seat: number): Card[] {
+  if (H.ri !== ri) return [];
+  return H.rows.get(seat)?.cards ?? [];
 }
-async function writeHand(
-  sb: SupabaseClient, code: string, ri: number, seat: number, cards: Card[], H?: Hands,
-) {
-  if (H && H.ri === ri) H.rows.set(seat, cards);
-  await sb.from("hands").upsert({ code, ri, seat, cards }, { onConflict: "code,ri,seat" });
+function writeHand(H: Hands, seat: number, cards: Card[]) {
+  H.rows.set(seat, { cards, bid: H.rows.get(seat)?.bid ?? null });
+  H.dirty.add(seat);
 }
 
-async function deal(sb: SupabaseClient, R: Room, H?: Hands) {
+function deal(R: Room, H: Hands) {
   R.ri++;
   if (R.ri >= R.ladder.length) { R.phase = "over"; return; }
   const n = R.ladder[R.ri];
@@ -257,30 +261,28 @@ async function deal(sb: SupabaseClient, R: Room, H?: Hands) {
   R.trick = []; R.led = null; R.played = 0;
   R.leader = R.starter; R.turn = R.starter;
   R.phase = "bid";
-  await sb.from("hands").delete().eq("code", R.code);
-  await sb.from("hands").insert(
-    hands.map((cards, seat) => ({ code: R.code, ri: R.ri, seat, cards })),
-  );
-  // 剛發的這份就是現在的手牌，進來時抓的那份作廢
-  if (H) { H.ri = R.ri; H.rows = new Map(hands.map((cards, seat) => [seat, cards])); }
+  // 整桌換一副：提交時先清掉這一桌所有手牌再寫這一份——跟王牌在同一個交易裡，不可能兩副
+  H.ri = R.ri; H.reset = true;
+  H.rows = new Map(hands.map((cards, seat) => [seat, { cards, bid: null }]));
+  H.dirty = new Set(hands.map((_, seat) => seat));
 }
 
-async function applyBid(sb: SupabaseClient, R: Room, seat: number, v: number): Promise<boolean> {
+function applyBid(R: Room, H: Hands, seat: number, v: number): boolean {
   if (R.phase !== "bid") return false;
   if (!(Number.isInteger(v) && v >= 0 && v <= R.hs)) return false;
 
   if (R.cfg.bidMode === "sim") {
-    // 同時叫墩：數字先寫進 hands（那張表 RLS 開著、一條 policy 都沒有，誰都讀不到），
+    // 同時叫墩：數字放進 hands（那張表 RLS 開著、一條 policy 都沒有，誰都讀不到），
     // rooms 上只留一個 -1 表示「這位放好了」。全桌放完才一次翻開。
+    // 翻開讀的是同一個快照裡別人的暗數字＋自己這一手——以前是先寫 hands 再回頭 select，
+    // 而那一筆寫在鎖外：六個人一起按，誰的 persist 先到誰贏，其他人被吞還回 200。
     if (R.bids[seat] !== null && R.bids[seat] !== undefined) return false;
-    await sb.from("hands").update({ bid: v })
-      .eq("code", R.code).eq("ri", R.ri).eq("seat", seat);
+    H.rows.set(seat, { cards: H.rows.get(seat)?.cards ?? [], bid: v });
+    H.dirty.add(seat);
     R.bids[seat] = -1;
     for (let i = 0; i < R.cfg.n; i++) if (R.bids[i] === null || R.bids[i] === undefined) return true;
-    const { data } = await sb.from("hands").select("seat,bid").eq("code", R.code).eq("ri", R.ri);
-    const sealed = new Map((data ?? []).map((r: { seat: number; bid: number | null }) => [r.seat, r.bid]));
     for (let i = 0; i < R.cfg.n; i++) {
-      const b = sealed.get(i);
+      const b = H.rows.get(i)?.bid;
       R.bids[i] = typeof b === "number" && b >= 0 && b <= R.hs ? b : 0;
     }
     R.phase = "play"; R.turn = R.leader;
@@ -309,16 +311,14 @@ function reseat(R: Room) {
   R.bids = R.seats.map(() => null);
   R.won = R.seats.map(() => 0);
 }
-async function applyPlay(
-  sb: SupabaseClient, R: Room, seat: number, cardId: string, H?: Hands,
-): Promise<boolean> {
+function applyPlay(R: Room, H: Hands, seat: number, cardId: string): boolean {
   if (R.phase !== "play" || R.turn !== seat) return false;
-  const hand = (await readHand(sb, R.code, R.ri, seat, H)).slice();
+  const hand = readHand(H, R.ri, seat).slice();
   const i = hand.findIndex((c) => c.id === cardId);
   if (i < 0) return false;
   if (!legalCards(hand, R.led).some((c) => c.id === cardId)) return false;
   const card = hand.splice(i, 1)[0];
-  await writeHand(sb, R.code, R.ri, seat, hand, H);
+  writeHand(H, seat, hand);
   if (R.trick.length === 0) R.led = card.s;
   R.trick.push({ p: seat, card });
   if (R.trick.length === R.cfg.n) R.phase = "trickend";
@@ -340,15 +340,49 @@ function resolveTrick(R: Room) {
     R.phase = "roundend";
   } else R.phase = "play";
 }
+/** 誰接房主：還在線的第一個真人，沒有的話任一個在座的真人（牌局中離開也要交棒，
+ *  不然 host_pid 指著一個已經不在桌上的人——以前只有等待房間裡會交） */
+function nextHost(R: Room, leaving: string): string | null {
+  const humans = R.seats.filter((s) => s.kind === "human" && s.pid && s.pid !== leaving);
+  return (humans.find((s) => isLive(R, s.pid)) ?? humans[0])?.pid ?? null;
+}
 
-/* ════════════ 存回去（樂觀鎖）════════════ */
-async function persist(sb: SupabaseClient, R: Room, bumpStep = true) {
-  const patch: Record<string, unknown> = { rev: R.rev + 1, updated_at: new Date().toISOString() };
+/* ════════════ 載入與提交（一步的兩端）════════════ */
+/** 房間＋這一桌全部手牌，同一個快照。找不到房間回 null。 */
+async function load(sb: SupabaseClient, code: string): Promise<Snap | null> {
+  const { data, error } = await sb.rpc("game_load", { p_code: code });
+  if (error) throw new Error("game_load: " + error.message);
+  const d = data as { room: Room | null; hands: { ri: number; seat: number; cards: Card[]; bid: number | null }[] } | null;
+  if (!d || !d.room) return null;
+  const R = d.room;
+  R.seen = R.seen || {};
+  const H: Hands = { ri: R.ri, rows: new Map(), dirty: new Set(), reset: false };
+  for (const h of d.hands ?? []) {
+    if (h.ri === R.ri) H.rows.set(h.seat, { cards: h.cards ?? [], bid: h.bid ?? null });
+  }
+  return { R, H };
+}
+/** 寫回去。rev 被別人先推走了回 null——那時候房間與手牌一筆都沒寫（同一個交易）。 */
+async function commit(sb: SupabaseClient, S: Snap, pid: string, bumpStep: boolean): Promise<Room | null> {
+  const { R, H } = S;
+  const patch: Record<string, unknown> = {};
   for (const k of PERSIST) patch[k] = (R as unknown as Record<string, unknown>)[k];
   if (bumpStep) patch.step_at = Date.now();
-  const { data } = await sb.from("rooms").update(patch)
-    .eq("code", R.code).eq("rev", R.rev).select().maybeSingle();
-  return data as Room | null;
+  const seats = H.reset ? [...H.rows.keys()] : [...H.dirty];
+  const hands = H.reset || seats.length
+    ? {
+      reset: H.reset,
+      rows: seats.map((seat) => ({
+        ri: H.ri, seat, cards: H.rows.get(seat)?.cards ?? [], bid: H.rows.get(seat)?.bid ?? null,
+      })),
+    }
+    : null;
+  const { data, error } = await sb.rpc("game_commit", {
+    p_code: R.code, p_rev: R.rev, p_patch: patch,
+    p_pid: pid, p_now: R.seen[pid] ?? Date.now(), p_hands: hands,
+  });
+  if (error) throw new Error("game_commit: " + error.message);
+  return (data as Room | null) ?? null;
 }
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -447,6 +481,27 @@ async function saveResults(sb: SupabaseClient, R: Room) {
   }
 }
 
+/* ════════════ 一步的結果 ════════════ */
+/* 每個動作只回答一件事：照現在這一刻的桌面，這一步要怎麼走。三種答案：
+   · write ：改了記憶體裡的房間／手牌，要提交
+   · idle  ：不必做了——沒輪到、或別人已經做掉了（補敲、兩發 next、重送）。這不是錯
+   · no    ：不行（不是你的回合、這張牌不能出、牌局已經開始……）
+   ⚠️ 動作可能被跑不只一次：提交輸了（別人先寫了）就重新載入、對新的桌面再問一次。
+   所以動作裡只准改 S，不准碰資料庫、不准有副作用——戰績這種要寫的東西放進 after，提交成功才跑。 */
+type Out =
+  | { kind: "write"; bump?: boolean; after?: (room: Room) => Promise<void> }
+  | { kind: "idle" }
+  | { kind: "no"; error: string; status: number };
+const WRITE: Out = { kind: "write" };
+const WRITE_QUIET: Out = { kind: "write", bump: false };   // 等待房間裡的動作：不算「牌局走了一步」
+const IDLE: Out = { kind: "idle" };
+const no = (error: string, status = 409): Out => ({ kind: "no", error, status });
+
+/** 提交輸了重來幾次。一次輸＝這一瞬間有別人在寫，重新讀一次幾乎一定成功。
+ *  最壞的正常情形是同時叫墩：n 個人同一刻放骰子，每一輪只有一個人寫得進去，最後一位要輸 n−1 次
+ *  （最多 10 人）。所以給到 8 次、每次多等一點把大家錯開；再輸就是這桌正被狂敲，老實回 409。 */
+const TRIES = 8;
+
 /* ════════════ 進入點 ════════════ */
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -491,15 +546,14 @@ Deno.serve(async (req) => {
     };
     const fresh = action === "hello" || action === "create" || action === "sit";
 
-    /* 身分、房間、手牌，三件事誰也不等誰——以前是一趟等一趟等一趟。
+    /* 身分、房間＋手牌，兩件事誰也不等誰——以前是一趟等一趟等一趟。
        函式在東京、資料庫在新加坡，每一趟都是 0.07～0.09 秒。 */
     const code = String((body as { code?: string }).code || "").toUpperCase();
     const needRoom = action !== "hello" && action !== "create";
     if (needRoom && !/^[A-Z0-9]{4}$/.test(code)) return json({ error: "房號格式不對" }, 400);
-    const [pid, roomRes, handRes] = await Promise.all([
+    const [pid, first] = await Promise.all([
       resolvePid(sb, uid, token, prof, fresh),
-      needRoom ? sb.from("rooms").select("*").eq("code", code).maybeSingle() : null,
-      needRoom ? sb.from("hands").select("ri,seat,cards").eq("code", code) : null,
+      needRoom ? load(sb, code) : null,
     ]);
     if (!pid) return json({ error: "身分建立失敗，請重新整理" }, 500);
 
@@ -520,56 +574,56 @@ Deno.serve(async (req) => {
           score: [0], bids: [null], won: [0],
           seen: { [pid]: Date.now() }, step_at: Date.now(),
         }).select().maybeSingle();
-        if (data) return json({ ok: true, pid, room: data, hand: [] });
+        if (data) return json({ ok: true, pid, room: data, hand: [], now: Date.now() });
         if (error && !String(error.message).includes("duplicate")) return json({ error: error.message }, 500);
       }
       return json({ error: "房號產生失敗，請再試一次" }, 500);
     }
 
-    /* ---- 以下都需要房間（上面那一趟已經抓好了）---- */
-    const row = roomRes?.data;
-    if (!row) return json({ error: `找不到房號 ${code}` }, 404);
-    const R = row as Room;
-    R.seen = R.seen || {};
-    R.seen[pid] = Date.now();
+    /* ---- 以下都需要房間（上面那一趟已經連手牌一起抓好了）---- */
+    if (!first) return json({ error: `找不到房號 ${code}` }, 404);
 
-    /* 剛剛順便抓回來的手牌。只收得上這一回合的——抓的當下要是有人在發下一局，
-       ri 就對不上，那些座位一律回去查資料庫（readHand 自己會處理）。 */
-    const H: Hands = { ri: R.ri, rows: new Map() };
-    for (const h of (handRes?.data ?? []) as { ri: number; seat: number; cards: Card[] }[]) {
-      if (h.ri === R.ri) H.rows.set(h.seat, h.cards);
-    }
-
-    const mine = async () => {
+    const mine = (R: Room, H: Hands) => {
       const s = seatOf(R, pid);
-      return s < 0 || R.ri < 0 ? [] : await readHand(sb, code, R.ri, s, H);
+      return s < 0 || R.ri < 0 ? [] : readHand(H, R.ri, s);
     };
-    /* persist 寫不進去有兩種，以前混為一談，兩種都回 `room ?? R`——
-       把記憶體裡那份「沒有存進去」的狀態當成真的送回客端。客端的 applyRow 只擋
-       `cur > inc`（比較舊的那一列），rev 沒變的話 `cur === inc` 就照單全收：
-       畫面顯示成功、資料庫沒有這回事，重新整理就打回原形。
-       （2026-09-11 就是這樣：migration 還沒跑，「再來一場」整條路假裝成功。）
+    /* 回應永遠帶「同一刻」的房間與手牌，三種結果都是：
+       以前搶頁輸了回 {ok:true, room: 別人寫的那一列}、不帶手牌——被吞的那一手跟成功長得一模一樣
+       （函式紀錄、API 紀錄全是 200），客端不退回也不重送，使用者只能狂按。
+       `now` 是伺服器的時鐘：客端拿 seen 判斷誰在線時要用同一支錶，不能用自己手機的。 */
+    const reply = (S: Snap, extra: Record<string, unknown> = {}, status = 200) =>
+      json({ ...(status === 200 ? { ok: true } : {}), pid, room: S.R, hand: mine(S.R, S.H), now: Date.now(), ...extra }, status);
 
-       現在回頭讀一次，把兩種分開：
-       · 別人先寫了（rev 被搶走，兩個客端同時敲 tick 很常見）——良性，
-         把資料庫裡那份真的送回去，客端跟上就好。不帶 hand：那一份是照 R.ri 讀的，
-         局數要是已經換了會被 applyRow 貼上新的 ri 標籤，變成拿舊手牌當新的；
-         不帶的話 applyRow 自己會去補一次 state。
-       · rev 沒動——那就是真的寫失敗（欄位不存在、約束擋下來）。老實回錯誤，
-         客端該退回的退回、該說話的說話。 */
-    const ok = async (room: Room | null) => {
-      if (room) return json({ ok: true, pid, room, hand: await mine() });
-      const { data } = await sb.from("rooms").select("*").eq("code", R.code).maybeSingle();
-      const fresh = data as Room | null;
-      if (fresh && (fresh.rev ?? 0) > R.rev) return json({ ok: true, pid, room: fresh });
-      return json({ error: "這一步沒有寫進去，再試一次" }, 409);
+    /** 跑一步：問動作 → 提交 → 輸了重讀再問。見上面「一步的結果」。 */
+    const step = async (act: (S: Snap) => Out): Promise<Response> => {
+      let S = first;
+      for (let k = 0; ; k++) {
+        S.R.seen[pid] = Date.now();
+        const before = structuredClone(S);     // 「不行」的時候回的是動作改之前的那一刻
+        const out = act(S);
+        if (out.kind === "no") return reply(before, { error: out.error }, out.status);
+        if (out.kind === "idle") {
+          const { error } = await sb.rpc("game_seen", { p_code: code, p_pid: pid, p_now: S.R.seen[pid] });
+          if (error) console.error("game_seen", code, error.message);
+          return reply(S, { idle: true });
+        }
+        const room = await commit(sb, S, pid, out.bump !== false);
+        if (room) {
+          if (out.after) await out.after(room);
+          return reply({ R: room, H: S.H });
+        }
+        if (k + 1 >= TRIES) return reply(before, { error: "這一步沒有寫進去，再試一次" }, 409);
+        await new Promise((r) => setTimeout(r, (15 + Math.random() * 45) * (1 + k / 2)));
+        const again = await load(sb, code);
+        if (!again) return json({ error: `找不到房號 ${code}` }, 404);
+        S = again;
+      }
     };
 
     switch (action) {
-      case "state": {
-        await sb.rpc("touch_seen", { p_code: code, p_pid: pid });
-        return json({ ok: true, pid, room: R, hand: await mine() });
-      }
+      // 心跳與「畫面可能舊了，問一次」：只報到，不寫牌局
+      case "state":
+        return await step(() => IDLE);
 
       // 舊版客端還在用 sit（挑座位）。部署函式與推前端之間一定有一小段空窗，
       // 這條別名讓那段時間線上的舊頁面照樣坐得下來——座位改成動態之後，
@@ -577,106 +631,123 @@ Deno.serve(async (req) => {
       case "sit":
       // 幾個人進來就幾個人玩：不必挑位子，來了就多一張椅子
       case "join": {
-        if (seatOf(R, pid) >= 0) return json({ ok: true, pid, room: R, hand: await mine() });
-        if (R.phase !== "lobby") return json({ error: "牌局已經開始，等這局結束再進來" }, 409);
-        if (R.seats.length >= 10) return json({ error: "這桌滿了（最多 10 人）" }, 409);
         const name = String((body as { name?: string }).name || "玩家").slice(0, 10);
-        R.seats.push({ name, kind: "human", pid, av: prof.avatar });
-        reseat(R);
-        return await ok(await persist(sb, R, false));
+        return await step(({ R }) => {
+          if (seatOf(R, pid) >= 0) return IDLE;
+          if (R.phase !== "lobby") return no("牌局已經開始，等這局結束再進來");
+          if (R.seats.length >= 10) return no("這桌滿了（最多 10 人）");
+          R.seats.push({ name, kind: "human", pid, av: prof.avatar });
+          reseat(R);
+          return WRITE_QUIET;
+        });
       }
 
-      case "addai": {
-        if (R.phase !== "lobby") return json({ error: "牌局已經開始" }, 409);
-        if (!canDirect(R, pid)) return json({ error: "只有房主能加人" }, 403);
-        if (R.seats.length >= 10) return json({ error: "這桌滿了（最多 10 人）" }, 409);
-        R.seats.push({ name: `AI ${R.seats.length + 1}`, kind: "ai", pid: null, av: null });
-        reseat(R);
-        return await ok(await persist(sb, R, false));
-      }
+      case "addai":
+        return await step(({ R }) => {
+          if (R.phase !== "lobby") return no("牌局已經開始");
+          if (!canDirect(R, pid)) return no("只有房主能加人", 403);
+          if (R.seats.length >= 10) return no("這桌滿了（最多 10 人）");
+          R.seats.push({ name: `AI ${R.seats.length + 1}`, kind: "ai", pid: null, av: null });
+          reseat(R);
+          return WRITE_QUIET;
+        });
 
       case "unseat": {
-        if (R.phase !== "lobby") return json({ error: "牌局已經開始" }, 409);
-        if (!canDirect(R, pid)) return json({ error: "只有房主能移除座位" }, 403);
         const i = (body as { seat?: number }).seat ?? -1;
-        if (i < 0 || i >= R.seats.length) return json({ error: "沒有這個座位" }, 400);
-        if (R.seats[i].pid && R.seats[i].pid === R.host_pid)
-          return json({ error: "房主不能把自己移掉" }, 409);
-        R.seats.splice(i, 1);
-        reseat(R);
-        return await ok(await persist(sb, R, false));
+        return await step(({ R }) => {
+          if (R.phase !== "lobby") return no("牌局已經開始");
+          if (!canDirect(R, pid)) return no("只有房主能移除座位", 403);
+          if (i < 0 || i >= R.seats.length) return no("沒有這個座位", 400);
+          if (R.seats[i].pid && R.seats[i].pid === R.host_pid) return no("房主不能把自己移掉");
+          R.seats.splice(i, 1);
+          reseat(R);
+          return WRITE_QUIET;
+        });
       }
 
       // 規則只有房主改得動，而且只在開打之前。改完存進 cfg，跟著這一桌走。
       case "cfg": {
-        if (R.phase !== "lobby") return json({ error: "開打之後不能改規則" }, 409);
-        if (!canDirect(R, pid)) return json({ error: "只有房主能改規則" }, 403);
-        R.cfg = cleanCfg((body as { cfg?: unknown }).cfg, R.seats.length);
-        reseat(R);
-        return await ok(await persist(sb, R, false));
+        const raw = (body as { cfg?: unknown }).cfg;
+        return await step(({ R }) => {
+          if (R.phase !== "lobby") return no("開打之後不能改規則");
+          if (!canDirect(R, pid)) return no("只有房主能改規則", 403);
+          R.cfg = cleanCfg(raw, R.seats.length);
+          reseat(R);
+          return WRITE_QUIET;
+        });
       }
 
-      case "start": {
-        if (R.phase !== "lobby") return json({ error: "已經開始了" }, 409);
-        if (!canDirect(R, pid)) return json({ error: "只有房主能開始" }, 403);
-        if (R.seats.length < 2) return json({ error: "至少要兩個人，可以加 AI 湊" }, 409);
-        R.seats = R.seats.map((s, i) =>
-          s.kind === "human" ? s : { name: s.name || `AI ${i + 1}`, kind: "ai" as const, pid: null, av: null });
-        reseat(R);
-        R.score = Array(R.cfg.n).fill(0);
-        await deal(sb, R, H);
-        return await ok(await persist(sb, R));
-      }
+      case "start":
+        return await step(({ R, H }) => {
+          if (R.phase !== "lobby") return no("已經開始了");
+          if (!canDirect(R, pid)) return no("只有房主能開始", 403);
+          if (R.seats.length < 2) return no("至少要兩個人，可以加 AI 湊");
+          R.seats = R.seats.map((s, i) =>
+            s.kind === "human" ? s : { name: s.name || `AI ${i + 1}`, kind: "ai" as const, pid: null, av: null });
+          reseat(R);
+          R.score = Array(R.cfg.n).fill(0);
+          deal(R, H);
+          return WRITE;
+        });
 
       case "bid": {
-        const seat = seatOf(R, pid);
-        if (seat < 0) return json({ error: "你不在座位上" }, 403);
-        if (!await applyBid(sb, R, seat, (body as { v?: number }).v ?? -1))
-          return json({ error: "現在不能叫墩" }, 409);
-        return await ok(await persist(sb, R));
+        const v = (body as { v?: number }).v ?? -1;
+        return await step(({ R, H }) => {
+          const seat = seatOf(R, pid);
+          if (seat < 0) return no("你不在座位上", 403);
+          if (!applyBid(R, H, seat, v)) return no("現在不能叫墩");
+          return WRITE;
+        });
       }
 
       case "play": {
-        const seat = seatOf(R, pid);
-        if (seat < 0) return json({ error: "你不在座位上" }, 403);
         const cid = String((body as { card?: string }).card || "");
-        if (!await applyPlay(sb, R, seat, cid, H)) return json({ error: "這張牌不能出" }, 409);
-        return await ok(await persist(sb, R));
+        return await step(({ R, H }) => {
+          const seat = seatOf(R, pid);
+          if (seat < 0) return no("你不在座位上", 403);
+          if (!applyPlay(R, H, seat, cid)) return no("這張牌不能出");
+          return WRITE;
+        });
       }
 
+      // 局末開下一局。誰都可以敲（ticker 到時間自動送、其他人補敲、任何人按「馬上開始」），
+      // 所以常常好幾發一起到——第一發開了，後面的都是 idle。
+      // 客端帶它看到的那一局（ri）：那一局已經被開過了就是 idle；舊版客端沒帶，就照 phase 判。
       case "next": {
-        if (R.phase !== "roundend" && R.phase !== "over")
-          return json({ error: "這局還沒結束" }, 409);
-        if (seatOf(R, pid) < 0) return json({ error: "你不在座位上" }, 403);
-        if (R.ri + 1 >= R.ladder.length) {
-          R.phase = "over";
-          await saveResults(sb, R);
-          return await ok(await persist(sb, R));
-        }
-        await deal(sb, R, H);
-        if (R.phase === "over") await saveResults(sb, R);
-        return await ok(await persist(sb, R));
+        const seenRi = (body as { ri?: number }).ri;
+        return await step(({ R, H }) => {
+          if (typeof seenRi === "number" && R.ri > seenRi) return IDLE;
+          if (R.phase === "over") return IDLE;
+          if (R.phase !== "roundend") return no("這局還沒結束");
+          if (seatOf(R, pid) < 0) return no("你不在座位上", 403);
+          const save = { kind: "write" as const, after: (room: Room) => saveResults(sb, room) };
+          if (R.ri + 1 >= R.ladder.length) { R.phase = "over"; return save; }
+          deal(R, H);
+          return (R.phase as string) === "over" ? save : WRITE;   // deal() 改了 phase，TS 看不出來
+        });
       }
 
-      // AI 的節奏：任何一個 client 都能敲，rev 樂觀鎖讓重複的那些自然落空
       // 打完了要回到等待房間再開一場。座位、規則、房主都留著，牌局的東西全部歸零。
       // 誰都可以按（跟 next 一樣）——最先按到的那個人讓整桌回到等待狀態。
-      case "again": {
-        if (R.phase !== "over") return json({ error: "這一場還沒打完" }, 409);
-        if (seatOf(R, pid) < 0) return json({ error: "你不在座位上" }, 403);
-        R.phase = "lobby";
-        R.ri = -1;              // 下一次 deal() 會 ++ 成 0，跟剛開房時一樣
-        R.hs = 0; R.starter = 0;
-        R.trump = null; R.trump_card = null;
-        R.leader = 0; R.turn = 0; R.led = null; R.played = 0;
-        R.trick = []; R.log = [];
-        R.score = R.seats.map(() => 0);   // 先歸零再 reseat：reseat 會沿用 score
-        R.match = (R.match ?? 1) + 1;
-        reseat(R);
-        await sb.from("hands").delete().eq("code", R.code);
-        return await ok(await persist(sb, R));
-      }
+      case "again":
+        return await step(({ R, H }) => {
+          if (R.phase !== "over") return no("這一場還沒打完");
+          if (seatOf(R, pid) < 0) return no("你不在座位上", 403);
+          R.phase = "lobby";
+          R.ri = -1;              // 下一次 deal() 會 ++ 成 0，跟剛開房時一樣
+          R.hs = 0; R.starter = 0;
+          R.trump = null; R.trump_card = null;
+          R.leader = 0; R.turn = 0; R.led = null; R.played = 0;
+          R.trick = []; R.log = [];
+          R.score = R.seats.map(() => 0);   // 先歸零再 reseat：reseat 會沿用 score
+          R.match = (R.match ?? 1) + 1;
+          reseat(R);
+          H.ri = -1; H.reset = true; H.rows = new Map(); H.dirty = new Set();
+          return WRITE;
+        });
 
+      // AI 的節奏：任何一個 client 都能敲。好幾發一起到是常態（ticker＋補敲），
+      // 第一發提交了，後面的重讀之後看到「這一步已經走過了」就是 idle——真的只會落空。
       case "tick": {
         const raw = (body as { speed?: number }).speed ?? 520;
         const sp = Math.max(200, Math.min(1200, raw));
@@ -684,51 +755,60 @@ Deno.serve(async (req) => {
         // 太短看不清楚是誰贏的，太長會被一個亂送的 client 把整桌卡住
         const rawGap = (body as { gap?: number }).gap ?? 0;
         const gap = Math.max(2000, sp * 1.9, Math.min(12000, rawGap));
-        const since = Date.now() - (R.step_at || 0);
-        // 叫完到第一張牌之間多停一下：客端立體桌上叫墩的收場判詞要讀得完，牌才飛進來
-        const firstPlay = R.phase === "play" && R.played === 0 && !R.trick.length;
-        const playWait = firstPlay ? Math.max(sp * 0.9, 2800) : sp * 0.9;
-        let moved = false;
-        if (R.phase === "bid" && since > sp * 0.8) {
-          // 同時叫墩沒有「輪到誰」：挑一個還沒放好的 AI，一次放一個，節奏跟依序叫一樣
-          const seat = R.cfg.bidMode === "sim"
-            ? R.seats.findIndex((_, i) => aiSeat(R, i) && (R.bids[i] === null || R.bids[i] === undefined))
-            : (aiSeat(R, R.turn) ? R.turn : -1);
-          if (seat >= 0) {
-            const h = await readHand(sb, code, R.ri, seat, H);
-            moved = await applyBid(sb, R, seat, aiBid(h, R.trump, R.hs, R.cfg.n, hookBlocked(R, seat)));
+        return await step(({ R, H }) => {
+          const since = Date.now() - (R.step_at || 0);
+          // 叫完到第一張牌之間多停一下：客端立體桌上叫墩的收場判詞要讀得完，牌才飛進來
+          const firstPlay = R.phase === "play" && R.played === 0 && !R.trick.length;
+          const playWait = firstPlay ? Math.max(sp * 0.9, 2800) : sp * 0.9;
+          if (R.phase === "bid" && since > sp * 0.8) {
+            // 同時叫墩沒有「輪到誰」：挑一個還沒放好的 AI，一次放一個，節奏跟依序叫一樣
+            const seat = R.cfg.bidMode === "sim"
+              ? R.seats.findIndex((_, i) => aiSeat(R, i) && (R.bids[i] === null || R.bids[i] === undefined))
+              : (aiSeat(R, R.turn) ? R.turn : -1);
+            if (seat < 0) return IDLE;
+            const h = readHand(H, R.ri, seat);
+            return applyBid(R, H, seat, aiBid(h, R.trump, R.hs, R.cfg.n, hookBlocked(R, seat))) ? WRITE : IDLE;
           }
-        } else if (R.phase === "play" && aiSeat(R, R.turn) && since > playWait) {
-          const h = await readHand(sb, code, R.ri, R.turn, H);
-          const need = (R.bids[R.turn] as number) - R.won[R.turn];
-          moved = await applyPlay(sb, R, R.turn, aiCard(h, R.trick, R.led, R.trump, need).id, H);
-        } else if (R.phase === "trickend" && since > gap) {
-          // 贏的那張推出來停在檯面上，定格夠久了才收
-          resolveTrick(R); moved = true;
-        }
-        if (!moved) {
-          await sb.rpc("touch_seen", { p_code: code, p_pid: pid });
-          return json({ ok: true, pid, room: R, hand: await mine(), idle: true });
-        }
-        return await ok(await persist(sb, R));
+          if (R.phase === "play" && aiSeat(R, R.turn) && since > playWait) {
+            const h = readHand(H, R.ri, R.turn);
+            // 輪到的座位手上沒牌＝這一桌的帳已經壞了（0007 之前的鎖外寫入留下來的）。
+            // 不替他出：以前這裡是 aiCard([]) → undefined.id → 每一發 500
+            if (!h.length) { console.error("tick: 輪到的座位沒有手牌", code, R.ri, R.turn); return IDLE; }
+            const need = (R.bids[R.turn] as number) - R.won[R.turn];
+            return applyPlay(R, H, R.turn, aiCard(h, R.trick, R.led, R.trump, need).id) ? WRITE : IDLE;
+          }
+          if (R.phase === "trickend" && since > gap) {
+            // 贏的那張推出來停在檯面上，定格夠久了才收
+            resolveTrick(R);
+            return WRITE;
+          }
+          return IDLE;
+        });
       }
 
-      case "leave": {
-        if (R.phase === "lobby") {
-          const i = R.seats.findIndex((s) => s.pid === pid);
-          if (i >= 0) { R.seats.splice(i, 1); reseat(R); }
-          // 房主走了，房主身分交給還在座的第一個真人
-          if (R.host_pid === pid)
-            R.host_pid = R.seats.find((s) => s.kind === "human" && s.pid)?.pid ?? null;
-        } else {
-          // 牌局中不能抽掉椅子（位序會整排位移），交給 AI 代打
-          for (const s of R.seats) if (s.pid === pid) { s.pid = null; s.kind = "open"; s.name = "座位"; s.av = null; }
-        }
-        return await ok(await persist(sb, R, false));
-      }
+      case "leave":
+        return await step(({ R }) => {
+          const wasHost = R.host_pid === pid;
+          if (R.phase === "lobby") {
+            const i = R.seats.findIndex((s) => s.pid === pid);
+            if (i < 0 && !wasHost) return IDLE;
+            if (i >= 0) { R.seats.splice(i, 1); reseat(R); }
+          } else {
+            // 牌局中不能抽掉椅子（位序會整排位移），交給 AI 代打
+            let mine = false;
+            for (const s of R.seats) {
+              if (s.pid === pid) { s.pid = null; s.kind = "open"; s.name = "座位"; s.av = null; mine = true; }
+            }
+            if (!mine && !wasHost) return IDLE;
+          }
+          // 房主走了，房主身分交給還在線的下一個真人（牌局中也要交，不然打完沒人按得動「再開一場」以外的東西）
+          if (wasHost) R.host_pid = nextHost(R, pid);
+          return WRITE_QUIET;
+        });
     }
     return json({ error: "unknown action" }, 400);
   } catch (e) {
+    console.error("game", e);
     return json({ error: String((e as Error)?.message ?? e) }, 500);
   }
 });

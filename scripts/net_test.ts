@@ -21,7 +21,7 @@ const t0 = performance.now();
 /** 頁面裡的小道具：造一桌、造一列、當假伺服器 */
 const SETUP = `
 window.__T = {
-  calls: [], reply: null, sfx: 0,
+  calls: [], args: {}, reply: null, sfx: 0,
   /* 造一桌：4 人、我坐 0 號、已經叫完墩、輪我出牌 */
   table(){
     const E = UD.engine, T = UD.__t;
@@ -53,7 +53,7 @@ window.__T = {
   install(){
     const T = this;
     window.__call = function(action, args){
-      T.calls.push(action);
+      T.calls.push(action); T.args[action] = args;
       if(T.reply === "pending") return new Promise(function(){});   /* 永遠不回 */
       return Promise.resolve(T.reply).then(function(d){
         if(d && d.room) UD.__t.applyRow(d.room, d.hand);
@@ -73,7 +73,23 @@ window.__T = {
     return {mode:UD.MODE, seat:UD.mySeat(), hand:UD.G.hands[UD.mySeat()].length, rev:UD.G.rev};
   },
   /* 我手上第一張出得掉的牌 */
-  mine(){ return UD.legalCards(UD.G.hands[UD.mySeat()], UD.G.led)[0].id; }
+  mine(){ return UD.legalCards(UD.G.hands[UD.mySeat()], UD.G.led)[0].id; },
+  /* 丟掉隊伍：前一段故意掛著不回的那一趟永遠不會走到 done()，它記的帳要由測試歸零。
+     ⚠️ 只准從這裡清。以前十二處各寫各的三個欄位，api() 多一個 urgent 之後沒有一處知道，
+     一趟掛著的出牌就讓後面每一趟背景呼叫都在讓路（plan 0006 撞到的）。 */
+  flush(){
+    const N = UD.__t.NET;
+    N.tail = null; N.queued = 0; N.busy = false; N.urgent = 0; N.ac = null;
+  },
+  /* 一墩剛打完的那一列：全桌每人一張在檯面上。伺服器只在湊滿 n 張時才進 trickend（index.ts applyPlay），
+     而且收這一墩的同一步就清掉檯面——trickend 配空的檯面是不可能的狀態。
+     以前這裡寫 trick:[]，靠前一段留下的 NET.err 讓狀態列整列換成紅字、沒去讀檯面才沒爆。 */
+  trickEnd(r, g){
+    r.phase = "trickend";
+    r.trick = g.hands.map(function(h, i){ return {p:i, card:h[0]}; });
+    r.led = r.trick[0].card.s;
+    return r;
+  }
 };
 return 1;`;
 
@@ -130,7 +146,7 @@ try {
   /* ── 六、送不出去就退回按之前的樣子 ── */
   await b.eval(`
     /* 第一步那通呼叫是故意讓它永遠不回的，api() 是排隊的，不清掉後面全部卡在它後面 */
-    UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false;
+    __T.flush();
     UD.__t.applyRow(__T.row(__T.g, 5), __T.clone(__T.g.hands[0]));   /* 回到出牌前，rev 拉高 */
     __T.reply = null;                                      /* 伺服器打回票 */
     __T.card2 = __T.mine();
@@ -184,7 +200,7 @@ try {
      直到自己按叫墩那一趟（rev 必定最新、必定通得過）才被校正——
      這就是「為何出完骰子，牌就變了」。 */
   await b.eval(`
-    UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false;
+    __T.flush();
     __T.reply = null;
     const g3 = __T.clone(__T.g);
     UD.engine.startRound(g3);                      /* 下一局：換一副牌 */
@@ -206,7 +222,7 @@ try {
   /* ── 十一、同一局裡，遲到的那一列帶的舊手牌不准蓋回去 ──
      （不然出掉的牌會被加回手上，那是另一種「牌憑空出現」） */
   await b.eval(`
-    UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false;
+    __T.flush();
     const g4 = __T.clone(__T.g3);
     let guard = 0;
     while(g4.phase === "bid" && guard++ < 30){ const s = g4.turn; UD.engine.applyBid(g4, s, UD.engine.aiBid(g4, s)); }
@@ -226,24 +242,25 @@ try {
   /* ── 十二、對帳：張數對不上就自己去抓，而且那一趟不准被背景那道門丟掉 ── */
   await new Promise((r) => setTimeout(r, 900));    /* 等對帳的退避過去 */
   await b.eval(`
-    UD.__t.NET.tail = null; UD.__t.NET.busy = false;
+    __T.flush();
     __T.reply = null;
     UD.G.hands[UD.mySeat()].pop();     /* 不管從哪條路歪掉，長出來都是這個形狀：張數對不上 */
     UD.__t.NET.queued = 5;             /* 通道塞住：BG 那道門本來會把這趟 state 丟掉 */
+    UD.__t.NET.urgent = 1;             /* 也有玩家的動作排著：「讓路」那道門本來也會把它跳過 */
     __T.calls.length = 0;
     UD.__t.applyRow(__T.row(__T.g4, 60));
     return 1`);
   await new Promise((r) => setTimeout(r, 150));
   ok(await b.eval<boolean>(`return __T.calls.indexOf("state") >= 0`),
     "手牌張數對不上，卻沒有去把真的那一份抓回來（或那一趟被 BG 那道門丟掉了）");
-  await b.eval(`UD.__t.NET.queued = 0; UD.__t.NET.tail = null; return 1`);
+  await b.eval(`__T.flush(); return 1`);
 
   /* ── 十三、一趟永遠不回，不能把整條隊伍卡死 ──
      api() 是排隊的：fetch 掛著不動（手機切網路）或 getSession 搶不到鎖，後面所有動作全卡在它後面，
      整桌就是「牌亮著卻點不動、一輪結束不會走」。時間到要當它失敗：busy 放掉、出牌那手退回。
      這一段走真的 call()（把假伺服器拿掉），伺服器換成掛著不回的 fetch。 */
   await b.eval(`
-    UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false;
+    __T.flush();
     __T.savedCall = window.__call; window.__call = null;      /* 走真的 call() */
     __T.savedFetch = window.fetch;
     UD.__t.NET.tmoCall = 400; UD.__t.NET.tmoTok = 400;
@@ -272,7 +289,7 @@ try {
   await b.eval(`UD.__t.NET.tmoTok = 300; return 1`);
   await new Promise((r) => setTimeout(r, 100));
   await b.eval(`window.fetch = __T.savedFetch; window.__call = __T.savedCall; UD.__t.NET.sb = null;
-    UD.__t.NET.tmoCall = 12000; UD.__t.NET.tmoTok = 6000; UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false; return 1`);
+    UD.__t.NET.tmoCall = 12000; UD.__t.NET.tmoTok = 6000; __T.flush(); UD.__t.NET.err = ""; return 1`);
 
   /* ── 十四、敲的人不在了，別人要補敲 ──
      只有「在座第一位還在線的真人」負責敲 tick／next。他手機鎖了、分頁凍住，他的 seen 還新鮮，
@@ -283,7 +300,7 @@ try {
     const r = __T.row(__T.g4, 80);
     r.seats[0] = {name:"別人", kind:"human", pid:"other", av:null};       /* 他排在我前面，他是 ticker */
     r.seats[1] = {name:"我", kind:"human", pid:"me", av:null};
-    r.phase = "trickend"; r.trick = [];
+    __T.trickEnd(r, __T.g4);
     r.seen = {other:Date.now(), me:Date.now()};
     UD.__t.applyRow(r);
     UD.G.at = Date.now() - 1000;                                          /* 才停 1 秒：不該補 */
@@ -297,6 +314,8 @@ try {
   await b.eval(`UD.G.phase = "roundend"; UD.G.at = Date.now() - 60000; __T.calls.length = 0; return 1`);
   await new Promise((r) => setTimeout(r, 900));
   ok(await b.eval<boolean>(`return __T.calls.indexOf("next") >= 0`), "一局打完 ticker 不在，其他人卻沒有補敲 next——這就是「一輪結束卡著不動」");
+  ok(await b.eval<boolean>(`return !!__T.args.next && __T.args.next.ri === UD.G.ri`),
+    "補敲 next 沒帶局數——好幾個人同時開下一局，伺服器分不出那一局開過了沒（兩副牌）");
   await b.eval(`UD.G.at = Date.now(); return 1`);
 
   /* ── 十五、即時那條線斷了要知道，接回來要補問 ──
@@ -307,7 +326,7 @@ try {
   const states = () => b.eval<number>(`return __T.calls.filter(function(a){ return a === "state"; }).length`);
   await b.eval(`
     __T.reply = {ok:true};
-    UD.__t.NET.tail = null; UD.__t.NET.queued = 0; UD.__t.NET.busy = false;
+    __T.flush();
     const r = __T.row(__T.g, 100); r.seen = {me:Date.now()};
     UD.__t.applyRow(r, __T.clone(__T.g.hands[0]));
     __T.subs = []; __T.removed = 0;
@@ -328,7 +347,7 @@ try {
   await b.eval(`__T.calls.length = 0; UD.__t.NET.queued = 1; __T.subs[0]("SUBSCRIBED"); return 1`);
   await new Promise((r) => setTimeout(r, 150));
   ok(await states() === 1, `重新接上之後沒有補問狀態（state ${await states()} 次）——漏掉的那段永遠補不回來`);
-  await b.eval(`UD.__t.NET.queued = 0; __T.calls.length = 0; return 1`);
+  await b.eval(`__T.flush(); __T.calls.length = 0; return 1`);
   await new Promise((r) => setTimeout(r, 3500));
   ok(await states() === 0, `接上之後還在 2 秒一次地問（${await states()} 次）——線是好的就該回到 10 秒`);
   /* 又斷了 */
@@ -340,6 +359,237 @@ try {
     return UD.__t.NET.rt + "/" + __T.removed`);
   ok(rt === "SUBSCRIBED/1", `舊訂閱拆掉時的 CLOSED 蓋到新的那條上了（${rt}）`);
   await b.eval(`UD.__t.NET.sb = null; UD.__t.NET.chan = null; UD.__t.NET.rt = ""; return 1`);
+
+  /* ════ 以下是 plan 0006（2026-10-18）：健檢在真頁面上重現的那幾條，一條一段 ════ */
+  /* 走真的 call()：伺服器換成測試給的 fetch（回 JSON 或掛著），token 由假的 session 給 */
+  await b.eval(`
+    __T.real = function(fetchImpl){
+      __T.flush();
+      UD.__t.NET.err = ""; UD.__t.NET.bgFail = 0;
+      UD.__t.NET.skew = 0; UD.__t.NET.skewRtt = Infinity; UD.__t.NET.skewAt = 0;
+      if(!__T.savedCall2) __T.savedCall2 = window.__call;
+      if(!__T.savedFetch2) __T.savedFetch2 = window.fetch;
+      window.__call = null;
+      UD.__t.NET.sb = {auth:{getSession:function(){ return Promise.resolve({data:{session:{access_token:"t", expires_at:Math.floor(Date.now()/1000) + 3600}}}); }}};
+      __T.sent = [];
+      window.fetch = function(url, o){ const body = JSON.parse(o.body); __T.sent.push(body.action); return fetchImpl(body, o); };
+    };
+    __T.fake = function(){
+      window.__call = __T.savedCall2; window.fetch = __T.savedFetch2; UD.__t.NET.sb = null;
+      __T.flush();
+      UD.__t.NET.err = ""; UD.__t.NET.bgFail = 0; UD.__t.NET.skew = 0; UD.__t.NET.skewRtt = Infinity;
+    };
+    __T.json = function(d, status){ return Promise.resolve(new Response(JSON.stringify(d), {status:status || 200, headers:{"content-type":"application/json"}})); };
+    __T.hang = function(o){ return new Promise(function(_, rej){ o.signal.addEventListener("abort", function(){ rej(new DOMException("aborted", "AbortError")); }); }); };
+    /* 叫墩階段、輪到我（0 號）；sim 為真就是同時叫墩 */
+    __T.bidTable = function(rev, sim){
+      const g = __T.clone(__T.g3);
+      g.phase = "bid"; g.bids = g.bids.map(function(){ return null; }); g.turn = 0; g.starter = 0;
+      g.cfg = Object.assign({}, g.cfg, {bidMode:sim ? "sim" : "seq"});
+      __T.gb = g;
+      UD.__t.applyRow(__T.row(g, rev), __T.clone(g.hands[0]));
+      return g;
+    };
+    __T.bidButtons = function(){ return document.querySelectorAll("#status [data-bid]").length; };
+    return 1`);
+
+  /* ── 十六、排在慢請求後面很久：同一格的列不准抹掉還在路上的那一手 ──
+     以前保險絲 6 秒從按下去那一刻算。前面一趟 state 慢 5 秒、叫墩又等了幾秒，
+     別人報到推來的同 rev 列一到，先演的那一手就被抹掉，人再按一次就被 409（健檢 T4c） */
+  await b.eval(`
+    __T.flush();
+    __T.reply = "pending";
+    UD.__t.applyRow(__T.row(__T.g4, 200), __T.clone(__T.full));
+    UD.doPlay(__T.mine());
+    UD.__t.INBOX.at = Date.now() - 9000;           /* 已經在路上 9 秒了 */
+    const r = __T.row(__T.g4, 200); r.seen = {me:Date.now(), x:Date.now()};
+    UD.__t.applyRow(r);                            /* 別人報到推來的：同一個 rev */
+    return 1`);
+  v = await view();
+  ok(v.trick === 1 && v.hand === full - 1, `還在路上的那一手被同一格的列抹掉了（檯面=${v.trick} 手牌=${v.hand}）`);
+  ok(v.ahead, "那一手還在路上，保險絲卻已經燒斷");
+  await b.eval(`UD.__t.INBOX.settled(); return 1`);
+
+  /* ── 十七、同時叫墩：別人先寫進去的那一列先到，我的骰子要疊回去 ──
+     以前那一列一收，我的骰子收回、叫墩按鈕又冒出來，人只好再按一次 */
+  await b.eval(`
+    __T.flush();
+    __T.reply = "pending";
+    __T.bidTable(300, true);
+    UD.__t.doBid(1);
+    const g = __T.clone(__T.gb); g.bids[2] = -1;    /* 2 號先寫進去了，裡面還沒有我 */
+    UD.__t.applyRow(__T.row(g, 301));
+    return 1`);
+  const s17 = await b.eval<{ mine: unknown; two: unknown; rev: number; btn: number; ahead: boolean }>(
+    `return {mine:UD.G.bids[0], two:UD.G.bids[2], rev:UD.G.rev, btn:__T.bidButtons(), ahead:UD.__t.INBOX.isAhead()}`);
+  ok(s17.rev === 301 && s17.two === -1, `比較新的那一列沒有被收下（rev=${s17.rev}）`);
+  ok(s17.mine === -1 && s17.btn === 0, `別人的列一到，我的骰子就收回去了（我的=${s17.mine}、按鈕 ${s17.btn} 顆）`);
+  ok(s17.ahead, "疊回去之後沒有繼續等回話");
+  await b.eval(`const g = __T.clone(__T.gb); g.bids[2] = -1; g.bids[0] = -1;
+    UD.__t.applyRow(__T.row(g, 302)); return 1`);       /* 我的那一手寫進去了 */
+  ok(!(await b.eval<boolean>(`return UD.__t.INBOX.isAhead() || !!UD.__t.INBOX.pend`)), "我那一手寫進去了，記號卻還在");
+
+  /* ── 十八、房主不在線：叫墩按鈕照樣要在 ──
+     09-09 第一版是房主在自己手機上跑引擎，那時房主不在牌局就真的停了。引擎搬到伺服器以後
+     那道門只剩把按鈕收掉：房主鎖屏 30 秒，其他人全部叫不了墩（健檢 T1） */
+  await b.eval(`
+    __T.reply = {ok:true};
+    const g = __T.bidTable(400, false);
+    const r = __T.row(g, 401);
+    r.seats[1] = {name:"房主", kind:"human", pid:"host", av:null};
+    r.host_pid = "host"; r.seen = {me:Date.now(), host:Date.now() - 60000};
+    UD.__t.applyRow(r, __T.clone(g.hands[0]));
+    return 1`);
+  ok(await b.eval<number>(`return __T.bidButtons()`) > 0, "房主離線，輪到我叫墩卻沒有按鈕（「房主已離線」那道門還在）");
+
+  /* ── 十九、背景那一趟斷一次不算數；就算真的斷線了，按鈕也不准收 ── */
+  /* 結果在那一趟的 promise 裡當場讀：心跳 10 秒一次，隔幾百毫秒再看的話偶爾會被它多算一次 */
+  const e1 = await b.eval<{ err: string; btn: number }>(`
+    __T.real(function(){ return Promise.reject(new TypeError("Failed to fetch")); });
+    return UD.__t.api("state", {code:"TEST"}).then(function(){ return {err:UD.__t.NET.err, btn:__T.bidButtons()}; })`);
+  ok(!e1.err, `心跳斷一次就掛紅字了（${e1.err}）`);
+  ok(e1.btn > 0, "心跳斷一次，叫墩按鈕就不見了");
+  const e2 = await b.eval<{ err: string; btn: number }>(`
+    return UD.__t.api("state", {code:"TEST"}).then(function(){ return {err:UD.__t.NET.err, btn:__T.bidButtons()}; })`);
+  ok(!!e2.err, "連斷兩次還是一聲不吭——真的斷線了要讓人知道");
+  ok(e2.btn > 0, "說了連不上，順手把叫墩按鈕收掉了（錯誤只該換掉那一句話）");
+
+  /* ── 二十、玩家的動作插隊：背景那一趟掛著，叫墩照樣馬上送出去 ── */
+  await b.eval(`
+    __T.real(function(body, o){
+      if(body.action === "state") return __T.hang(o);
+      return __T.json({ok:true, pid:"me", room:__T.row(__T.gb, 450), hand:__T.clone(__T.gb.hands[0]), now:Date.now()});
+    });
+    UD.__t.NET.tmoCall = 3000;
+    __T.bidTable(440, false);
+    UD.__t.api("state", {code:"TEST"});              /* 背景那一趟：掛著 */
+    __T.t20 = Date.now();
+    return 1`);
+  await new Promise((r) => setTimeout(r, 50));
+  await b.eval(`UD.__t.doBid(0); return 1`);
+  await new Promise((r) => setTimeout(r, 300));
+  const s20 = await b.eval<{ sent: string[]; err: string; rev: number }>(
+    `return {sent:__T.sent.slice(), err:UD.__t.NET.err, rev:UD.G.rev}`);
+  ok(s20.sent.indexOf("bid") >= 0, `叫墩排在掛著的背景呼叫後面，300ms 還沒送出去（送了：${s20.sent.join(",")}）`);
+  ok(s20.rev === 450, `叫墩送出去了，回來的那一列卻沒收（rev=${s20.rev}）`);
+  ok(!s20.err, `背景那一趟讓路被當成連線錯誤（${s20.err}）`);
+  /* 同一個 task 裡：背景那一趟剛排進去、還沒開跑（沒有東西可以放掉），玩家就按下去了。
+     輪到它時要跳過，不然叫墩排在它後面，等它掛到逾時 */
+  const s20b = await b.eval<{ sent: string[] }>(`
+    __T.real(function(body, o){
+      if(body.action === "state") return __T.hang(o);
+      return __T.json({ok:true, pid:"me", room:__T.row(__T.gb, 470), hand:__T.clone(__T.gb.hands[0]), now:Date.now()});
+    });
+    __T.bidTable(465, false);
+    UD.__t.api("state", {code:"TEST"});
+    UD.__t.doBid(0);
+    return new Promise(function(r){ setTimeout(function(){ r({sent:__T.sent.slice()}); }, 300); })`);
+  ok(s20b.sent.indexOf("bid") >= 0 && s20b.sent.indexOf("state") < 0,
+    `還沒開跑的背景呼叫沒有讓路，叫墩排在它後面（送了：${s20b.sent.join(",")}）`);
+  /* 被放掉的那一趟不算一次斷線：前一趟心跳剛斷過一次，這時玩家按下去把背景那趟放掉——
+     不准因此湊滿兩次，在玩家那一趟回來之前閃一下「連不上」（回來之後會被蓋掉，所以要在途中看） */
+  const s20c = await b.eval<{ err: string }>(`
+    __T.real(function(body, o){
+      if(body.action === "state") return __T.hang(o);
+      return new Promise(function(r){ setTimeout(r, 400); }).then(function(){
+        return __T.json({ok:true, pid:"me", room:__T.row(__T.gb, 480), hand:__T.clone(__T.gb.hands[0]), now:Date.now()});
+      });
+    });
+    __T.bidTable(475, false);
+    UD.__t.NET.bgFail = 1;
+    UD.__t.api("state", {code:"TEST"});
+    return new Promise(function(r){ setTimeout(r, 50); }).then(function(){
+      UD.__t.doBid(0);
+      return new Promise(function(r){ setTimeout(function(){ r({err:UD.__t.NET.err}); }, 150); });
+    })`);
+  ok(!s20c.err, `背景那一趟讓路被算成一次斷線，湊滿兩次閃出「${s20c.err}」`);
+  await new Promise((r) => setTimeout(r, 400));
+  await b.eval(`UD.__t.NET.tmoCall = 12000; return 1`);
+
+  /* ── 二十一、被打回票時帶回來的那一列照收：退回的是真相，不是按之前那一格 ── */
+  await b.eval(`
+    __T.real(function(body){
+      const g = __T.clone(__T.g4); g.turn = 2;           /* 伺服器那邊：早就不是我的回合了 */
+      return __T.json({error:"這張牌不能出", pid:"me", room:__T.row(g, 520), hand:__T.clone(__T.full), now:Date.now()}, 409);
+    });
+    UD.__t.applyRow(__T.row(__T.g4, 510), __T.clone(__T.full));
+    UD.doPlay(__T.mine());
+    return 1`);
+  await new Promise((r) => setTimeout(r, 300));
+  const s21 = await b.eval<{ rev: number; turn: number; trick: number; ahead: boolean; err: string }>(
+    `return {rev:UD.G.rev, turn:UD.G.turn, trick:UD.G.trick.length, ahead:UD.__t.INBOX.isAhead(), err:UD.__t.NET.err}`);
+  ok(s21.rev === 520 && s21.turn === 2, `409 帶回來的那一列沒收，畫面退回按之前那一格（rev=${s21.rev} turn=${s21.turn}）`);
+  ok(s21.trick === 0 && !s21.ahead, "被打回票了，那張牌還留在檯面上");
+  ok(!!s21.err, "被打回票卻一聲不吭");
+
+  /* ── 二十二、手機時鐘快 40 秒：不會覺得全桌都離線 ── */
+  await b.eval(`
+    __T.real(function(){
+      const r = __T.row(__T.g4, 600); r.seen = {me:Date.now() - 40000, x:Date.now() - 40000};
+      return __T.json({ok:true, pid:"me", room:r, hand:__T.clone(__T.full), now:Date.now() - 40000});
+    });
+    return 1`);
+  ok(await b.eval<boolean>(`return UD.__t.api("state", {code:"TEST"}, true).then(function(){ return UD.__t.isLive("x") && UD.__t.isLive("me"); })`),
+    "伺服器時鐘慢 40 秒（＝手機快 40 秒），剛報到的人被當成離線了");
+  await b.eval(`__T.fake(); return 1`);
+
+  /* ── 二十三、補敲錯開：第二個補敲的人再晚 1.5 秒 ── */
+  await b.eval(`
+    __T.reply = {ok:true};
+    const r = __T.row(__T.g4, 700);
+    r.seats[0] = {name:"ticker", kind:"human", pid:"other", av:null};
+    r.seats[1] = {name:"先補", kind:"human", pid:"x", av:null};
+    r.seats[2] = {name:"我", kind:"human", pid:"me", av:null};
+    __T.trickEnd(r, __T.g4);
+    r.seen = {other:Date.now(), x:Date.now(), me:Date.now()};
+    UD.__t.applyRow(r);
+    __T.due = UD.trickGap();
+    return UD.mySeat()`).then((s) => ok(s === 2, `座位排錯了（我在 ${s}）`));
+  const due = await b.eval<number>(`return __T.due`);
+  if (due > 0) {
+    await b.eval(`UD.G.at = Date.now() - (__T.due + 4000 + 600); __T.calls.length = 0; return 1`);
+    await new Promise((r) => setTimeout(r, 900));
+    ok(await b.eval<boolean>(`return __T.calls.indexOf("tick") < 0`), "排第二個補敲的人跟第一個同一刻就敲了（沒有錯開）");
+    await b.eval(`UD.G.at = Date.now() - (__T.due + 4000 + 1500 + 600); __T.calls.length = 0; return 1`);
+    await new Promise((r) => setTimeout(r, 900));
+    ok(await b.eval<boolean>(`return __T.calls.indexOf("tick") >= 0`), "排第二個補敲的人等過了自己那一格還是沒敲");
+  } else ok(false, "trickGap 量出來不是正數，補敲錯開這段沒驗");
+  await b.eval(`UD.G.at = Date.now(); return 1`);
+
+  /* ── 二十四、離開之後，舊頻道進來的列不准把我拉回去 ── */
+  await b.eval(`
+    __T.handlers = [];
+    UD.__t.NET.sb = {
+      channel:function(){
+        const c = {on:function(type, f, cb){ __T.handlers.push({type:type, cb:cb, ch:c}); return c; }, send:function(){},
+                   subscribe:function(){ return c; }};
+        return c;
+      },
+      removeChannel:function(){}
+    };
+    UD.__t.subscribe("TEST");
+    const old = __T.handlers.filter(function(h){ return h.type === "postgres_changes"; })[0];
+    UD.__t.subscribe("OTHR");
+    const r = __T.row(__T.g4, 900);                 /* 舊房 TEST 的一列，rev 很新 */
+    old.cb({new:r});
+    const code = UD.__t.NET.code;
+    UD.__t.NET.sb = null; UD.__t.NET.chan = null; UD.__t.NET.rt = "";
+    return code`).then((c) => ok(c === "OTHR", `已經換到別桌了，舊頻道的列把我拉回 ${c}`));
+
+  /* ── 二十五、舊伺服器搶頁輸了回 200＋一列沒有我那一手的：不准把那一手疊回去 ──
+     新伺服器的回話一定含著那一手（不行的話是 409），走不到這裡；但上線那段時間新網頁會配到舊伺服器。
+     疊回去的話骰子擺在桌上、按鈕收起來，伺服器上卻沒有——等下一列推來才突然消失，人以為自己叫過了。 */
+  const s25 = await b.eval<{ mine: unknown; btn: number }>(`
+    __T.real(function(){
+      const g = __T.clone(__T.gb); g.bids[1] = -1;    /* 1 號先寫進去的那一列：裡面沒有我的骰子 */
+      return __T.json({ok:true, pid:"me", room:__T.row(g, 1002), hand:__T.clone(g.hands[0])});
+    });
+    __T.bidTable(1000, true);             /* rev 要比二十四留下的 900 新：整支的 rev 從上到下只增不減 */
+    UD.__t.doBid(2);
+    return new Promise(function(r){ setTimeout(function(){ r({mine:UD.G.bids[0], btn:__T.bidButtons()}); }, 300); })`);
+  ok((s25.mine === null || s25.mine === undefined) && s25.btn > 0,
+    `舊伺服器回 200 卻沒寫進去，我的骰子還擺在桌上（我的=${s25.mine}、按鈕 ${s25.btn} 顆）——人會以為叫過了`);
+  await b.eval(`__T.fake(); return 1`);
 } catch (e) {
   fails.push("測試中途爆掉：" + (e as Error).message);
 } finally {
@@ -349,6 +599,7 @@ try {
 const ms = Math.round(performance.now() - t0);
 console.log("11 Up & Down — 連線那一段的測試（無頭 Chrome ＋ 假伺服器）");
 console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點、手牌對帳、逾時、補敲、斷線補問");
+console.log("  plan 0006：飛行中的那一手、同時叫墩重放、房主離線照樣有按鈕、背景斷一次不嚷、玩家動作插隊、409 帶回房間、手機時鐘快、補敲錯開、舊頻道的列、舊伺服器的假成功");
 console.log(`  ${checks} 項，${ms} 毫秒`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);

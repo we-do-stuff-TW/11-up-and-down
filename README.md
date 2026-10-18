@@ -67,10 +67,12 @@ deno run --allow-read scripts/engine_test.ts     # 牌局引擎：各種規則�
 deno run --allow-read scripts/rules_test.ts      # 兩份規則對照：畫面 vs 伺服器
 deno run -A          scripts/ui_test.ts         # 出牌的入口：無頭 Chrome 開真的牌桌
 deno run -A          scripts/net_test.ts        # 連線那一段：假伺服器重演各種時序
+deno run -A          scripts/idle_test.ts       # 畫面沒變就不動：立體不叫醒 WebGL、平面細條不重演；真的變了照畫
 deno run -A          scripts/end_test.ts        # 一場牌的兩個出口：收桌、再來一局、離開遊戲
 deno run -A          scripts/gag_test.ts        # 收桌頒獎（Thomas 爬講台）：真牌桌上停格截圖、關頁會停、沒捲軸（DIM=3 立體、PHONE=1 手機寬）
 deno run -A          scripts/i18n_scan.ts      # 英文版有沒有殘留中文（加 zh 反過來掃；DIM=3 走立體；SHOT=1 順手截圖）
 deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗證
+deno run -A          scripts/server_test.ts     # 伺服器那一步：真的 index.ts＋真的 Postgres（PGlite），多人同時按的撞法
 ```
 
 前兩支**不改也不需要任何產品程式配合**：它們照區段標記把「純計算」那一段從
@@ -94,8 +96,25 @@ deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗
   「再來一局」直接發牌不經過房間而且分數歸零、
   設定頁最下面的「離開遊戲」要按兩下才走、走完回到大廳而且桌子退回石板灰。`SHOT=1` 跑會順手截圖。
 - **`net_test.ts`** 重演那些真的網路重現不了的時序：樂觀先走、遲到的同一格（realtime 慢一秒的那條）、
-  伺服器蓋章不重演動畫、過期的那一列、六秒保險絲、送不出去要退回、對手廣播、有人亂喊。
+  伺服器蓋章不重演動畫、過期的那一列、六秒保險絲、送不出去要退回、對手廣播、有人亂喊；
+  plan 0006 加的：飛行中的那一手不被同一格的列抹掉、同時叫墩別人先寫進去時把我的骰子疊回去、房主離線與背景斷一次
+  按鈕都還在、玩家的動作插隊到背景呼叫前面、409 帶回來的房間照收、手機時鐘快 40 秒照樣看得到誰在線、補敲錯開、
+  舊頻道進來的列不收。
   伺服器換成假的（接縫 `window.__call`），每一列什麼時候到、內容是什麼都由測試決定。
+- **`server_test.ts`** 是伺服器 `index.ts` 第一支測試（以前一條都沒有）。不抄伺服器：import 本體，只換兩個接縫
+  （supabase-js 換成 `scripts/_fakesb.ts`、登入換成「jwt 就是使用者」），底下是 PGlite——真的 PostgreSQL 16 編成 WASM、
+  跑在記憶體裡，`supabase/migrations/0004`–`0007` 直接跑 repo 裡的檔。重演多人同時按的撞法：鎖屏補敲不准讓人少一張牌、
+  兩發 next 手牌與王牌要是同一副、六人同時叫墩每個拿到 200 的數字都要在桌上；另外打完一整場、409 帶回真相、
+  報到不吃別人的、房主牌局中離開、別人叫不動那三支函式。約 40 秒。
+  `BEFORE=1` 拿 0007 之前的伺服器（`git show 67a5c79`）跑同一套劇本——那是「改之前會紅」的證據，紅是對的；
+  `ONLY=5,6` 只跑那幾段、`SEED=N` 重現同一串延遲。**第一次跑要網路**（從 npm 抓 PGlite，之後走 Deno 快取）。
+  抓不到的：PostgREST 本身、真的並行鎖等待（PGlite 一次跑一句；請求之間照樣交錯）。
+- **`idle_test.ts`** 數「畫了幾格」：同一列進來好幾次（心跳列）立體一格都不畫、高檔的靜止精算停在 24 格、
+  桌布轉完色不會再轉一次（幽靈換色）；反過來，只有補間（而且那一格卡得比整段補間還久）、出牌、只有手牌壓暗、
+  換王牌、換牌面、量到太慢自己降檔、動畫減量下的每一種變化都一定要畫——每段停手後整個場景比一次指紋，
+  「最後畫出去的那一格」必須就是「場景現在的樣子」。約三分鐘（高檔停手要疊滿 24 格精算，軟體 WebGL 慢）。
+  平面那段數 `spread-in`：心跳與出牌不重演、發牌與換局照演、被打斷的接著演。
+  跟 `net_test` 一樣用假伺服器，另外多一個接縫看得到立體那層的場景（`UD.__3d`）；壁爐的火在測試裡停掉。
 - **`i18n_scan.ts`** 不是斷言式的測試，是掃描：開 `?lang=en` 把 12 站走一遍（大廳、設定、帳號、規則、
   開房、規則設定、叫墩、出牌、來回切語言、牌局中的設定、收桌），每一站掃看得到的文字節點與
   `aria-label`／`placeholder`／`title`／`alt`，還有中文就印出來是哪一段字、掛在哪個元素上——那就是字典漏掉的 key。

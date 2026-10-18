@@ -350,6 +350,10 @@ body.is3d .av{width:18px;height:18px}
   background:var(--ink-3);opacity:.42;
   animation:spread-in .34s var(--e-out) both;
 }
+/* 演完的細條：座位區每一列都可能整塊 innerHTML 重寫，節點是新的，CSS 動畫就從 0 再長一次——
+   以前每出一張牌全桌細條一起重演（6 人第 10 局約 58 條，量到兩列出牌列 117 次 spread-in）。
+   演過就由 spreadHold() 掛 .s 不演；還在演的那幾條給負的 animation-delay 接著演。SPREAD_MS 340 跟上面的 .34s 是同一個數 */
+.spread i.s{animation:none}
 @keyframes spread-in{from{height:0;opacity:0}to{height:16px;opacity:.42}}
 
 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ink-3);opacity:.4;flex:none}
@@ -2001,7 +2005,6 @@ window.I18N_EN = {
 "看座位":"See the seats",
 "還沒開局":"No game yet",
 "回大廳":"Back to lobby",
-"房主已離線":"The host is offline",
 "全桌同時叫，選好先蓋著":"Everyone bids at once, face down",
 "你要叫幾墩？":"How many tricks?",
 "不能叫":"can't bid",
@@ -3851,7 +3854,22 @@ const MY = {
   pid:null,
   name:(function(){ try{ return localStorage.getItem("ud.name") || ""; }catch(e){ return ""; } })()
 };
-const NET = {code:null, chan:null, rt:"", sb:null, state:"ok", err:"", busy:false, queued:0, tail:null};
+const NET = {code:null, chan:null, rt:"", sb:null, state:"ok", err:"", busy:false, queued:0, tail:null,
+  urgent:0,     /* 排著的玩家動作有幾個（見 api：背景呼叫要讓路） */
+  ac:null,      /* 正在跑的那一趟的 AbortController（背景那趟會被玩家的動作搶掉） */
+  bgFail:0,     /* 背景呼叫連續斷了幾次（斷一次不算數，見 call 的 catch） */
+  skew:0, skewRtt:Infinity, skewAt:0};   /* 伺服器時鐘減手機時鐘（見 clockSample） */
+/* ⚠️ 誰在線是拿 seen（伺服器的時鐘寫的）比「現在」——「現在」也要是伺服器的時鐘。
+   以前用手機自己的 Date.now()：時鐘快 30 秒的那台覺得全桌都離線，叫不了墩、自己的回合也每 420ms 補敲
+   （2026-10-17 健檢 T8）。每個回應都帶伺服器的 now，取來回最快的那一趟算時差：
+   一趟 3 秒的回應，伺服器那一刻落在這 3 秒裡的哪裡都有可能，來回越短誤差越小。一分鐘後重新取樣。 */
+function clockSample(srv, sent, got){
+  const rtt = got - sent;
+  if(rtt <= NET.skewRtt || got - NET.skewAt > 60000){
+    NET.skew = srv - (sent + rtt / 2); NET.skewRtt = rtt; NET.skewAt = got;
+  }
+}
+const serverNow = () => Date.now() + NET.skew;
 /* 登入用的 access token 存一份在記憶體裡，快過期了才回去換（見 accessToken） */
 const TOK = {v:null, exp:0};
 /* 關掉分頁不等於離開房間——座位、手牌、分數都還在伺服器上，只是三十秒後換 AI 代打。
@@ -3920,7 +3938,7 @@ const mySeat = () => {
 const amHost = () => MODE === "solo" || (G && G.host === MY.pid);
 function isLive(pid){
   if(!pid || !G || !G.seen) return false;
-  return Date.now() - (G.seen[pid] || 0) < 30000;
+  return serverNow() - (G.seen[pid] || 0) < 30000;   /* 兩邊同一支錶，見 clockSample */
 }
 const liveCids = () => {
   const s = {};
@@ -3980,8 +3998,20 @@ setInterval(function(){
    分頁被瀏覽器凍住、或那一趟請求卡在半路——他自己的 seen 還新鮮，別人都乖乖等他。
    一局打完正是大家低頭看手機的時候，所以最常卡在「一輪結束就不動了」（2026-09-22 Francis 的截圖）。
    補救：這一格停得比該停的久超過 BACKUP_GRACE，其他還在線的真人就補敲一發。
-   伺服器有樂觀鎖（rev）與 phase 檢查，多敲只會落空，不會多走一步。 */
-const BACKUP_GRACE = 4000;
+   ⚠️「多敲只會落空」這句在 0007 之前只對房間那一列成立：手牌寫在伺服器的鎖外，
+   好幾發同時替鎖屏的人出牌，他會少一張牌、那局最後一墩整桌卡死（2026-10-17 健檢，6 人 67%）。
+   現在伺服器的一步是一個交易，多敲真的只會落空；但五台在同一個 420ms 裡一起敲仍然是白做工，
+   所以照座位順序錯開：第一個補敲的人晚 BACKUP_GRACE，下一個再晚 BACKUP_STEP，以此類推。 */
+const BACKUP_GRACE = 4000, BACKUP_STEP = 1500;
+/* 我是第幾個補敲的：ticker 以外還在線的真人，照座位順序 0、1、2…… */
+function backupRank(ticker, me){
+  let k = 0;
+  for(let i=0;i<G.seats.length;i++){
+    if(i === me) return k;
+    if(i !== ticker && G.seats[i].kind === "human" && isLive(G.seats[i].cid)) k++;
+  }
+  return k;
+}
 setInterval(function(){
   /* 通道上有東西（在跑的、排隊的）就等下一輪。420ms 後還是會再來一次，
      這裡搶進去只會多一個沒必要的呼叫——「next」尤其不能連放兩發 */
@@ -4004,10 +4034,11 @@ setInterval(function(){
     const firstPlay = G.phase === "play" && G.played === 0 && !G.trick.length;
     const due = rounding ? roundGap() : G.phase === "trickend" ? trickGap()
       : firstPlay ? Math.max(SPEED * .9, 2800) : SPEED;
-    if(idle < due + BACKUP_GRACE) return;
+    if(idle < due + BACKUP_GRACE + backupRank(ticker, me) * BACKUP_STEP) return;
     if(TRACE.on) TRACE.log("tick", "backup " + G.phase + " idle=" + idle + " ticker=" + ticker);
   }
-  if(rounding) api("next", {code:NET.code});
+  /* next 帶著「我看到的是第幾局」：好幾個人一起開下一局時，伺服器看到那一局已經開過了就回 idle */
+  if(rounding) api("next", {code:NET.code, ri:G.ri});
   else api("tick", {code:NET.code, speed:SPEED, gap:trickGap()});
 }, 420);
 
@@ -4031,13 +4062,27 @@ setInterval(function(){
    現在改成排隊：玩家的動作一定會送出去，只是可能晚一點輪到（畫面早就先演了）。
    tick 與 state 是背景噪音，有東西在排隊就跳過這一次，反正下一輪馬上又來。 */
 const BG = {tick:1, state:1};
+/* 自動送的、失敗了也不必讓人看到第一次的（見 call 的錯誤處理） */
+const QUIET = {tick:1, state:1, next:1};
 function api(action, args, force){
-  /* force：這一趟不是背景噪音（畫面上的手牌是錯的，不抓回來就一直錯），不讓 BG 那道門擋 */
-  if(!force && BG[action] && (NET.busy || NET.queued)) return Promise.resolve(null);
+  /* force：這一趟不是背景噪音（畫面上的手牌是錯的，不抓回來就一直錯），兩道背景的門都不准擋：
+     這裡的「有人在跑就跳過」，以及下面的「玩家動作排著就跳過」。⚠️ 第二道是 plan 0006 加的，
+     第一版只寫了 BG[action]，強制的對帳 state 被它吃掉——net_test 十二段抓到的。 */
+  const bg = BG[action] && !force;
+  if(bg && (NET.busy || NET.queued)) return Promise.resolve(null);
+  /* ⚠️ 玩家的動作不排在背景呼叫後面。以前它要等前面那一趟（常常是一趟 state）跑完、
+     再等所有排著的強制 state 跑完：前面一趟慢 5 秒，叫墩就晚 5 秒才送出去，
+     而先演的那一手 6 秒後就被抹掉，人再按一次就被 409 打回（2026-10-17 健檢 T4、T4c）。
+     現在：玩家的動作一進隊伍，正在跑的背景那一趟直接放掉（state／tick 本來就隨時可以重來，
+     伺服器那邊真的做了的話 realtime 會推過來），排在它前面還沒跑的背景呼叫輪到時也跳過——
+     玩家那一趟回來本來就帶著整列與手牌（0007 之後）。 */
+  const urgent = !BG[action];
+  if(urgent){ NET.urgent++; if(NET.ac && NET.ac.bg) NET.ac.preempt(); }
   NET.queued++;
   const run = function(){ return call(action, args); };
-  const done = function(d){ NET.queued--; return d; };
-  NET.tail = (NET.tail || Promise.resolve()).then(run, run).then(done, function(){ return done(null); });
+  const go = function(){ return bg && NET.urgent > 0 ? null : run(); };
+  const done = function(d){ NET.queued--; if(urgent) NET.urgent--; return d; };
+  NET.tail = (NET.tail || Promise.resolve()).then(go, go).then(done, function(){ return done(null); });
   return NET.tail;
 }
 /* 一趟最多等多久。api() 是一條隊伍：一趟永遠不回（手機切網路時 fetch 會掛著不動、
@@ -4058,10 +4103,14 @@ async function call(action, args){
   const t0 = Date.now();
   const ac = typeof AbortController === "function" ? new AbortController() : null;
   const timer = ac ? setTimeout(function(){ ac.abort(); }, NET.tmoCall) : 0;
+  if(ac){ ac.bg = !!BG[action]; ac.preempt = function(){ ac.cut = true; ac.abort(); }; }
+  NET.ac = ac;
   try{
     /* Authorization 帶的是「你」，不是 anon key——anon key 誰都有，那不叫身分 */
     const jwt = await withTimeout(accessToken(), NET.tmoTok, "token");
     if(!jwt){ gotoLogin(); return null; }
+    if(ac && ac.cut) return null;            /* 等 token 的時候被玩家的動作搶掉了 */
+    const sent = Date.now();
     const res = await fetch(API, {
       method:"POST",
       headers:{"Content-Type":"application/json", apikey:SB_KEY, Authorization:"Bearer " + jwt},
@@ -4070,24 +4119,33 @@ async function call(action, args){
       signal: ac ? ac.signal : undefined
     });
     const d = await res.json().catch(function(){ return {}; });
+    if(typeof d.now === "number") clockSample(d.now, sent, Date.now());
     if(TRACE.on && action !== "tick") TRACE.log("api", action + " " + res.status + " " + (Date.now() - t0) + "ms" + (d.room ? " rev=" + d.room.rev : "") + (d.error ? " err=" + d.error : ""));
     if(d.pid) MY.pid = d.pid;
     /* 401 有兩個來源：我們自己回的（帶 signin），以及 token 過期時 Supabase 平台
        在函式跑起來之前就擋掉的（回的 body 不是我們寫的）。兩者都是「這張身分不算數」。 */
     if(d.signin || res.status === 401){ gotoLogin(true); return null; }
+    NET.bgFail = 0;                          /* 有回話就是連得上，就算回的是錯 */
     if(d.error){
       /* next 是自動敲的（可能兩個人同時補敲，晚到的那一發會被「這局還沒結束」打回），不必印出來 */
-      if(action !== "tick" && action !== "state" && action !== "next"){ NET.err = TErr(d.error); render(); }
+      if(!QUIET[action]){ NET.err = TErr(d.error); render(); }
+      /* 被打回票時伺服器連同那一刻的房間與手牌一起送回來（0007 之後）：照收，畫面退回真相。
+         只退回「按之前」的話，按之前那一格可能早就是舊的了 */
+      if(d.room) applyAnswer(action, d);
       return null;
     }
     NET.err = "";
-    if(d.room) applyRow(d.room, d.hand);
+    if(d.room) applyAnswer(action, d);
     return d;
   }catch(e){
+    if(ac && ac.cut){ if(TRACE.on) TRACE.log("api~", action + " preempted"); return null; }
     if(TRACE.on) TRACE.log("api!", action + " " + (Date.now() - t0) + "ms " + String(e && e.message));
-    if(action !== "tick" && action !== "next"){ NET.err = T("連不上伺服器，檢查一下網路"); render(); }
+    /* ⚠️ 背景那一趟（心跳、tick、自動開下一局）斷一次不算數，連續斷兩次才說連不上。
+       手機切網路、鎖屏回來的第一趟本來就常常失敗，下一趟幾秒內就來；
+       以前斷一次就把紅字掛上狀態列。玩家自己按的那一趟失敗了照樣馬上說。 */
+    if(!QUIET[action] || ++NET.bgFail >= 2){ NET.err = T("連不上伺服器，檢查一下網路"); render(); }
     return null;
-  }finally{ if(timer) clearTimeout(timer); NET.busy = false; }
+  }finally{ if(timer) clearTimeout(timer); if(NET.ac === ac) NET.ac = null; NET.busy = false; }
 }
 
 /* 畫面可能舊了的時候去問一次伺服器：點了暗的牌、doPlay 說不是我的回合、
@@ -4131,10 +4189,20 @@ const INBOX = {
 
   /* 本機先演了一格。**任何新的樂觀路徑只要呼叫這一支**——
      退路與記號是同一個動作，就不會有人只做了一半。 */
-  ranAhead:function(snap){ this.opt = snap || null; this.at = Date.now(); },
-  isAhead:function(){ return this.at > 0 && Date.now() - this.at < this.TTL; },
-  settled:function(){ this.opt = null; this.at = 0; },   /* 伺服器講話了，預測作廢 */
-  waiting:function(snap){ return this.opt === snap; },   /* 這一手還在等回音嗎 */
+  /* 自己那一手還在路上（送出去了、伺服器還沒回話）：{t:"bid", v} 或 {t:"play", card}。
+     ⚠️ 它在的時候保險絲不燒。以前 6 秒從按下去那一刻算：排在慢請求後面超過 6 秒，
+     別人報到推來的同一個 rev 的列就把先演的骰子抹掉、按鈕又冒出來，再按就被 409 打回（健檢 T4c）。
+     call() 一定會回來（最多 NET.tmoCall），所以這裡只留一個很寬的上限防萬一。
+     比較新的列（別人真的走了一步）照收，收完把這一手疊回去（replayPend）。 */
+  pend:null,
+  PEND_MAX:40000,
+  ranAhead:function(snap, move){ this.opt = snap || null; this.at = Date.now(); this.pend = move || null; },
+  isAhead:function(){
+    if(this.at <= 0) return false;
+    return Date.now() - this.at < (this.pend ? this.PEND_MAX : this.TTL);
+  },
+  settled:function(){ this.opt = null; this.at = 0; this.pend = null; },   /* 伺服器講話了，預測作廢 */
+  waiting:function(move){ return !!move && this.pend === move; },          /* 這一手還在等回音嗎 */
 
   /* 伺服器那一列該不該採用。HTTP 回應與 realtime 推播問的是同一句。 */
   fresher:function(row){
@@ -4165,6 +4233,42 @@ function rollback(s){
   if(i >= 0) G.hands[i] = MYHAND;
   INBOX.settled();
   render();
+}
+/* 這一列是不是「我那一手」自己的回話。是的話收完不疊回去：新伺服器的回話一定已經含著那一手
+   （不行的話是 409，帶的是真相）；舊伺服器搶頁輸了會回 200＋一列沒有那一手的——疊回去等於把
+   沒寫進去的那一手留在畫面上，比讓人再按一次更糟。 */
+let ANSWER = "";
+function applyAnswer(action, d){
+  ANSWER = action;
+  try{ applyRow(d.room, d.hand); }finally{ ANSWER = ""; }
+}
+/* 伺服器對我這一手回話了。成功的話那一列在 call() 裡已經收過；失敗就退回——
+   退回的是 INBOX.opt（最近一次疊上去之前的那一格），不是按下去那一刻的快照：
+   中間收過比較新的列的話，按下去那一刻早就是舊的了 */
+function landed(move, d){
+  if(!INBOX.waiting(move)) return;        /* 已經被比較新的一列講完了 */
+  if(d) INBOX.settled();
+  else rollback(INBOX.opt);
+}
+/* 比較新的一列收下來了，而我那一手還在路上：重新疊上去。
+   同時叫墩最常見——六個人一起按，別人先寫進去的那一列會先到，裡面還沒有我的骰子；
+   不疊回去的話我的骰子收回、按鈕又冒出來，人只好再按一次。
+   疊不上去（已經不是我的回合、那張牌不在手上）就算了：伺服器的回話馬上會到。 */
+function replayPend(move){
+  const s = mySeat();
+  if(s < 0 || !G) return false;
+  const snap = snapshot();
+  let ok = false;
+  if(move.t === "bid" && G.phase === "bid"){
+    if(rules(G.cfg).bidMode === "sim"){
+      if(G.bids[s] === null || G.bids[s] === undefined){ G.bids[s] = -1; ok = true; }
+    }else if(G.turn === s && move.v !== hookBlocked(G, s)) ok = applyBid(G, s, move.v);
+  }else if(move.t === "play" && G.phase === "play" && G.turn === s){
+    applying = true; ok = applyPlay(G, s, move.card); applying = false;
+  }
+  if(ok) INBOX.ranAhead(snap, move);
+  if(TRACE.on) TRACE.log("pend", move.t + (ok ? " replayed" : " noreplay"));
+  return ok;
 }
 /* 伺服器這一列跟畫面上這一格是同一個畫面嗎？（本機已經演過了，它只是來蓋章）
    是的話時間戳要留著，不然每一手的動畫都會在伺服器回話的那一刻從頭再跑一次。 */
@@ -4236,6 +4340,7 @@ function applyRow(row, hand){
   }
   if(TRACE.on && (!G || (G.rev || 0) !== (row.rev || 0) || G.phase !== row.phase || G.turn !== row.turn))
     TRACE.log("row", "rev=" + row.rev + " ph=" + row.phase + " turn=" + row.turn + " trick=" + (row.trick || []).length + (hand ? " +hand" : ""));
+  const pend = INBOX.pend;                 /* 我那一手還在路上的話，收完這一列要疊回去 */
   INBOX.settled();                        /* 伺服器講話了，本機那份預測就作廢 */
 
   let needHand = false;
@@ -4261,6 +4366,7 @@ function applyRow(row, hand){
   G = g; MODE = "net"; NET.code = row.code;
   const s = mySeat();
   if(s >= 0) G.hands[s] = MYHAND;
+  if(pend && ANSWER !== "bid" && ANSWER !== "play") replayPend(pend);
   auditHand();                            /* 張數對不上就去把真的那一份抓回來 */
   /* 只記「我還坐在裡面」的那一桌。被移除、或牌局中把位子交給 AI 之後，
      伺服器回的那一列裡就沒有我了——那一桌不該再問「要不要回去」。 */
@@ -4285,8 +4391,10 @@ function subscribe(code){
   NET.rt = "";
   ch.on("postgres_changes",
         {event:"*", schema:"public", table:"rooms", filter:"code=eq." + code},
-        function(p){ if(p && p.new) applyRow(p.new); })
-    .on("broadcast", {event:"move"}, function(p){ peerMove(p && p.payload); })
+        /* ⚠️ 只收現在這一條的。離開房間時舊頻道要等伺服器回 ok 才真的拆掉，那段時間進來的列
+           以前照收：applyRow 把 MODE 改回 net、NET.code 改回舊房，心跳每 10 秒打舊房（健檢 T7） */
+        function(p){ if(NET.chan === ch && p && p.new) applyRow(p.new); })
+    .on("broadcast", {event:"move"}, function(p){ if(NET.chan === ch) peerMove(p && p.payload); })
     /* 換房、離房之後，舊的那條會被拆掉並回報 CLOSED——那是舊房間的事，不能把現在這條標成斷線 */
     .subscribe(function(st){ if(NET.chan === ch) chanStatus(st); });
 }
@@ -4596,15 +4704,16 @@ function doBid(v){
      真正的數字等全桌都放好了伺服器一起翻開。依序叫的數字本來就攤在桌上，直接演。 */
   if(sim){ G.bids[s] = -1; G.at = Date.now(); }
   else if(!applyBid(G, s, v)) return;
-  INBOX.ranAhead(snap);
+  const move = {t:"bid", v:v};
+  INBOX.ranAhead(snap, move);
   render();
   sendMove({t:"bid", seat:s, v:sim ? -1 : v});
-  api("bid", {code:NET.code, v:v}).then(function(d){ if(!d && INBOX.waiting(snap)) rollback(snap); });
+  api("bid", {code:NET.code, v:v}).then(function(d){ landed(move, d); });
 }
 /* 一局打完就自己接下一局；打完最後一局就收桌 */
 function nextRound(){
   if(!G) return;
-  if(MODE === "net"){ api("next", {code:NET.code}); return; }
+  if(MODE === "net"){ api("next", {code:NET.code, ri:G.ri}); return; }
   if(G.ri + 1 >= G.ladder.length){ G.phase = "over"; G.at = Date.now(); }
   else startRound(G);
   push();
@@ -4634,10 +4743,11 @@ function doPlay(cardId, el){
     el.classList.add("is-leaving");
   }
   if(MODE === "solo"){ push(); return; }
-  INBOX.ranAhead(snap);
+  const move = {t:"play", card:cardId};
+  INBOX.ranAhead(snap, move);
   render();
   sendMove({t:"play", seat:s, card:G.trick[G.trick.length-1].card});
-  api("play", {code:NET.code, card:cardId}).then(function(d){ if(!d && INBOX.waiting(snap)) rollback(snap); });
+  api("play", {code:NET.code, card:cardId}).then(function(d){ landed(move, d); });
 }
 
 /* ================= 畫面 ================= */
@@ -5215,8 +5325,42 @@ function seatHTML(i){
       (MODE === "net" ? '<span class="dot ' + (online ? "on" : "") + '"></span>' : "") +
       seatLabel(i) + seatTag(i) + '</span></div>' +
     '<div class="seat-row">' + dieHTML(bid, i) + bidPips(i) +
-      '<span class="spread">' + Array.from({length:handCount(i)}, () => "<i></i>").join("") +
+      '<span class="spread">' + spreadHTML(i) +
     '</span></div></div>';
+}
+/* 手上還剩幾張的細條：跟 SEEN 同一套「演過就不演」。
+   ⚠️ 座位區是整塊 setHTML：輪到誰、叫墩、贏墩、在不在線任何一個字變了，六個座位一起重寫，
+   細條全是新節點，CSS 的 spread-in 就從 0 再長一次——以前每出一張牌全桌細條重演一遍
+   （2026-10-17 量到：兩列出牌列之後 spread-in 117 次）。這裡只記每條是什麼時候長出來的，
+   真的被重寫了才由 spreadHold() 照出生時間處理新節點：
+     · 新長出來的（發牌、手牌變多）：不動它，照演，跟以前一樣；
+     · 還在 340ms 裡的：給負的 animation-delay，從被打斷的那一刻接著演，不是重頭再長；
+     · 演完的：掛 .s 不演（CSS 那邊 animation:none，終點就是 height 16px／opacity .42，跟演完停住的那一格一樣）。
+   少了一條是從尾巴拿掉，跟以前一樣沒有退場動畫。
+   ⚠️ 狀態不寫進字串：字串裡帶「演完了沒」的話，演完那一刻字串就變了，下一列（連心跳列）
+   會多重寫一次座位區——六顆頭貼、骰子跟著重建，以前沒有這一下。字串照舊只看張數，重寫的時機一格都不變。
+   換局跟 SEEN.bids／keys 一起清（render() 的 freshRound），新的一局整排重新長出來。 */
+const SPREAD_MS = 340;
+let SPREAD = {};
+function spreadHTML(i){
+  const n = handCount(i), now = performance.now();
+  const born = SPREAD[i] || (SPREAD[i] = []);
+  if(born.length > n) born.length = n;
+  for(let k = born.length; k < n; k++) born[k] = now;
+  return "<i></i>".repeat(n);
+}
+/* 座位區剛被 innerHTML 換掉時跑（setHTML 回 true）：同一個工作裡、樣式還沒算之前改掉，
+   演完的那幾條就根本不會開演（也就不會有 animationstart）。 */
+function spreadHold(){
+  const now = performance.now();
+  document.querySelectorAll("#seats .seat").forEach(function(el){
+    const born = SPREAD[el.dataset.seat] || [];
+    el.querySelectorAll(".spread i").forEach(function(b, k){
+      const age = born[k] === undefined ? 0 : Math.round(now - born[k]);
+      if(age >= SPREAD_MS) b.classList.add("s");
+      else if(age > 0) b.style.animationDelay = -age + "ms";
+    });
+  });
 }
 /* 叫幾墩就排幾格墩位，贏一墩就填實一格——骰子說「他答應了幾」，墩位說「走到哪了」。
    空的還剩幾格就是還差幾墩。本來是 9px 的圓點，要對焦才數得清；
@@ -5291,7 +5435,7 @@ function render(){
   renderLadder();
 
   const freshRound = SEEN.round !== G.ri;
-  if(freshRound){ SEEN.round = G.ri; SEEN.bids = {}; SEEN.keys = {}; }
+  if(freshRound){ SEEN.round = G.ri; SEEN.bids = {}; SEEN.keys = {}; SPREAD = {}; }
 
   setHTML($("meta"),
     (MODE === "net" ? '<span class="mi"><span class="k">房號</span><span class="v code">' + NET.code + '</span></span>' : "") +
@@ -5306,7 +5450,7 @@ function render(){
 
   const all = [];
   for(let i=0;i<G.cfg.n;i++) all.push(i);
-  setHTML($("seats"), all.map(seatHTML).join(""));
+  if(setHTML($("seats"), all.map(seatHTML).join(""))) spreadHold();
 
   /* 牌庫疊幾張＝這局用幾副牌，翻出來的王牌算最上面那一張。
      以前固定疊三張，看起來像三副牌 */
@@ -5539,19 +5683,22 @@ function tallyScores(){
 
 function renderStatus(me){
   const el = $("status");
-  if(NET.err){ setHTML(el, '<span class="msg" style="color:var(--bad)">' + NET.err + '</span>'); return; }
+  /* ⚠️ 狀態列是兩半：左邊一句話、右邊一排按鈕（叫墩的骰子、看座位、馬上開始……）。
+     出錯只換掉那一句話，按鈕永遠照畫。以前 NET.err 一來整列換成紅字：背景報到斷一次，
+     叫墩按鈕就消失到下一次心跳成功（最多 10 秒）——輪到你、手機也知道，就是按不到（2026-10-17 健檢 T2）。
+     同一類的還有「房主已離線」那道門（09-09 第一版就有）：那時是房主在自己手機上跑引擎，
+     房主不在牌局就真的停了；引擎搬到伺服器之後誰都推得動牌局，那道門剩下的作用只有把按鈕收掉——
+     房主鎖屏 30 秒，其他人全部叫不了墩（健檢 T1）。拿掉了。 */
+  const put = function(msg, row){
+    setHTML(el, (NET.err ? '<span class="msg" style="color:var(--bad)">' + NET.err + '</span>' : msg) + (row || ""));
+  };
 
   if(G.phase === "lobby"){
     /* 大廳那張空桌也是 phase:"lobby"，但它沒有房號——不要對著沒開的房間報房號 */
-    setHTML(el, NET.code
-      ? '<span class="msg">' + T('房間已開好，房號 <b class="code">%1</b>', NET.code) + '</span>' +
-        '<span class="bidrow"><button class="btn primary" id="btnLobby">看座位</button></span>'
-      : '<span class="msg">還沒開局</span>' +
-        '<span class="bidrow"><button class="btn primary" id="btnLobby">回大廳</button></span>');
-    return;
-  }
-  if(MODE === "net" && !amHost() && !liveCids()[G.host]){
-    setHTML(el, '<span class="msg" style="color:var(--bad)">房主已離線</span>');
+    if(NET.code) put('<span class="msg">' + T('房間已開好，房號 <b class="code">%1</b>', NET.code) + '</span>',
+      '<span class="bidrow"><button class="btn primary" id="btnLobby">看座位</button></span>');
+    else put('<span class="msg">還沒開局</span>',
+      '<span class="bidrow"><button class="btn primary" id="btnLobby">回大廳</button></span>');
     return;
   }
   const who = G.seats[G.turn] ? seatLabel(G.turn) : "";
@@ -5582,25 +5729,25 @@ function renderStatus(me){
             (d === 0 ? T("剛好") : d < 0 ? T("欠 %1", -d) : T("超 %1", d)) + '</i></button>'
           : '<button class="bidbtn" data-bid="' + v + '">' + v + '</button>';
       }
-      setHTML(el, '<span class="msg">' + (sim ? "全桌同時叫，選好先蓋著" : "你要叫幾墩？") + '</span>' +
+      put('<span class="msg">' + (sim ? "全桌同時叫，選好先蓋著" : "你要叫幾墩？") + '</span>',
         '<span class="bidrow"><span class="pill">' + b + '</span></span>');
     }else if(sim){
-      setHTML(el, '<span class="msg">等其他人放骰子…</span>');
-    }else setHTML(el, '<span class="msg"><b>' + who + '</b> 正在放骰子…</span>');
+      put('<span class="msg">等其他人放骰子…</span>');
+    }else put('<span class="msg"><b>' + who + '</b> 正在放骰子…</span>');
     return;
   }
 
   if(G.phase === "play"){
     /* 出牌階段只留一句「輪到誰」。跟牌花色、這局在搶還是在讓，牌桌上本來就看得到：
        不能出的牌會壓暗，叫了幾墩就放在誰面前——再多寫兩行提示反而把畫面弄雜 */
-    if(G.turn === me) setHTML(el, '<span class="msg">' + T('輪到<b>你</b>出牌') + '</span>');
-    else setHTML(el, '<span class="msg"><b>' + who + '</b> 出牌中…</span>');
+    if(G.turn === me) put('<span class="msg">' + T('輪到<b>你</b>出牌') + '</span>');
+    else put('<span class="msg"><b>' + who + '</b> 出牌中…</span>');
     return;
   }
 
   if(G.phase === "trickend"){
     const w = G.trick[trickBest(G)];
-    setHTML(el, '<span class="msg">' +
+    put('<span class="msg">' +
       T('<b>%1</b> 用 %2 贏得這墩', seatLabel(w.p),
         pip(w.card.s) + (isJoker(w.card) ? T("card.jokerSuffix") : " " + rankLabel(w.card.r))) + '</span>');
     return;
@@ -5610,7 +5757,7 @@ function renderStatus(me){
     const more = G.ri + 1 < G.ladder.length;
     /* 那一局誰叫幾、拿幾、幾分，右邊的計分表整場都寫在那裡，狀態列不再重講一次 */
     /* 下一局會自己開始，按鈕只是給想快轉的人。伺服器允許任何在座的人開下一局 */
-    setHTML(el, '<span class="msg">' + T("第 %1 局結束", G.ri+1) + '</span>' +
+    put('<span class="msg">' + T("第 %1 局結束", G.ri+1) + '</span>',
       '<span class="bidrow">' +
         '<span class="autonext" style="--d:' + roundGap() + 'ms"><i></i></span>' +
         '<span class="hint">' +
@@ -5620,7 +5767,7 @@ function renderStatus(me){
     return;
   }
   if(G.phase === "over")
-    setHTML(el, '<span class="msg">牌局結束</span>' +
+    put('<span class="msg">牌局結束</span>',
       '<span class="bidrow"><button class="btn primary" id="btnFinal">最終結果</button></span>');
 }
 
@@ -7244,10 +7391,21 @@ function roomColor(){
 }
 /* 顏色的過場：桌布、背景、霧各自一條，換王牌時一起慢慢轉過去 */
 const fades = [];
+/* ⚠️ 「已經是這個顏色了嗎」要容許誤差，過場收尾也要直接設成目標色（frame() 那段）——兩道都要。
+   2026-10-17 健檢量到的幽靈過場：以前收尾那格是 lerpColors(from, to, 1)，浮點算出來跟 to 差 1e-17，
+   下一列 sync() 用 equals() 一比就判成「顏色不一樣」，又開一段 900ms 的過場，60fps 畫 900ms；
+   靜止之後連著三列各中一次才收斂（量到只有桌布色中，sheen 剛好沒中——是運氣，不是它比較穩）。
+   只修收尾：別條路寫進來的尾差（以後誰在別處直接設色）照樣被 equals 判成不同；
+   只放寬比較：尾差永遠留在桌布上，等下一個拿 equals 比的人踩。
+   1e-6 用的是線性 sRGB 0–1 的量：8 位元輸出在最暗處一階約 3e-4，差三百倍，眼睛分不出來。 */
+const FADE_EPS = 1e-6;
+const sameColor = (a, b) =>
+  Math.abs(a.r - b.r) < FADE_EPS && Math.abs(a.g - b.g) < FADE_EPS && Math.abs(a.b - b.b) < FADE_EPS;
 function fade(col, rgb){
   const to = new THREE.Color().setRGB(rgb[0], rgb[1], rgb[2], THREE.LinearSRGBColorSpace);
-  if(col.equals(to)) return;
+  if(sameColor(col, to)) return;
   for(let i = fades.length - 1; i >= 0; i--) if(fades[i].col === col) fades.splice(i, 1);
+  touch();          /* 動畫減量時是直接換色、不經過 fades——frame() 看不到，sync() 要知道該叫醒 */
   if(UD.REDUCED){ col.copy(to); return; }
   fades.push({col:col, from:col.clone(), to:to, t0:nowMs()});
 }
@@ -7513,17 +7671,21 @@ function jump(target, to){
   for(let i = tweens.length - 1; i >= 0; i--)
     if(tweens[i].target === target) tweens.splice(i, 1);
   for(const k in to) target[k] = to[k];
+  touch();          /* 瞬間到位不經過補間，frame() 看不到它在動：要記一筆，sync() 才會叫醒重畫 */
 }
 /* 由舊到新處理——陣列本來就是插入順序，接力的兩段（queue）一定前段在前。
    以前是倒著走：平常一格 16ms 看不出差別，但一格拖太久（分頁切走、GC、換局那一格著色器在編譯、
    手機卡一下）讓接力的兩段同時到期時，後段先套到終點、前段再把它蓋回自己的終點——
    我的手牌就永遠背面朝上躺在發牌的中繼站，直到下一次 slot 變了才動（2026-09-22 Francis 的截圖）。
-   onEnd 會動這個陣列（kill 收牌、骰子再彈一下），所以走的是複本，動手前先確認那一段還在。 */
+   onEnd 會動這個陣列（kill 收牌、骰子再彈一下），所以走的是複本，動手前先確認那一段還在。
+   回傳「這一格有沒有套到任何一段」——包括這一格剛跑完、已經從清單拿掉的（理由在 frame() 的 stepped 那一行）。 */
 function stepTweens(t){
   const list = tweens.slice();
+  let ran = false;
   for(const w of list){
     if(t < w.t0) continue;
     if(tweens.indexOf(w) < 0) continue;              /* 這一格前面某個 onEnd 把它拿掉了 */
+    ran = true;
     if(!w.from) w.from = snap(w.target, w.to);
     let k = Math.min(1, (t - w.t0) / w.dur);
     const e = w.ease(k);
@@ -7538,6 +7700,7 @@ function stepTweens(t){
       if(w.onEnd) w.onEnd();
     }
   }
+  return ran;
 }
 /* ================= 排位 ================= */
 /* 一切都用極座標排。牌寬 = 1 個世界單位，其餘都用牌寬量。真實牌桌大約是 14 張牌寬，
@@ -8405,16 +8568,22 @@ function buildRoom(r, scene){
   return {g:g, floor:floor, tick:fp.userData.tick, chair:chair, last:0};
 }
 /* 每個座位一張椅子：人數、換座位、直式壓扁都會動到，所以每次 sync() 都擺一遍（便宜） */
+/* ⚠️ 擺之前先比：椅子是直接改位置、沒有補間，真的挪了才 touch()——
+   每次都 touch 的話，每一列（包括只換了 seen 的心跳列）都會叫醒 WebGL，sync() 的閘就白做了。
+   位置是同一組輸入算出來的同一個浮點數，所以直接用 !== 比就夠，不需要誤差。 */
 function placeChairs(){
   if(!S || !S.room || !UD.G) return;
   const n = UD.G.cfg.n, list = S.chairs || (S.chairs = []);
-  while(list.length < n){ const c = S.room.chair(); S.scene.add(c); list.push(c); }
+  while(list.length < n){ const c = S.room.chair(); S.scene.add(c); list.push(c); touch(); }
   list.forEach(function(c, i){
-    c.visible = i < n;
-    if(i >= n) return;
-    const a = ang(i), p = polar(R_CHAIR, a);
+    const vis = i < n;
+    if(c.visible !== vis){ c.visible = vis; touch(); }
+    if(!vis) return;
+    const a = ang(i), p = polar(R_CHAIR, a), ry = a + Math.PI;
+    if(c.position.x === p.x && c.position.y === -TABLE_H && c.position.z === p.z && c.rotation.y === ry) return;
     c.position.set(p.x, -TABLE_H, p.z);
-    c.rotation.y = a + Math.PI;
+    c.rotation.y = ry;
+    touch();
   });
 }
 
@@ -8500,6 +8669,11 @@ function fxDecal(on){
 function fxBuild(){
   if(FX.comp){ FX.comp.dispose(); FX.comp = null; }
   FX.gtao = FX.vig = null;
+  /* ⚠️ 換了管線就要重畫：牌底下那片接觸陰影跟著開關（fxDecal），畫面上那一格是舊管線畫的。
+     設定頁與 UD.fx() 那兩條自己會 dirty = 4，但 fxRender() 量到太慢「自己降檔」那條沒有——
+     以前靠下一列 sync() 無條件 dirty = 4 補畫，sync() 改成沒變不畫之後，那一格就一直停著。
+     放在這裡（唯一的入口），哪條路換管線都一樣。 */
+  if(S) S.dirty = 4;
   if(!FX.mods || FX.tier === "low" || !S || !S.boxW){ fxDecal(true); return; }
   const M = FX.mods;
   const rt = new THREE.WebGLRenderTarget(1, 1, {type:THREE.HalfFloatType, samples:4});
@@ -8719,7 +8893,7 @@ function build(){
           mePlate:[3.15,.50,2.85], portrait:false, tableS:1, diceS:1,
           maxAniso: r.capabilities.getMaxAnisotropy(),
           cards:new Map(), me:0, round:-2, playedN:-1, sweep:null,
-          dirty:6, lampBase:88, atlas:null, backTex:null, mats:new Map(),
+          dirty:6, chg:0, lampBase:88, atlas:null, backTex:null, mats:new Map(),
           backMat:null, edgeMat:null, hover:null, ray:new THREE.Raycaster(),
           ptr:new THREE.Vector2(), minRank:null, jokers:null};
 }
@@ -8786,6 +8960,7 @@ function spawn(key, card, depth, own){
              t:{x:0, y:0, z:0, rx:-Math.PI/2, ry:0, rz:0, flip:0, s:1}, slot:""};
   if(card) mesh.userData.cardId = card.id;
   S.cards.set(key, c);
+  touch();
   return c;
 }
 /* 1＝可以出、或還沒輪到你（誰的回合由狀態列說，牌面不必變髒）；.38＝輪到你但這張不合跟牌花色。
@@ -8794,6 +8969,7 @@ function shade(c, k){
   if(c.shade === k) return;
   c.shade = k;
   c.mesh.material[0].color.setRGB(k, k, k, THREE.LinearSRGBColorSpace);
+  touch();          /* 「輪到你、這張不能出」的壓暗是直接改材質，沒有補間：不記這筆，壓暗要等下一個會動的東西才看得到 */
 }
 function applyCard(c){
   const t = c.t;
@@ -8816,6 +8992,7 @@ function applyCard(c){
 function kill(c, to, dur, o){
   o = o || {};
   S.cards.delete(c.key);
+  touch();          /* 沒給去處（或動畫減量）就是當場從場景拿掉：不經過補間 */
   const end = () => {
     S.scene.remove(c.holder);
     if(c.ownMat) c.mesh.material[0].dispose();
@@ -8844,6 +9021,7 @@ function rebuildAtlas(minRank, jokers){
      整副牌只剩角標、中間一片空白。 */
   if(S.minRank === minRank && S.jokers === jokers && S.artRev === ART.rev) return;
   S.minRank = minRank; S.jokers = jokers; S.artRev = ART.rev;
+  touch();          /* 整副牌的貼圖換了（桌上每張牌的面跟著換）：直接改材質，沒有補間 */
   for(const m of S.mats.values()){ if(m.map) m.map.dispose(); m.dispose(); }
   S.mats.clear();
   if(S.atlas) S.atlas.tex.dispose();
@@ -8998,6 +9176,7 @@ function bidRing(r0, r1, th0, len, segs, col, em, emI){
     new THREE.MeshStandardMaterial({color:col, emissive:em, emissiveIntensity:emI, roughness:.5, metalness:.55}));
   m.rotation.x = -Math.PI/2; m.position.set(0, .003, BID_Z);
   S.scene.add(m);
+  touch();          /* 動畫減量時環是直接長好的（sc = 1，沒有補間） */
   return m;
 }
 /* 刻環：一格一格從遠端十二點鐘順時鐘長出來，最後中央那圈細線 */
@@ -9058,6 +9237,7 @@ function bidThrow(i, v, n, delay, instant){
   });
   B.sum += v;
   B.dice.set(i, d);
+  touch();          /* 不演的那條（instant／重排／動畫減量）骰子是直接擺到位的，frame() 看不出它變了 */
   if(!d.parts.length){ d.land = nowMs(); return d; }                  /* 叫 0：沒有骰子，但流程當它已經落定 */
   if(instant || S.snap || UD.REDUCED){ d.land = nowMs() - BID_STEP * 12; return d; }   /* 不演：直接落定、格子一次亮完 */
   d.at = nowMs() + (delay || 0);   /* 環還沒刻好的話先等著：丟出那一刻才現身 */
@@ -9137,6 +9317,7 @@ function bidRetreat(){
 /* 拆掉環（all：連骰子一起，換局用） */
 function bidDrop(all){
   const B = S.bid; if(!B) return;
+  touch();          /* 環當場從場景拿掉 */
   const gone = o => { S.scene.remove(o.mesh); o.mesh.geometry.dispose(); o.mesh.material.dispose(); jump(o.st, {}); };
   B.seg.forEach(gone); B.outer.forEach(gone); if(B.hubRing) gone(B.hubRing);
   B.seg = []; B.outer = []; B.hubRing = null;
@@ -9260,9 +9441,27 @@ function bidFrame(t){
   return moving;
 }
 
+/* ================= 叫醒重畫：sync() 只有真的動到場景才叫 =================
+   ⚠️ 以前 sync() 結尾無條件 S.dirty = 4。每一列 realtime 都會走到這裡（只換了 seen 的心跳列也是：
+   applyRow → render() → UD.sync3d()），於是低/中檔一列畫 4 格、高檔 4 + 24 格——靜止精算每一列都被打掉重疊。
+   2026-10-17 健檢量到：每 0.3 秒一列「什麼都沒變」的列，高檔 10 秒畫了 582／600 格（靜止時 0）。
+   ADR 0001 的「不動就不畫」在手機上從來沒成立過。
+
+   判斷的是「sync() 這一趟實際改了什麼」，不是「它讀進來的輸入變了沒」。
+   輸入散在別的層：G 的十幾個欄位、mySeat、tap.playable（看的是平面那層的出牌狀態）、handCount、
+   桌色、牌面版號、畫布尺寸……那些層以後加什麼，這一層不會知道，指紋漏一個＝畫面停在舊的一格。
+   出口反而都在這一層、而且只有幾道：spawn／jump／kill／shade／fade／rebuildAtlas／relayout／
+   placeChairs／叫墩的環與骰子。凡是「直接改場景、不經過補間」的寫法都必須經過 touch()；
+   補間、fades、glowCue、flash、bidFrame 本來就會讓 frame() 的 moving 成立，不必記。
+   兩種漏法的代價一樣（停在舊的一格），所以選漏的機會少的那邊。scripts/idle_test.ts 用
+   「最後畫出去的那一格＝場景現在的樣子」整個場景比一次，抓的就是有人繞過 touch() 直接改。
+   frame() 裡也會呼叫到這幾支（收牌的 onEnd、亮格），在那裡記這一筆沒有人看，無害。 */
+function touch(){ if(S) S.chg++; }
+
 function sync(){
   const G = UD.G;
   if(!S || !G || !document.body.classList.contains("is3d")){ if(S) S.snap = false; return; }
+  const chg0 = S.chg;
   const n = G.cfg.n;
   const seat = UD.mySeat();
   S.me = seat < 0 ? 0 : seat;
@@ -9468,13 +9667,17 @@ function sync(){
   bidSync(G, fresh, lastDeal);
 
   S.snap = false;
-  S.dirty = 4;
+  /* 只有這一趟真的動到場景才叫醒（理由在 touch() 上面）。同一個狀態 sync 兩次＝第二次一格都不畫，
+     高檔的靜止精算（FX.accN）也就不會被打回 0。疊在畫布上的 DOM（名牌、手牌按鈕、狀態列的高度）
+     不管有沒有叫醒都在下一行照擺——它們跟著平面那層剛寫完的 DOM 走，不是跟著 WebGL。 */
+  if(S.chg !== chg0) S.dirty = 4;
   placeOverlays();
 }
 /* 版面換了（人數、換座位、轉向、視窗大小）就把所有 slot 清掉，逼 sync() 重排一次；
    歸位是瞬間的，重排不是牌局裡發生的事 */
 function relayout(){
   if(!S) return;
+  touch();
   S.snap = true;
   for(const c of S.cards.values()) c.slot = "";
 }
@@ -9522,7 +9725,7 @@ function glowApply(key, k, kd){
 
 function frame(t){
   if(!S) return;
-  stepTweens(t);
+  const stepped = stepTweens(t);
 
   /* 只有真的在動的補間才算「在動」：定格那一秒排在後面的還沒開始，畫面不用重畫 */
   let moving = false;
@@ -9547,8 +9750,10 @@ function frame(t){
   /* 顏色過場：桌布、背景、霧 */
   for(let i = fades.length - 1; i >= 0; i--){
     const f = fades[i], k = Math.min(1, (t - f.t0) / 900);
-    f.col.lerpColors(f.from, f.to, easeOut(k));
-    if(k >= 1) fades.splice(i, 1);
+    /* 收尾那格直接 copy 成目標色，不用 lerpColors(…, 1)——後者差 1e-17，會被下一列判成「還沒到」，
+       重開一段 900ms 的幽靈過場（理由與量到的數字在 fade() 上面）。這一格畫出來的顏色兩種寫法一樣。 */
+    if(k >= 1){ f.col.copy(f.to); fades.splice(i, 1); }
+    else f.col.lerpColors(f.from, f.to, easeOut(k));
     moving = true;
   }
   /* 贏的那張牌：金線亮起（微微過頭）→ 定格、輕輕呼吸 → 收墩時暗掉；整桌同時稍微收暗 */
@@ -9585,6 +9790,12 @@ function frame(t){
   }
 
   if(moving) S.dirty = 3;
+  /* ⚠️ 補間在這一格裡從頭跑到尾（一格拖得比整段還久：GC、著色器編譯、手機卡一下）：
+     跑完就從清單拿掉了，上面的 moving 看不到它，終點那一格從來沒畫出去。
+     以前看不出來，是因為 sync() 每次都無條件 dirty = 4 順手補畫；現在 sync() 只在直接改了場景時才叫醒，
+     「只有補間」的變化（例如輪到我先出、每張都能出：牌只是浮上來）就靠這一行至少畫一格。
+     平常 60fps 時跑完那一格 dirty 本來就還沒歸零（上一格在動），這一行不會多畫任何一格。 */
+  else if(stepped && S.dirty === 0) S.dirty = 1;
   if(S.dirty > 0){
     S.dirty--;
     fxReset();                        /* 有東西在動：精算的累積重新來 */
@@ -9952,6 +10163,10 @@ async function redeck(){
   if(old) old.dispose();
   S.minRank = null; S.jokers = null;
   rebuildAtlas(UD.G ? UD.G.cfg.minRank : 7, UD.G && UD.G.cfg.jokers);
+  /* ⚠️ 這裡是 await 之後，不在任何一趟 sync() 裡：touch() 記了也沒有人看，要自己叫醒。
+     以前靠的是「下一列進來 sync() 一定 dirty = 4」順手補畫（中低檔還有火每 150ms 補一格），
+     sync() 改成沒變不畫之後，高檔停手的桌子會一直停在舊牌面。 */
+  S.dirty = 4;
 }
 
 /* 平面／立體的狀態住在這一層——只有這裡知道 WebGL 行不行、桌子鋪好了沒。

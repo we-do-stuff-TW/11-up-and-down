@@ -29,17 +29,20 @@ async function serve(hooks: boolean): Promise<{ port: number; stop: () => Promis
     .replace(bounce, "function gotoLogin(stale){\n  return;   /* 測試接縫：不跳走 */\n  if(bouncing) return;");
 
   // 連線那一段的測試還要兩個接縫：換掉伺服器、以及看得到 IIFE 裡面。
-  // 只有 net_test 會開（hooks），ui_test 跑的頁面跟正式版一模一樣。
+  // 第三個是立體那層的模組作用域（場景、補間、顏色過場、後處理），idle_test 數「畫了幾格」要用。
+  // 只有 net_test／idle_test 會開（hooks），ui_test 跑的頁面跟正式版一模一樣。
   if (hooks) {
     const swap = "  const run = function(){ return call(action, args); };";
     const expose = "  engine:{";
-    for (const [what, seam] of [["api 的呼叫", swap], ["UD.engine", expose]] as [string, string][]) {
+    const peek3d = "UD.webglOK = webglOK;";
+    for (const [what, seam] of [["api 的呼叫", swap], ["UD.engine", expose], ["立體那層的 UD.webglOK", peek3d]] as [string, string][]) {
       if (!html.includes(seam)) throw new Error(`接縫插不進去：找不到${what}那一段`);
     }
     html = html
       .replace(swap, "  const run = function(){ return (window.__call || call)(action, args); };")
       .replace(expose, "  __t:{applyRow:applyRow, peerMove:peerMove, INBOX:INBOX, " +
-        "snapshot:snapshot, MY:MY, NET:NET, subscribe:subscribe},\n  engine:{");
+        "snapshot:snapshot, MY:MY, NET:NET, subscribe:subscribe, api:api, isLive:isLive, doBid:doBid},\n  engine:{")
+      .replace(peek3d, peek3d + " UD.__3d = function(){ return {S:S, tweens:tweens, fades:fades, FX:FX}; };");
   }
 
   const types: Record<string, string> = {
