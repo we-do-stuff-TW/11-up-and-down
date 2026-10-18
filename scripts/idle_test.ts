@@ -279,6 +279,31 @@ try {
   ok(await A.eval(`return UD.__3d().fades.length === 0`) && await frames(A) === 0,
     "高檔：桌布色只差 1e-12 就被當成要轉色（比顏色沒有容許誤差）");
 
+  /* 轉到一半進來一列（出牌階段每張牌都是一列）：已經在往同一個顏色轉的那段要讓它走完，
+     不准從半路重開 900ms（Francis 10-18 拍板）。看的是「那一段過場還是不是同一個物件」——
+     舊寫法每一列都丟掉舊的、推一段新的；只比起點時間的話，同一個 task 裡兩次 now 可能一樣，會假綠 */
+  const near = (a: string, b: string) => `(Math.abs(${a}.r-${b}.r) < 1e-6 && Math.abs(${a}.g-${b}.g) < 1e-6 && Math.abs(${a}.b-${b}.b) < 1e-6)`;
+  const midway = await A.eval<{ ok: boolean; why: string }>(`
+    __I.trump();
+    const d = UD.__3d(), col = d.S.feltMat.color, f = d.fades.find(x => x.col === col);
+    if(!f) return {ok:false, why:"換王牌之後桌布沒有開始轉色"};
+    f.t0 -= 400;                                   /* 走到一半 */
+    window.__f = f; const t0 = f.t0;
+    __I.same(); __I.same();                        /* 同一個目標的列進來兩次 */
+    const g = d.fades.find(x => x.col === col);
+    return {ok:g === f && g.t0 === t0, why:g === f ? "起點被改了" : g ? "被換成新的一段" : "那一段不見了"};`);
+  ok(midway.ok, `高檔：桌布轉到一半，同一個目標的列一進來就從半路重開（${midway.why}）`);
+  await settle(A, "轉到一半進來的列");
+  ok(await A.eval(`return ${near("UD.__3d().S.feltMat.color", "window.__f.to")} && __I.fresh()`),
+    "高檔：轉到一半進來列之後，桌布沒有停在目標色（或最後一格不是現在的樣子）");
+
+  /* 一格之內王牌換過去又換回來：最後要停在換回來的那個顏色。
+     先問「已經是這個顏色了嗎」再清舊的那段，就會留下往中間色的過場，桌布停在錯的顏色 */
+  await A.eval(`window.__c0 = UD.__3d().S.feltMat.color.clone(); __I.trump(); __I.trump(); return 1`);
+  await settle(A, "換過去又換回來");
+  ok(await A.eval(`return ${near("UD.__3d().S.feltMat.color", "window.__c0")} && __I.fresh()`),
+    "高檔：王牌換過去又馬上換回來，桌布停在中間那個顏色（往中間色的那段過場沒清掉）");
+
   /* 換牌面：等字型與圖到齊才換貼圖（await 之後，不在 sync 裡），要自己叫醒 */
   const deck0 = await A.eval<string>(`return UD.deck().id`);
   const back0 = await A.eval<number>(`return UD.__3d().S.backMat.map.id`);
@@ -405,6 +430,18 @@ try {
   ok(mid.length === n4 && mid.every((p) => p >= .12 && p < .97),
     "平面：發牌時細條還在長，座位區被重寫——細條應該接著長，結果是重頭長或直接跳到滿（進度 " +
     mid.map((p) => p.toFixed(2)).join(",") + "）");
+
+  /* 平面的桌色是 CSS 的 --felt 過場（820ms）：轉到一半進來一列，寫進去的是同一個值，過場不准重新起步。
+     立體那支 fade() 的同一題；CSS 本來就是這樣，這裡釘住，免得以後有人改成「每列先清掉再設」 */
+  const css = await C.eval<{ ok: boolean; why: string }>(`
+    const pick = () => document.documentElement.getAnimations().find(a => a.transitionProperty === "--felt");
+    __I.trump();
+    const a = pick();
+    if(!a) return {ok:false, why:"換王牌之後 --felt 沒有開始過場"};
+    __I.same(); __I.same();
+    const b = pick();
+    return {ok:b === a, why:b ? "被換成新的一段" : "那一段不見了"};`);
+  ok(css.ok, `平面：桌色轉到一半，同一個目標的列一進來就重新起步（${css.why}）`);
 } catch (e) {
   fails.push("平面細條那一段爆掉：" + (e as Error).message);
 } finally {
@@ -413,7 +450,7 @@ try {
 
 const ms = Math.round(performance.now() - t0);
 console.log("11 Up & Down — 畫面沒變就不動（無頭 Chrome，立體用軟體 WebGL）");
-console.log("  立體：沒變的列不叫醒（高／中／低檔）、精算不被打掉、幽靈換色；真的變了照畫（只有補間且卡一格、出牌、只有壓暗、換王牌、換牌面、自己降檔、動畫減量）");
+console.log("  立體：沒變的列不叫醒（高／中／低檔）、精算不被打掉、幽靈換色；真的變了照畫（只有補間且卡一格、出牌、只有壓暗、換王牌、換牌面、自己降檔、動畫減量）；桌布轉到一半進來的列不重開、換過去又換回來停在對的顏色；平面桌色同一題");
 console.log("  平面：細條演過就不演（心跳、出牌不重演；發牌、換局照演；被打斷接著演）");
 console.log(`  ${checks} 項，${ms} 毫秒`);
 if (skipped) console.log("  ⚠ " + skipped);

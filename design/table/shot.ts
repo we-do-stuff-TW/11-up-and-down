@@ -10,7 +10,7 @@ const proc = new Deno.Command(CHROME, { args: ["--headless=new", "--no-first-run
 let ws = "";
 for (let i = 0; i < 100 && !ws; i++) {
   await new Promise((r) => setTimeout(r, 100));
-  try { const [p, path] = (await Deno.readTextFile(`${profile}/DevToolsActivePort`)).trim().split("\n"); ws = `ws://127.0.0.1:${p}${path}`; } catch { /* 還沒 */ }
+  try { const [p, path] = (await Deno.readTextFile(`${profile}/DevToolsActivePort`)).trim().split("\n"); if (p && path) ws = `ws://127.0.0.1:${p}${path}`;   /* 兩行都到才算（理由見 scripts/_browser.ts） */ } catch { /* 還沒 */ }
 }
 const sock = new WebSocket(ws);
 await new Promise((r) => (sock.onopen = r));

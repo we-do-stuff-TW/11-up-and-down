@@ -7401,10 +7401,16 @@ const fades = [];
 const FADE_EPS = 1e-6;
 const sameColor = (a, b) =>
   Math.abs(a.r - b.r) < FADE_EPS && Math.abs(a.g - b.g) < FADE_EPS && Math.abs(a.b - b.b) < FADE_EPS;
+/* ⚠️ 轉到一半又進來一列（出牌階段每一張牌都是一列）：已經在往同一個顏色轉的，讓它走完。
+   以前拿「半路的顏色」跟目標比，當然不一樣，就丟掉那段、從半路重開 900ms——每一列都把桌布重新起步一次，
+   曲線在每一列折一下、轉完的時間跟著拖長（Francis 10-18 拍板要動）。
+   先清掉往別的顏色轉的那段、再問「已經是這個顏色了嗎」，順序不能反：反過來的話，一格之內王牌換過去又換回來，
+   看到「現在就是目標色」直接 return，留下那段往中間色的過場，桌布最後停在錯的顏色。 */
 function fade(col, rgb){
   const to = new THREE.Color().setRGB(rgb[0], rgb[1], rgb[2], THREE.LinearSRGBColorSpace);
-  if(sameColor(col, to)) return;
+  for(const f of fades) if(f.col === col && sameColor(f.to, to)) return;
   for(let i = fades.length - 1; i >= 0; i--) if(fades[i].col === col) fades.splice(i, 1);
+  if(sameColor(col, to)) return;    /* 拿掉的那段停在半路的值，就是最後畫出去的那一格：不必叫醒 */
   touch();          /* 動畫減量時是直接換色、不經過 fades——frame() 看不到，sync() 要知道該叫醒 */
   if(UD.REDUCED){ col.copy(to); return; }
   fades.push({col:col, from:col.clone(), to:to, t0:nowMs()});

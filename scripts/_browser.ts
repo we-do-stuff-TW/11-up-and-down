@@ -97,8 +97,10 @@ export class Browser {
     for (let i = 0; i < 100 && !wsPath; i++) {
       await new Promise((r) => setTimeout(r, 100));
       try {
+        /* ⚠️ 兩行都讀到才算數：Chrome 先開檔、後寫字，剛好讀在中間會拿到空字串，
+           拼出 ws://127.0.0.1:undefined，整支測試在起跑線就爆（2026-10-18 一天撞兩次） */
         const [p, path] = (await Deno.readTextFile(portFile)).trim().split("\n");
-        wsPath = `ws://127.0.0.1:${p}${path}`;
+        if (p && path) wsPath = `ws://127.0.0.1:${p}${path}`;
       } catch { /* 還沒寫出來 */ }
     }
     if (!wsPath) throw new Error("Chrome 起不來（找不到 DevToolsActivePort）");
