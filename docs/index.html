@@ -6521,8 +6521,11 @@ function showFinal(){
 function endGag(dealEnd){
   if(endGag.stop) endGag.stop();
   const stage = $("endStage"), tom = $("tom"), cup = $("tomCup");
-  const p1 = stage.querySelector(".stack.p1 .pile"), p2 = stage.querySelector(".stack.p2 .pile"), p3 = stage.querySelector(".stack.p3 .pile");
-  if(!p1 || !p3 || !stage.querySelector(".stack.p1 .faces")) return;   /* 台上不到三疊（同分併階）就不演：沒有第三名可以爬 */
+  /* 下面的 p3／P3／on3 是「起爬的那一疊」：三疊時是第三名；兩疊時（同分併階、或只有兩個人）就是第二名，
+     爬上去之後直接跳第一名，不繞路（2026-10-21 Francis：「兩疊也要」——以前兩疊整段不演）。 */
+  const p1 = stage.querySelector(".stack.p1 .pile"), p2 = stage.querySelector(".stack.p2 .pile"), third = stage.querySelector(".stack.p3 .pile");
+  const p3 = third || p2;
+  if(!p1 || !p3 || !stage.querySelector(".stack.p1 .faces")) return;   /* 台上只有一疊（全桌同分）不演：沒有別疊可以爬 */
   const S = stage.getBoundingClientRect();
   const R = function(el){ const r = el.getBoundingClientRect(); return {l:r.left - S.left, r:r.right - S.left, t:r.top - S.top, b:r.bottom - S.top, cx:(r.left + r.right) / 2 - S.left, cy:(r.top + r.bottom) / 2 - S.top}; };
   const F = R($("endFloor")).t, P1 = R(p1), P2 = R(p2 || p1), P3 = R(p3), W = S.width;
@@ -6530,7 +6533,7 @@ function endGag(dealEnd){
   const k = parseFloat(getComputedStyle(tom).getPropertyValue("--k")) || 1;
   const EO = "cubic-bezier(.16,1,.3,1)", EIO = "cubic-bezier(.77,0,.175,1)", EI = "cubic-bezier(.11,0,.5,0)", BACK = "cubic-bezier(.34,1.56,.64,1)", LIN = "linear";
   const HEAD = 118 * k, ARML = 80 * k, SH = 44 * k;        /* 頭頂、手臂長、肩高（腳底算起） */
-  const DETOUR = true;   /* 繞第二名那一版（Francis 看的就是這版） */
+  const DETOUR = !!third;   /* 繞第二名那一版（Francis 看的就是這版）；兩疊時人已經站在第二名上，走直達 */
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ── 站位 ── */
@@ -6794,7 +6797,8 @@ function endGag(dealEnd){
     if(window.SFX && SFX.gag) SFX.gag(B, 1, {pan1:pan(P1.cx), pan2:pan(P2.cx), pan3:pan(P3.cx)});
     later(B.bump, function(){ pileWobble(p3, -2.4); });
     later(B.hang, function(){ pileWobble(p3, 1.6); });
-    later(B.land2, function(){ pileWobble(p2, 1.4); });
+    /* 直達沒有 land2：B.land2 是 undefined，setTimeout 會當成 0 立刻晃第二名那疊 */
+    if(DETOUR) later(B.land2, function(){ pileWobble(p2, 1.4); });
     later(B.land1, function(){ pileWobble(p1, -1.4); });
     later(B.present + .55, winnerNod);
     later(B.fall, function(){ pileWobble(p1, 1.2); });

@@ -184,10 +184,15 @@ Francis 看完 G：「整個動畫和圖可以再更荒謬的大。動畫跟整�
   因為 `.end-mid` 是 `overflow:auto`，clip-path 剪掉的部分還是會撐出捲軸）。
 - JS：`endGag(dealEnd)` 接在 `showFinal()` 尾巴（`$("endOv").hidden = false` 之後才量得到位置）。
   收桌那一頁被關掉（`hidden`）就整段停：MutationObserver 看 `#endOv`，動畫取消、計時器清掉、`SFX.gagStop()`。
-  再開（最終結果按鈕）會重新開演。台上不到三疊（同分併階）不演——沒有第三名可以爬。單人局（對 AI）也演。
+  再開（最終結果按鈕）會重新開演。單人局（對 AI）也演。
+  **台上幾疊才演**：09-22 起不到三疊就不演；2026-10-21 Francis 問「原本的頒獎動畫勒？」（他打到的是兩疊），回「兩疊也要」——
+  兩疊（同分併階、或只有兩個人）改成爬第二名那疊、走直達（不繞第二名，人已經站在上面），只剩一疊（全桌同分）不演。
+  直達沒有 `land2`：那顆晃第二名的計時器要用 `if(DETOUR)` 擋，否則 `setTimeout(undefined)` 會在開演當下就晃。
+  實錄樣品（兩種兩疊結局各一段）：https://claude.ai/artifact/XtKWwBdDbjUTmHcUEN4cNj
 - 音效：`SFX.gag`／`SFX.gagStop` 搬進音效層的 IIFE（整段走自己一顆 gain，關頁時壓到 0）。
 - 測試接縫：`UD.gag`（＝endGag，有 `.seek(秒)`／`.B`／`.stop`）。驗收：`deno run -A scripts/gag_test.ts`（`DIM=3` 立體、`PHONE=1` 手機寬）
-  ——打完一場 → 把分數改成十個不同的值逼出三疊 → 停在九個節拍截圖 → 驗沒橫向捲軸、關頁會停、重開會演；
+  ——打完一場 → 把分數改成十個不同的值逼出三疊 → 停在九個節拍截圖 → 驗沒橫向捲軸、關頁會停、重開會演
+  → 改成兩疊：要開演、走直達、牌疊第一次晃要等到撞牌 → 改成一疊：不演（後兩段 10-21 補，三刀 tamper 各紅在自己那一條）；
   三種都跑過：`shots/live2_sheet.png`、`live3_sheet.png`、`live2p_sheet.png`。
   立體模式在 headless 打牌時本來就有三個 `needsUpdate` 的錯（頒獎開演前就在，`faceMat` 的圖集在 swiftshader 下少格），跟頒獎無關。
 - **照片**：`docs/img/tom.jpg` 目前是 symlink → `design/thanks/_avatar.jpg`，**列在 `.gitignore`**。

@@ -1,4 +1,4 @@
-// 收桌頒獎（endGag）在真的牌桌上：打完一場 → 收桌 → 停在幾個節拍截圖 → 驗沒有錯、沒有橫向捲軸
+// 收桌頒獎（endGag）在真的牌桌上：打完一場 → 收桌 → 停在幾個節拍截圖 → 驗沒有錯、沒有橫向捲軸 → 兩疊也演（直達）、一疊不演
 // 跑法：DIM=2 deno run -A gag_test.ts   /  DIM=3（立體）/  PHONE=1（390 寬）
 import { Browser } from "./_browser.ts";
 const DIM = Deno.env.get("DIM") ?? "2", PHONE = !!Deno.env.get("PHONE");
@@ -79,6 +79,47 @@ try {
   } else {
     await shot(`${tag}_noshow.png`);
   }
+  /* ── 兩疊（同分併階、或只有兩個人）也要演：起爬的是第二名那疊、走直達（2026-10-21 Francis「兩疊也要」；以前兩疊整段不演）──
+     記下每次 animate() 被叫的時間：牌疊晃的第一下要等到撞牌（B.bump）才來。直達沒有 land2，
+     那顆計時器沒擋的話 setTimeout(undefined) 會在開演當下就晃第二名那疊。 */
+  await b.eval(`document.getElementById("endClose2").click();
+    if(!window.__anHooked){ window.__anHooked = 1; const orig = Element.prototype.animate;
+      Element.prototype.animate = function(k, o){ (window.__an = window.__an || []).push({t:performance.now(), pile:this.classList.contains("pile"), tom:this.id === "tom"}); return orig.call(this, k, o); }; }
+    return 1`);
+  await new Promise((r) => setTimeout(r, 250));
+  await b.eval(`window.__an = []; const sc = UD.G.score; sc.forEach((v, i) => { sc[i] = i === 1 ? 21 : 15; });
+    document.getElementById("btnFinal").click(); return 1`);
+  await b.until(`!document.getElementById("endOv").hidden`, "收桌重開（兩疊）");
+  const two = await b.eval<number>(`return document.querySelectorAll("#endStacks .stack").length`);
+  if (two !== 2) fails.push(`該排出兩疊，排出 ${two} 疊`);
+  /* 立體在 headless 收桌後會卡 1～4 秒，Thomas 卡完才上場：等到開演，不要隔固定秒數看一眼（10-21 這樣誤判過「沒演」） */
+  const started = await b.until(`document.getElementById("tom").getAnimations().length > 0`, "兩疊開演", 10000).then(() => true, () => false);
+  if (!started) fails.push("兩疊沒有開演");
+  else {
+    const B2 = await b.eval<Record<string, number>>(`return UD.gag.B`);
+    if (B2.hop != null || B2.land2 != null) fails.push("兩疊卻繞了第二名（B 裡有 hop／land2）：人已經站在第二名上，該走直達");
+    const wob = await b.until(`window.__an.some(a => a.pile)`, "兩疊的牌疊晃", 10000).then(() => true, () => false);
+    if (!wob) fails.push("兩疊開演後一直沒有晃牌疊（撞牌那一下）");
+    else {
+      const lead = await b.eval<number>(`const t0 = window.__an.find(a => a.tom).t; return (window.__an.find(a => a.pile).t - t0) / 1000`);
+      console.log("兩疊：開演到第一次晃牌疊", lead.toFixed(2), "秒（撞牌在", B2.bump.toFixed(2), "秒）");
+      if (lead < B2.bump - .1) fails.push(`兩疊開演 ${lead.toFixed(2)} 秒就晃了牌疊，撞牌在 ${B2.bump.toFixed(2)} 秒`);
+    }
+    for (const [name, plus] of [["rise", .4], ["bump", .05], ["hang", .3], ["reach", .34], ["hop1", .28], ["present", .6], ["bow", .5], ["fall", .4]] as [string, number][]) {
+      await b.eval(`UD.gag.seek(${B2[name] + plus}); return 1`);
+      await new Promise((r) => setTimeout(r, 160));
+      await shot(`${tag}_two_${name}.png`);
+    }
+  }
+  /* ── 一疊（全桌同分）照舊不演：沒有別疊可以爬 ── */
+  await b.eval(`document.getElementById("endClose2").click(); return 1`);
+  await new Promise((r) => setTimeout(r, 250));
+  await b.eval(`const sc = UD.G.score; sc.forEach((v, i) => { sc[i] = 15; }); document.getElementById("btnFinal").click(); return 1`);
+  await b.until(`!document.getElementById("endOv").hidden`, "收桌重開（一疊）");
+  await new Promise((r) => setTimeout(r, 4000));
+  const one = await b.eval<{ n: number; anims: number }>(`return {n:document.querySelectorAll("#endStacks .stack").length, anims:document.getElementById("tom").getAnimations().length}`);
+  if (one.n !== 1) fails.push(`該排出一疊，排出 ${one.n} 疊`);
+  if (one.anims) fails.push("一疊（全桌同分）也開演了");
   const errs = await b.eval<string[]>(`return window.__errs`);
   if (errs.length) fails.push("頁面錯誤：" + errs.join(" | "));
 } catch (e) { fails.push(String(e)); } finally { await b.close(); }
