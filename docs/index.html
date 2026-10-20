@@ -2306,6 +2306,7 @@ window.I18N_EN = {
 "你不在座位上":"You're not seated",
 "現在不能叫墩":"You can't bid right now",
 "這張牌不能出":"You can't play that card",
+"還沒輪到你":"It's not your turn yet",
 "這局還沒結束":"This round isn't over yet",
 "這一場還沒打完":"This game isn't over yet"
 };
@@ -4210,7 +4211,11 @@ const INBOX = {
     if(!(G && MODE === "net" && NET.code === row.code)) return true;  /* 別桌、或第一次 */
     const cur = G.rev || 0, inc = row.rev || 0;
     if(cur > inc) return false;                       /* 過期的那一列 */
-    if(cur === inc && this.isAhead()) return false;   /* 同一格，但本機已經演到下一格 */
+    /* 同一格，但本機已經演到下一格——除非這一列正是伺服器否決我那一手的回話。
+       ⚠️ 那一列說的就是「這一格的真相裡沒有你那一手」，本機演到的下一格（連同墊在底下的對手廣播）
+       正是被它推翻的。以前一律不收，退回按之前那一格：對手那張沒寫進去的牌照樣在桌上、
+       狀態列說輪到我，字卻是「還沒輪到你」（10-21 log：409 之後 row! drop rev=833 … same；net_test 二十八）。 */
+    if(cur === inc && this.isAhead() && !(REFUSED && this.pend && this.pend.t === ANSWER)) return false;
     return true;
   },
 
@@ -4237,10 +4242,10 @@ function rollback(s){
 /* 這一列是不是「我那一手」自己的回話。是的話收完不疊回去：新伺服器的回話一定已經含著那一手
    （不行的話是 409，帶的是真相）；舊伺服器搶頁輸了會回 200＋一列沒有那一手的——疊回去等於把
    沒寫進去的那一手留在畫面上，比讓人再按一次更糟。 */
-let ANSWER = "";
+let ANSWER = "", REFUSED = false;          /* REFUSED：這一趟回話是 409／403（伺服器說不行），見 fresher */
 function applyAnswer(action, d){
-  ANSWER = action;
-  try{ applyRow(d.room, d.hand); }finally{ ANSWER = ""; }
+  ANSWER = action; REFUSED = !!d.error;
+  try{ applyRow(d.room, d.hand); }finally{ ANSWER = ""; REFUSED = false; }
 }
 /* 伺服器對我這一手回話了。成功的話那一列在 call() 裡已經收過；失敗就退回——
    退回的是 INBOX.opt（最近一次疊上去之前的那一格），不是按下去那一刻的快照：
@@ -4257,13 +4262,25 @@ function landed(move, d){
 function replayPend(move){
   const s = mySeat();
   if(s < 0 || !G) return false;
-  const snap = snapshot();
+  /* ⚠️ 出牌那一手：doPlay 時 applyPlay 拿的是 MYHAND 那個陣列本身，而這一列沒帶手牌——
+     照這一列（同一局、同一墩、還輪到我），那張其實還在我手上，要先放回原位再出一次。
+     以前直接 applyPlay：找不到那張就疊不上，牌從檯面與手上一起消失、狀態列又說輪到我，
+     手上其他牌亮著，再點一張就是第二次出牌；張數對帳還以為手牌壞了，多問一趟 state
+     （2026-10-21 兩人桌 log：pend play noreplay 接 hand! want=N got=N-1，四次；net_test 二十六）。
+     局與墩要對得上才放：含著我那一手的列先到（realtime 比 HTTP 回話快）時這裡已經不輪我，
+     更晚的一墩又輪到我時那張早就出掉了——放回去就是牌同時在手上與檯面上（二十七）。
+     放回去之後就算疊不上也留著：這一列說我還沒出，那張就在我手上。 */
+  const play = move.t === "play" && G.phase === "play" && G.turn === s &&
+    G.ri === move.ri && G.played === move.trick;
+  const hand = G.hands[s];
+  if(play && !hand.some(c => c.id === move.card)) hand.splice(Math.min(move.at, hand.length), 0, move.c);
+  const snap = snapshot();                 /* 退路要在放回去之後拍：被否決時退回這裡，牌才回得到手上 */
   let ok = false;
   if(move.t === "bid" && G.phase === "bid"){
     if(rules(G.cfg).bidMode === "sim"){
       if(G.bids[s] === null || G.bids[s] === undefined){ G.bids[s] = -1; ok = true; }
     }else if(G.turn === s && move.v !== hookBlocked(G, s)) ok = applyBid(G, s, move.v);
-  }else if(move.t === "play" && G.phase === "play" && G.turn === s){
+  }else if(play){
     applying = true; ok = applyPlay(G, s, move.card); applying = false;
   }
   if(ok) INBOX.ranAhead(snap, move);
@@ -4728,6 +4745,7 @@ function doPlay(cardId, el){
   /* 先問本機引擎這一手出不出得掉，出得掉才讓牌離開手上。
      以前是不管送不送得出去都先把牌淡掉，送不出去的時候牌就這樣消失在半空中。 */
   const snap = MODE === "net" ? snapshot() : null;
+  const at = G.hands[s].findIndex(c => c.id === cardId);
   applying = true;
   const ok = applyPlay(G, s, cardId);
   applying = false;
@@ -4743,10 +4761,13 @@ function doPlay(cardId, el){
     el.classList.add("is-leaving");
   }
   if(MODE === "solo"){ push(); return; }
-  const move = {t:"play", card:cardId};
+  /* 這一手要能自己重演（replayPend）：applyPlay 已經把那張從手牌陣列裡拿掉了，
+     所以那張牌本身、它原本排在第幾張、這是哪一局的哪一墩，都跟著這一手走 */
+  const played = G.trick[G.trick.length-1].card;
+  const move = {t:"play", card:cardId, c:{s:played.s, r:played.r, id:played.id}, at:at, ri:G.ri, trick:G.played};
   INBOX.ranAhead(snap, move);
   render();
-  sendMove({t:"play", seat:s, card:G.trick[G.trick.length-1].card});
+  sendMove({t:"play", seat:s, card:played});
   api("play", {code:NET.code, card:cardId}).then(function(d){ landed(move, d); });
 }
 

@@ -482,20 +482,43 @@ async function saveResults(sb: SupabaseClient, R: Room) {
 }
 
 /* ════════════ 一步的結果 ════════════ */
-/* 每個動作只回答一件事：照現在這一刻的桌面，這一步要怎麼走。三種答案：
+/* 每個動作只回答一件事：照現在這一刻的桌面，這一步要怎麼走。四種答案：
    · write ：改了記憶體裡的房間／手牌，要提交
    · idle  ：不必做了——沒輪到、或別人已經做掉了（補敲、兩發 next、重送）。這不是錯
+   · wait  ：還沒輪到你，但前一家那一手多半在路上（見 early()）。step() 隔一下重讀再問，等不到才是 no
    · no    ：不行（不是你的回合、這張牌不能出、牌局已經開始……）
    ⚠️ 動作可能被跑不只一次：提交輸了（別人先寫了）就重新載入、對新的桌面再問一次。
    所以動作裡只准改 S，不准碰資料庫、不准有副作用——戰績這種要寫的東西放進 after，提交成功才跑。 */
 type Out =
   | { kind: "write"; bump?: boolean; after?: (room: Room) => Promise<void> }
   | { kind: "idle" }
+  | { kind: "wait" }
   | { kind: "no"; error: string; status: number };
 const WRITE: Out = { kind: "write" };
 const WRITE_QUIET: Out = { kind: "write", bump: false };   // 等待房間裡的動作：不算「牌局走了一步」
 const IDLE: Out = { kind: "idle" };
+const WAIT: Out = { kind: "wait" };
 const no = (error: string, status = 409): Out => ({ kind: "no", error, status });
+
+/** 早到的那一手要等多久、多久重讀一次。
+ *  手機聽到對手的廣播（約 0.05 秒）就讓你出；對手那一手寫進資料庫要 0.7–1.9 秒（2026-10-21 兩人桌實測 15 次），
+ *  你的請求本身也要走一段，所以 3 秒蓋得住。等待不算函式的運算時間（Supabase：CPU 2 秒不含等 I/O、
+ *  一趟請求最多掛 150 秒）；每次重讀是一句 game_load。 */
+const WAIT_MAX = 3000, WAIT_POLL = 150;
+const NOT_YET = "還沒輪到你";
+
+/** 這一手是不是「早到了」：桌面還停在前一家，而這一手確實是你的、你也還沒做過。
+ *  ⚠️ 只有這種值得等。以前沒有這條：早到的一律馬上 409「這張牌不能出」——牌是合法的、理由是錯的，
+ *  人只好再點一次（10-21 log：最後一張牌被打回，4.3 秒後再點同一張就過了）。
+ *  這一墩已經出過（重送、連點）、牌不在手上、這一局叫過了的，等多久都不會變成可以，馬上回。
+ *  叫墩階段收到出牌：最後一家的叫墩還在路上、莊家聽到廣播就先出了（叫墩→出牌只差那一手）。 */
+function early(R: Room, H: Hands, seat: number, act: { play?: string; bid?: boolean }): boolean {
+  const bidYet = R.bids[seat] !== null && R.bids[seat] !== undefined;
+  if (act.bid) return R.phase === "bid" && R.cfg.bidMode !== "sim" && R.turn !== seat && !bidYet;
+  if (R.phase === "bid") { if (!bidYet) return false; }
+  else if (R.phase !== "play" || R.turn === seat || R.trick.some((t) => t.p === seat)) return false;
+  return readHand(H, R.ri, seat).some((c) => c.id === act.play);
+}
 
 /** 提交輸了重來幾次。一次輸＝這一瞬間有別人在寫，重新讀一次幾乎一定成功。
  *  最壞的正常情形是同時叫墩：n 個人同一刻放骰子，每一輪只有一個人寫得進去，最後一位要輸 n−1 次
@@ -594,10 +617,12 @@ Deno.serve(async (req) => {
     const reply = (S: Snap, extra: Record<string, unknown> = {}, status = 200) =>
       json({ ...(status === 200 ? { ok: true } : {}), pid, room: S.R, hand: mine(S.R, S.H), now: Date.now(), ...extra }, status);
 
-    /** 跑一步：問動作 → 提交 → 輸了重讀再問。見上面「一步的結果」。 */
+    /** 跑一步：問動作 → 提交 → 輸了重讀再問；早到的隔一下重讀再問。見上面「一步的結果」。
+     *  等前一家（wait）不算提交輸了——那 8 次是給「同一刻有人在寫」的，不是給「前一家還沒寫」的。 */
     const step = async (act: (S: Snap) => Out): Promise<Response> => {
       let S = first;
-      for (let k = 0; ; k++) {
+      const t0 = Date.now();
+      for (let k = 0; ;) {
         S.R.seen[pid] = Date.now();
         const before = structuredClone(S);     // 「不行」的時候回的是動作改之前的那一刻
         const out = act(S);
@@ -607,13 +632,18 @@ Deno.serve(async (req) => {
           if (error) console.error("game_seen", code, error.message);
           return reply(S, { idle: true });
         }
-        const room = await commit(sb, S, pid, out.bump !== false);
-        if (room) {
-          if (out.after) await out.after(room);
-          return reply({ R: room, H: S.H });
+        if (out.kind === "wait") {
+          if (Date.now() - t0 >= WAIT_MAX) return reply(before, { error: NOT_YET }, 409);
+          await new Promise((r) => setTimeout(r, WAIT_POLL));
+        } else {
+          const room = await commit(sb, S, pid, out.bump !== false);
+          if (room) {
+            if (out.after) await out.after(room);
+            return reply({ R: room, H: S.H });
+          }
+          if (++k >= TRIES) return reply(before, { error: "這一步沒有寫進去，再試一次" }, 409);
+          await new Promise((r) => setTimeout(r, (15 + Math.random() * 45) * (1 + (k - 1) / 2)));
         }
-        if (k + 1 >= TRIES) return reply(before, { error: "這一步沒有寫進去，再試一次" }, 409);
-        await new Promise((r) => setTimeout(r, (15 + Math.random() * 45) * (1 + k / 2)));
         const again = await load(sb, code);
         if (!again) return json({ error: `找不到房號 ${code}` }, 404);
         S = again;
@@ -695,8 +725,8 @@ Deno.serve(async (req) => {
         return await step(({ R, H }) => {
           const seat = seatOf(R, pid);
           if (seat < 0) return no("你不在座位上", 403);
-          if (!applyBid(R, H, seat, v)) return no("現在不能叫墩");
-          return WRITE;
+          if (applyBid(R, H, seat, v)) return WRITE;
+          return early(R, H, seat, { bid: true }) ? WAIT : no("現在不能叫墩");
         });
       }
 
@@ -705,8 +735,10 @@ Deno.serve(async (req) => {
         return await step(({ R, H }) => {
           const seat = seatOf(R, pid);
           if (seat < 0) return no("你不在座位上", 403);
-          if (!applyPlay(R, H, seat, cid)) return no("這張牌不能出");
-          return WRITE;
+          if (applyPlay(R, H, seat, cid)) return WRITE;
+          if (early(R, H, seat, { play: cid })) return WAIT;
+          // 字要分開：以前「不是你的回合」也說「這張牌不能出」，人會以為規則擋了一張合法的牌
+          return no(R.phase === "play" && R.turn === seat ? "這張牌不能出" : NOT_YET);
         });
       }
 

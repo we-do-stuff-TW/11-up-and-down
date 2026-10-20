@@ -80,6 +80,10 @@ window.__T = {
   flush(){
     const N = UD.__t.NET;
     N.tail = null; N.queued = 0; N.busy = false; N.urgent = 0; N.ac = null;
+    /* 掛著不回的那一趟如果是我出的牌，它那一手也永遠等不到回話：一起作廢。
+       ⚠️ 以前不清也沒事，是因為出牌那一手撐不過下一列（疊不回去）——plan 0007 修好之後它疊得回去，
+       十一段留下的那一手就一路活到十三段，被當成這一段的牌重演（十三段紅在「逾時之後那一手沒有退回手上」） */
+    UD.__t.INBOX.settled();
   },
   /* 一墩剛打完的那一列：全桌每人一張在檯面上。伺服器只在湊滿 n 張時才進 trickend（index.ts applyPlay），
      而且收這一墩的同一步就清掉檯面——trickend 配空的檯面是不可能的狀態。
@@ -590,6 +594,93 @@ try {
   ok((s25.mine === null || s25.mine === undefined) && s25.btn > 0,
     `舊伺服器回 200 卻沒寫進去，我的骰子還擺在桌上（我的=${s25.mine}、按鈕 ${s25.btn} 顆）——人會以為叫過了`);
   await b.eval(`__T.fake(); return 1`);
+
+  /* ════ 以下是 plan 0007（2026-10-21）：對手剛出、我馬上跟的那一下 ════
+     劇本來自 10-21 兩人桌的 ?trace=1：對手的廣播約 0.05 秒到，他那一手寫進資料庫的列要 0.7–1.9 秒才到。
+     我在中間出牌，那一列就夾在「我先演的那一手」與「伺服器回我的話」之間。 */
+  /* 輪到 3 號、他廣播出牌、我馬上跟（伺服器掛著不回）。回傳那張牌 */
+  await b.eval(`
+    __T.follow = function(rev){
+      __T.flush();
+      const g = __T.clone(__T.g4); g.leader = 3; g.turn = 3; g.trick = []; g.led = null;
+      UD.__t.applyRow(__T.row(g, rev), __T.clone(g.hands[0]));
+      const c = g.hands[3][0];
+      UD.__t.peerMove({t:"play", seat:3, card:{s:c.s, r:c.r, id:c.id}});
+      const after = __T.clone(g); UD.engine.applyPlay(after, 3, c.id);
+      __T.peerAfter = after;                              /* 他那一手寫進去之後的伺服器桌面 */
+      __T.my = __T.mine(); UD.doPlay(__T.my);
+      return g;
+    };
+    return 1`);
+  const look = () => b.eval<{ rev: number; turn: number; trick: string; mineOnTable: number; inHand: boolean; hand: number; ahead: boolean }>(`
+    return {rev:UD.G.rev, turn:UD.G.turn, trick:UD.G.trick.map(function(t){ return t.p; }).join(","),
+            mineOnTable:UD.G.trick.filter(function(t){ return t.card.id === __T.my; }).length,
+            inHand:UD.G.hands[0].some(function(c){ return c.id === __T.my; }), hand:UD.G.hands[0].length,
+            ahead:UD.__t.INBOX.isAhead()}`);
+  const nFull = await b.eval<number>(`return __T.full.length`);
+
+  /* ── 二十六、對手那一列（不帶手牌、裡面還沒有我）比我的回話先到：我那張要疊回去 ──
+     以前：出牌時那張已經從手牌陣列裡拿掉了，疊回去要再出一次卻找不到它，就放棄（log 的 pend play noreplay）。
+     畫面上檯面、手上都沒有那張，狀態列又說輪到我，手上其他牌亮著——再點一張就是第二次出牌。
+     接著張數對帳以為手牌壞了，多排一趟 state（hand! want=N got=N-1）。 */
+  await b.eval(`__T.reply = "pending"; __T.follow(1100); __T.q26 = UD.__t.NET.queued;
+    UD.__t.applyRow(__T.row(__T.peerAfter, 1101)); return 1`);
+  const s26 = await look();
+  ok(s26.rev === 1101 && s26.trick === "3,0" && s26.mineOnTable === 1,
+    `對手那一列先到，我那張從檯面上消失了（rev=${s26.rev}、檯面座位=${s26.trick || "空"}）`);
+  ok(!s26.inHand && s26.hand === nFull - 1, `我那張疊回去之後手牌不對（還在手上=${s26.inHand}、${s26.hand} 張，該是 ${nFull - 1}）`);
+  ok(s26.ahead && s26.turn !== 0, `疊回去了，卻沒有繼續等回話，或狀態列又說輪到我（turn=${s26.turn}）`);
+  ok(await b.eval<boolean>(`return UD.__t.NET.queued === __T.q26`), "張數對帳以為手牌壞了，多排了一趟 state");
+  /* 疊回去之後伺服器才否決（回話比那一列舊）：退回的是那一列＋那張在手上，不是那張不見了的樣子 */
+  ok(await b.eval<boolean>(`const o = UD.__t.INBOX.opt; return !!o && o.hand.some(function(c){ return c.id === __T.my; })`),
+    "疊回去之後的退路裡沒有那張牌——被否決時會退成牌不見了");
+
+  /* ── 二十七、含著我那一手的列先到（realtime 比 HTTP 回話快）：那張不准回到手上 ──
+     疊回去的那條路如果不看「這一墩我出過沒有」，牌會同時在手上與檯面上 */
+  await b.eval(`__T.reply = "pending"; __T.follow(1200);
+    const g = __T.clone(__T.peerAfter); UD.engine.applyPlay(g, 0, __T.my);
+    UD.__t.applyRow(__T.row(g, 1201)); return 1`);
+  const s27 = await look();
+  ok(s27.rev === 1201 && s27.mineOnTable === 1 && !s27.inHand && s27.hand === nFull - 1,
+    `含著我那一手的列先到，牌被重演或放回手上（檯面上 ${s27.mineOnTable} 張我的、還在手上=${s27.inHand}、手牌 ${s27.hand}）`);
+  /* 我的回話更慢：那一墩已經收掉、下一墩又輪到我（同一局、多打了一墩）——這一列是我那一手還在路上時直接到的。
+     那張早就出掉了，不准放回手上、也不准在新的一墩再出一次 */
+  await b.eval(`__T.reply = "pending"; __T.follow(1250);
+    const g = __T.clone(__T.peerAfter);
+    g.trick = []; g.led = null; g.played = __T.peerAfter.played + 1; g.leader = 0; g.turn = 0;
+    UD.__t.applyRow(__T.row(g, 1251)); return 1`);
+  const s27b = await look();
+  ok(s27b.rev === 1251 && !s27b.inHand && s27b.hand === nFull - 1 && s27b.trick === "",
+    `下一墩又輪到我，已經出掉的那張被放回手上或又出了一次（還在手上=${s27b.inHand}、手牌 ${s27b.hand}、檯面座位=${s27b.trick || "空"}）`);
+
+  /* ── 二十八、伺服器否決我那一手、帶回同一個 rev 的桌面：照收 ──
+     伺服器等不到前一家（他的廣播是真的、但那一手沒寫進去）就回 409「還沒輪到你」，帶的那一列 rev 跟畫面一樣。
+     以前同 rev ＋「已經演到下一格」一律不收（log 的 row! drop rev=833 … +hand same），
+     退回的是按之前那一格：對手那張還沒寫進去的牌照樣在桌上、狀態列說輪到我——字卻說還沒輪到我 */
+  await b.eval(`
+    __T.real(function(){
+      const g = __T.clone(__T.g4); g.leader = 3; g.turn = 3; g.trick = []; g.led = null;
+      return __T.json({error:"還沒輪到你", pid:"me", room:__T.row(g, 1300), hand:__T.clone(__T.full), now:Date.now()}, 409);
+    });
+    __T.follow(1300);
+    return 1`);
+  await new Promise((r) => setTimeout(r, 300));
+  const s28 = await look();
+  const err28 = await b.eval<string>(`return UD.__t.NET.err`);
+  ok(s28.rev === 1300 && s28.turn === 3 && s28.trick === "",
+    `409 帶回來的同 rev 真相沒收：還留著對手沒寫進去的牌或我那張（turn=${s28.turn}、檯面座位=${s28.trick || "空"}）`);
+  ok(s28.inHand && s28.hand === nFull && !s28.ahead, `被否決之後我那張沒回到手上（${s28.hand} 張，該是 ${nFull}）`);
+  ok(!!err28, "被否決卻一聲不吭");
+  /* 比畫面舊的否決照樣不收：那一列早就過時了，收了就是倒退 */
+  await b.eval(`
+    __T.real(function(){
+      return __T.json({error:"還沒輪到你", pid:"me", room:__T.row(__T.peerAfter, 1399), hand:__T.clone(__T.full), now:Date.now()}, 409);
+    });
+    __T.follow(1400);
+    return 1`);
+  await new Promise((r) => setTimeout(r, 300));
+  ok((await look()).rev === 1400, "比畫面舊的那一列跟著否決一起被收進來了（rev 倒退）");
+  await b.eval(`__T.fake(); return 1`);
 } catch (e) {
   fails.push("測試中途爆掉：" + (e as Error).message);
 } finally {
@@ -600,6 +691,7 @@ const ms = Math.round(performance.now() - t0);
 console.log("11 Up & Down — 連線那一段的測試（無頭 Chrome ＋ 假伺服器）");
 console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點、手牌對帳、逾時、補敲、斷線補問");
 console.log("  plan 0006：飛行中的那一手、同時叫墩重放、房主離線照樣有按鈕、背景斷一次不嚷、玩家動作插隊、409 帶回房間、手機時鐘快、補敲錯開、舊頻道的列、舊伺服器的假成功");
+console.log("  plan 0007：對手那一列先到時疊回我那張、含著我那一手的列不重演、否決我那一手的同 rev 真相照收");
 console.log(`  ${checks} 項，${ms} 毫秒`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);

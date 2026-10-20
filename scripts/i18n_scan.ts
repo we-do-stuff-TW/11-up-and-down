@@ -80,7 +80,32 @@ function staticCheck(): string[] {
       buf += c; i++;
     }
   }
-  return hits;
+  return hits.concat(serverCheck(known, src, CJK));
+}
+
+/* 伺服器回的錯誤字（index.ts 的 no("…")、error: "…"）也會上畫面：TErr() 查的是同一本字典。
+   走頁面掃不到——要真的撞到那個錯才會出現，而錯誤分支正是最少被走到的。
+   所以同一個時間點把 index.ts 的中文字串也比一次；帶 ${…} 的樣板要對得上 ERR_VAR 的其中一條。
+   ⚠️ plan 0007 加的：那一輪伺服器多了一句「還沒輪到你」，英文是手補進字典的，以前沒有任何東西會發現漏補。
+   抓不到的：字串拼出來的錯誤（"找不到" + x）、從別支檔案 import 進來的字。 */
+function serverCheck(known: Set<string>, html: string, CJK: RegExp): string[] {
+  const F = "supabase/functions/game/index.ts";
+  /* 註解換成空白（留著換行，行號才對得上）；網址裡的 :// 不是註解 */
+  const code = Deno.readTextFileSync(F)
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const ev = html.match(/ERR_VAR = (\[[\s\S]*?\]);/);
+  if (!ev) throw new Error("找不到 ERR_VAR（帶變數的錯誤字樣板）");
+  const vars = new Function("return " + ev[1])() as [RegExp, string][];
+  const out: string[] = [];
+  for (const m of code.matchAll(/(["`])((?:\\.|(?!\1)[^\\\n])*)\1/g)) {
+    const lit = m[2];
+    if (!CJK.test(lit) || known.has(lit) || ALLOW.has(lit)) continue;
+    if (/console\.(log|warn|error|info|debug)\s*\($/.test(code.slice(Math.max(0, m.index! - 80), m.index!).split("\n").pop() ?? "")) continue;
+    if (lit.includes("${") && vars.some(([re]) => re.test(lit.replace(/\$\{[^}]*\}/g, "X")))) continue;
+    out.push(F + ":" + code.slice(0, m.index!).split("\n").length + "  " + lit);
+  }
+  return out;
 }
 
 const LANG = Deno.args[0] === "zh" ? "zh" : "en";

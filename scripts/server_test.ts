@@ -457,6 +457,119 @@ try {
     }
   }
 
+  /* ════════ 十一、早到的那一手：前一家還在路上，我先到（plan 0007） ════════
+     手機是聽到對手的廣播（約 0.05 秒）就讓你出的；對手那一手寫進資料庫要 0.7–1.9 秒（2026-10-21 兩人桌 15 次）。
+     我的請求先到，伺服器眼裡就還輪對手。以前馬上 409「這張牌不能出」——牌是合法的，理由是錯的，人只好再點一次。
+     要的：等前一家寫進去再做；真的等不到才說「還沒輪到你」；重送、牌不在手上的不必等。 */
+  if (!BEFORE && part(11)) {
+    const legal = (hand: { id: string; s: number }[], led: number | null) =>
+      led === null || led === 4 || !hand.some((c) => c.s === led) ? hand : hand.filter((c) => c.s === led || c.s === 4);
+    const handOf = async (code: string, seat: number) => (await hands(code)).get(seat)!.cards;
+
+    // a. 前一家晚 0.3 秒才到：兩張都要在桌上
+    {
+      const { code, us, pids } = await table(2);
+      await bidAll(code, us, pids);
+      const R = await room(code);
+      const uL = (await seatUser(code, us, pids, R.turn))!, uO = us.find((x) => x !== uL)!;
+      const sO = (R.turn + 1) % 2;
+      const cL = (await handOf(code, R.turn))[0];
+      const cO = legal(await handOf(code, sO), cL.s)[0];
+      const [rO, rL] = await Promise.all([
+        hit(uO, { action: "play", code, card: cO.id }),
+        later(300, () => hit(uL, { action: "play", code, card: cL.id })),
+      ]);
+      const R2 = await room(code);
+      ok(rO.status === 200 && rL.status === 200,
+        `早到：我先到、前一家晚 0.3 秒——我拿到 ${rO.status} ${rO.body.error ?? ""}、前一家 ${rL.status} ${rL.body.error ?? ""}`);
+      ok(R2.trick.map((t: { card: { id: string } }) => t.card.id).join(",") === [cL.id, cO.id].join(","),
+        `早到：桌上的牌不是「前一家、我」（${R2.trick.map((t: { p: number }) => t.p).join(",") || "空"}）`);
+      ok((await ledger(code)).length === 0, "早到：帳對不上");
+    }
+
+    // b. 前一家一直不出：等到上限才 409，字是「還沒輪到你」，桌面沒被動到
+    //    手牌直接擺好（第一局每人只有一張，下面 c 的「這一墩出過還重送」「不跟花色」走不到）：
+    //    輪到的人拿 0、1 兩門各一張；下一家拿 0、2 兩門各一張——0 門被領出時，2 門那張就不合規則
+    {
+      const { code, us, pids } = await table(2);
+      await bidAll(code, us, pids);
+      const R = await room(code);
+      const uL = (await seatUser(code, us, pids, R.turn))!, uO = us.find((x) => x !== uL)!;
+      const sL = R.turn, sO = (R.turn + 1) % 2;
+      const used = new Set<string>([R.trump_card?.id, ...[...(await hands(code)).values()].flatMap((h) => h.cards.map((c) => c.id))]);
+      const pick = (suit: number) => {
+        for (const d of [0, 1]) for (let r = 7; r <= 14; r++) {
+          const id = `${d}-${suit}-${r}`;
+          if (!used.has(id)) { used.add(id); return { id, s: suit, r }; }
+        }
+        throw new Error("擺不出手牌");
+      };
+      const hL = [pick(0), pick(1)], hO = [pick(0), pick(2)];
+      const put = (seat: number, cards: unknown) =>
+        PG.db!.query(`update public.hands set cards = $3::jsonb where code = $1 and seat = $2`, [code, seat, JSON.stringify(cards)]);
+      await put(sL, hL); await put(sO, hO);
+
+      const t = performance.now();
+      const r = await hit(uO, { action: "play", code, card: hO[0].id });
+      const ms = performance.now() - t;
+      ok(r.status === 409 && r.body.error === "還沒輪到你",
+        `前一家一直不出：應該 409「還沒輪到你」，拿到 ${r.status} ${JSON.stringify(r.body.error ?? "")}`);
+      ok(ms >= 2500 && ms < 6000, `前一家一直不出：等了 ${Math.round(ms)}ms（該是 3 秒左右）`);
+      ok((await room(code)).rev === R.rev && r.body.room?.rev === R.rev, "前一家一直不出：等完被打回，桌面卻被動過了，或帶回來的不是這一刻");
+
+      // c. 不必等的：牌不在手上、這一墩已經出過（重送、連點）
+      const t2 = performance.now();
+      const r2 = await hit(uO, { action: "play", code, card: "沒有這張" });
+      ok(r2.status === 409 && performance.now() - t2 < 1500, `牌不在手上也等了 ${Math.round(performance.now() - t2)}ms`);
+      const rL = await hit(uL, { action: "play", code, card: hL[0].id });
+      ok(rL.status === 200, `擺好的手牌出不去：${rL.status} ${rL.body.error ?? ""}`);
+      const t3 = performance.now();
+      const r3 = await hit(uL, { action: "play", code, card: hL[1].id });
+      ok(r3.status === 409 && performance.now() - t3 < 1500, `這一墩已經出過還重送，也等了 ${Math.round(performance.now() - t3)}ms`);
+      // 輪到你但不跟花色：字還是「這張牌不能出」，不是「還沒輪到你」
+      const r4 = await hit(uO, { action: "play", code, card: hO[1].id });
+      ok(r4.status === 409 && r4.body.error === "這張牌不能出", `輪到你但不跟花色：${r4.status} ${JSON.stringify(r4.body.error)}`);
+    }
+
+    // d. 依序叫墩：下一家先到、輪到的人晚 0.3 秒
+    {
+      const { code, us, pids } = await table(3);
+      const R = await room(code);
+      const uA = (await seatUser(code, us, pids, R.turn))!;
+      const uB = (await seatUser(code, us, pids, (R.turn + 1) % 3))!;
+      const [rB, rA] = await Promise.all([
+        hit(uB, { action: "bid", code, v: 0 }),
+        later(300, () => hit(uA, { action: "bid", code, v: 0 })),
+      ]);
+      const R2 = await room(code);
+      ok(rA.status === 200 && rB.status === 200 && R2.bids[R.turn] === 0 && R2.bids[(R.turn + 1) % 3] === 0,
+        `依序叫墩早到：下一家 ${rB.status} ${rB.body.error ?? ""}、輪到的人 ${rA.status}（桌上 ${JSON.stringify(R2.bids)}）`);
+    }
+
+    // e. 最後一家的叫墩還在路上，莊家就先出牌了
+    {
+      const { code, us, pids } = await table(2);
+      const R = await room(code);
+      const uS = (await seatUser(code, us, pids, R.turn))!, uLast = us.find((x) => x !== uS)!;
+      await hit(uS, { action: "bid", code, v: 0 });
+      const c = (await handOf(code, R.starter))[0];
+      const lastBid = async () => {
+        for (const v of [0, 1, 2]) {
+          const r = await hit(uLast, { action: "bid", code, v });
+          if (r.status === 200) return r;
+        }
+        return null;
+      };
+      const [rP, rB] = await Promise.all([
+        hit(uS, { action: "play", code, card: c.id }),
+        later(300, lastBid),
+      ]);
+      const R2 = await room(code);
+      ok(rB?.status === 200 && rP.status === 200 && R2.trick.some((t: { card: { id: string } }) => t.card.id === c.id),
+        `叫墩還在路上時莊家先出牌：出牌 ${rP.status} ${rP.body.error ?? ""}、叫墩 ${rB?.status}`);
+    }
+  }
+
   /* ════════ 十、不准長出第二道門：牌局的寫入只走 game_commit ════════
      上面九段驗的是「走 game_commit 的那幾條路」；這一段釘的是「沒有別條路」。
      0007 之前的病根就是第二道門：手牌的寫入直接打 hands 表，在 rooms 的樂觀鎖外面。
@@ -481,7 +594,7 @@ try {
 
 const ms = Math.round(performance.now() - t0);
 console.log(`11 Up & Down — 伺服器那一步的測試（本體 index.ts ＋ 真的 Postgres）${BEFORE ? `【改之前：${BEFORE_REF}】` : ""}`);
-console.log("  鎖屏補敲、兩發 next、同時叫墩、整場、409 帶真相、報到、房主離開、權限、int[] 欄位、沒有第二道門");
+console.log("  鎖屏補敲、兩發 next、同時叫墩、整場、409 帶真相、報到、房主離開、權限、int[] 欄位、沒有第二道門、早到的那一手");
 console.log(`  ${checks} 項，${ms} 毫秒，SEED=${SEED}`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);
