@@ -681,6 +681,49 @@ try {
   await new Promise((r) => setTimeout(r, 300));
   ok((await look()).rev === 1400, "比畫面舊的那一列跟著否決一起被收進來了（rev 倒退）");
   await b.eval(`__T.fake(); return 1`);
+
+  /* ── 二十九、realtime 推來的列缺欄位：沒帶的那一欄是「沒變」，不是「空的」 ──
+     2026-10-24 五人桌 48DC 第 18 局：rooms 那一列長過 2KB，Postgres 把 seats 存到列外（TOAST）。
+     之後只改 seen 的心跳（game_seen）不碰 seats，邏輯複寫裡就沒有那一欄，realtime 推出來的那一列也就沒有 seats。
+     以前 (row.seats||[]) 把「沒帶」當成「桌上沒人」：認不得自己（log 的 me=-1）→ 出牌被 noseat 擋掉、
+     叫墩那排按鈕跟著每一次心跳消失又冒出來、ticker 每 420ms 一次 TypeError。
+     存在列外的是哪一欄看那一刻誰最大（scripts/toast_probe.ts 重演三趟：seats 從第 1～6 局起，兩趟到第 17、18 局換成 log），所以兩欄都測。 */
+  await b.eval(`__T.flush(); __T.reply = "pending";
+    const g = __T.clone(__T.g); g.phase = "bid"; g.bids = g.bids.map(function(){ return null; });
+    g.turn = 0; g.trick = []; g.led = null; g.played = 0;
+    g.log = [{size:1, trump:0, cells:g.seats.map(function(){ return {bid:0, got:0, pts:10, hit:true}; })}];
+    __T.g29 = g;
+    UD.__t.applyRow(__T.row(g, 1500), __T.clone(g.hands[0]));
+    return 1`);
+  /* 心跳那一列：rev 不變、seen 換新、drop 那幾欄沒帶 */
+  const beat = (rev: number, drop: string[], seen: number) => b.eval(`
+    const r = __T.row(__T.g29, ${rev}); r.seen = {me:${seen}};
+    ${JSON.stringify(drop)}.forEach(function(k){ delete r[k]; });
+    try{ UD.__t.applyRow(r); }catch(e){ __T.err29 = String(e); }   /* 以前這裡會在畫座位時爆掉：照樣往下驗 */
+    return 1`);
+  const s29 = () => b.eval<{ seat: number; n: number; seen: number; log: number; btn: number; rev: number }>(`
+    return {seat:UD.mySeat(), n:UD.G.seats.length, seen:UD.G.seen.me, log:UD.G.log.length, rev:UD.G.rev,
+            btn:document.querySelectorAll("#status .bidbtn").length}`);
+  ok((await s29()).btn > 0, "二十九段的前提不成立：輪到我叫墩，狀態列卻沒有叫墩按鈕");
+  await beat(1500, ["seats"], 777);
+  await new Promise((r) => setTimeout(r, 120));
+  let v29 = await s29();
+  ok(v29.seat === 0 && v29.n === 4, `心跳那一列沒帶座位，畫面就認不得我（座位=${v29.seat}、桌上 ${v29.n} 人）`);
+  ok(v29.btn > 0, "心跳那一列一到，叫墩那排按鈕就不見了");
+  ok(v29.seen === 777, "心跳那一列帶來的報到沒收（缺欄位的列整列丟掉，別人在不在線就停在舊的）");
+  await beat(1500, ["log"], 778);
+  v29 = await s29();
+  ok(v29.log === 1, `心跳那一列沒帶計分紀錄，計分表就被清空（${v29.log} 局）`);
+  ok(v29.seen === 778, "沒帶計分紀錄的那一列，帶來的報到沒收");
+  /* rev 變了的那一列缺欄位：那一欄在中間可能改過，拿手上那份補是猜——不收，去問伺服器 */
+  await b.eval(`__T.calls.length = 0; return 1`);
+  await beat(1501, ["seats"], 779);
+  v29 = await s29();
+  const asked = await b.eval<boolean>(`return __T.calls.indexOf("state") >= 0`);
+  ok(v29.rev === 1500 && v29.n === 4, `rev 變了又缺欄位的那一列被拿舊的補上收進來了（rev=${v29.rev}）`);
+  ok(asked, "rev 變了又缺欄位的那一列丟掉了，卻沒有去問伺服器真的那一列");
+  const err29 = await b.eval<string>(`return __T.err29 || ""`);
+  ok(!err29, `缺欄位的那一列一套進來畫面就爆掉：${err29}`);
 } catch (e) {
   fails.push("測試中途爆掉：" + (e as Error).message);
 } finally {
@@ -692,6 +735,7 @@ console.log("11 Up & Down — 連線那一段的測試（無頭 Chrome ＋ 假�
 console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點、手牌對帳、逾時、補敲、斷線補問");
 console.log("  plan 0006：飛行中的那一手、同時叫墩重放、房主離線照樣有按鈕、背景斷一次不嚷、玩家動作插隊、409 帶回房間、手機時鐘快、補敲錯開、舊頻道的列、舊伺服器的假成功");
 console.log("  plan 0007：對手那一列先到時疊回我那張、含著我那一手的列不重演、否決我那一手的同 rev 真相照收");
+console.log("  issue 0004：realtime 推來的列缺欄位（TOAST）——同 rev 照手上那列補、rev 變了不收去問伺服器");
 console.log(`  ${checks} 項，${ms} 毫秒`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);

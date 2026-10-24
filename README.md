@@ -73,6 +73,7 @@ deno run -A          scripts/gag_test.ts        # 收桌頒獎（Thomas 爬講�
 deno run -A          scripts/i18n_scan.ts      # 英文版有沒有殘留中文（加 zh 反過來掃；DIM=3 走立體；SHOT=1 順手截圖）
 deno run --allow-net supabase/functions/game/auth_test.ts   # 登入的簽章驗證
 deno run -A          scripts/server_test.ts     # 伺服器那一步：真的 index.ts＋真的 Postgres（PGlite），多人同時按的撞法
+deno run -A          scripts/toast_probe.ts     # 不是測試：重演 rooms 那一列哪一局開始把座位存到列外（issue 0004）
 ```
 
 前兩支**不改也不需要任何產品程式配合**：它們照區段標記把「純計算」那一段從
@@ -99,7 +100,10 @@ deno run -A          scripts/server_test.ts     # 伺服器那一步：真的 in
   伺服器蓋章不重演動畫、過期的那一列、六秒保險絲、送不出去要退回、對手廣播、有人亂喊；
   plan 0006 加的：飛行中的那一手不被同一格的列抹掉、同時叫墩別人先寫進去時把我的骰子疊回去、房主離線與背景斷一次
   按鈕都還在、玩家的動作插隊到背景呼叫前面、409 帶回來的房間照收、手機時鐘快 40 秒照樣看得到誰在線、補敲錯開、
-  舊頻道進來的列不收。
+  舊頻道進來的列不收；issue 0004 加的：realtime 推來的列缺欄位（資料庫存在列外、這一步沒改的那幾欄）時，
+  沒帶的是「沒變」不是「空的」——同一個 rev 照手上那一列補、rev 變了不收並去問伺服器。
+- **`toast_probe.ts`**（不是測試，issue 0004 的重演）用 PGlite 造一列跟線上一樣大的五人桌、打 21 局，
+  印出每一局哪一欄被存到列外；亂數沒種子，每一趟界線不同。
   plan 0007 加的：對手那一列（不帶手牌）比我的回話先到時把我那張疊回去、含著我那一手的列不准把牌放回手上、
   伺服器否決我那一手時帶回來的同 rev 桌面照收。
   伺服器換成假的（接縫 `window.__call`），每一列什麼時候到、內容是什麼都由測試決定。

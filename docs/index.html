@@ -4334,8 +4334,38 @@ function auditHand(){
   api("state", {code:NET.code}, true);
 }
 
+/* ⚠️ realtime 推來的那一列不一定是整列：沒帶的那一欄是「沒變」，不是「空的」。
+   rooms 那一列長過 2KB，Postgres 就把最大的那一欄 jsonb 存到列外（TOAST）。之後哪一步沒改到它，
+   邏輯複寫裡就沒有那一欄，realtime 推出來的列也就沒有那個 key——realtime.apply_rls 只會從 old_record 補，
+   而表的 REPLICA IDENTITY 是 DEFAULT 時 old_record 只有主鍵。最常見的是心跳：game_seen 只改 seen。
+   2026-10-24 五人桌 48DC 第 18 局：seats 在列外，每一次心跳推來的列都沒有座位。以前 (row.seats||[]) 把它當成
+   「桌上沒人」→ 認不得自己（log 的 me=-1）→ 出牌被 noseat 擋掉、ticker 每 420ms 一次 TypeError；
+   叫墩那排只在認得自己時才畫，他回報的「喊墩那一欄一直上下跳動、點不到」是從程式推的，沒在真牌桌上重現過。
+   在列外的是哪一欄看那一刻誰最大（scripts/toast_probe.ts 重演三趟：seats 從第 1～6 局起，兩趟到第 17、18 局換成 log），
+   所以這裡不認欄位名：手上那一列有、這一列沒帶的，就是沒帶。
+   · 同一個 rev 才補：rev 沒變＝牌局沒動（game_seen 不動 rev），除了它帶來的那幾欄，其他都跟手上那一列一樣。
+   · rev 變了又缺欄位：那一欄在中間可能改過，補了就是猜——不收；比手上新的話去問伺服器整列。
+   HTTP 回的是 to_jsonb(r)，永遠是整列；它進來時順便當下一次補欄位的底。net_test 二十九。 */
+let RAW = null;
+function wholeRow(row){
+  const base = RAW && RAW.code === row.code ? RAW : null;
+  const miss = base ? Object.keys(base).filter(k => row[k] === undefined) : [];
+  if(miss.length){
+    const same = (row.rev || 0) === (base.rev || 0);
+    if(TRACE.on) TRACE.log("row~", "rev=" + row.rev + " missing=" + miss.join(",") + (same ? " fill" : " drop"));
+    if(!same){
+      if((row.rev || 0) > (base.rev || 0) && MODE === "net" && NET.code === row.code) api("state", {code:row.code}, true);
+      return null;
+    }
+    for(const k of miss) row[k] = base[k];
+  }
+  if(!base || (row.rev || 0) >= (base.rev || 0)) RAW = row;
+  return row;
+}
+
 /* 伺服器的一列 → 畫面要的形狀。唯一的差別：手牌只有自己那份。 */
 function applyRow(row, hand){
+  if(row && row.code && !(row = wholeRow(row))) return;   /* 缺欄位又對不上 rev：不收（比手上新的話已經去問了） */
   const hk = row && row.cfg ? handKey(row) : "";
   const has = hand !== undefined && hand !== null;
   /* 換局、換場、換桌的那一副手牌先收下，不受 fresher 管——那一列就算過期了，

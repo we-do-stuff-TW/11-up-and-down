@@ -129,7 +129,7 @@ $f$;
 async function freshDb(ints = false): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(baseSchema(ints));
-  for (const m of ["0004_auth.sql", "0005_rules.sql", "0006_again.sql", "0007_one_step.sql"]) {
+  for (const m of ["0004_auth.sql", "0005_rules.sql", "0006_again.sql", "0007_one_step.sql", "0008_rooms_full_identity.sql"]) {
     await db.exec(await Deno.readTextFile(new URL("supabase/migrations/" + m, ROOT)));
   }
   await db.exec(`grant all on all tables in schema public to service_role;`);

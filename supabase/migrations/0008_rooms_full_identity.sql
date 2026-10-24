@@ -1,0 +1,13 @@
+-- 0008 rooms 的每一筆推播都是整列（issue 0004）。
+--
+-- rooms 那一列長過約 2KB，Postgres 就把最大的那一欄 jsonb 存到列外（TOAST）。之後哪一步沒改到它，
+-- 邏輯複寫裡就沒有那一欄（wal2json 寫明 "Unchanged TOAST Datum does not need to be output"）。
+-- realtime.apply_rls 會從 old_record 把它補回來，但 REPLICA IDENTITY 是 DEFAULT 時 old_record 只有主鍵——
+-- 補不到，推出去的那一列就少那一欄。最常見的是心跳 game_seen：只改 seen，seats 或 log 就沒帶。
+-- 2026-10-24 五人桌 48DC 第 18 局：網頁把沒帶的 seats 當成「桌上沒人」，認不得自己，出牌被擋、叫墩按鈕一閃一閃。
+--
+-- FULL：每一次 UPDATE 把整個舊列寫進 WAL（Postgres 會把列外的值攤平），realtime 補得回來。
+-- 代價：WAL 多一份舊列、每一筆推播多帶 old_record（現在一列約 2.5KB）。
+-- 網頁那邊另有 wholeRow()（docs/index.html）：同一個 rev 照手上那一列補，這支沒套的時候也不會壞。
+-- 改回去：alter table public.rooms replica identity default;
+alter table public.rooms replica identity full;
