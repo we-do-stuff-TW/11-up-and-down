@@ -1,6 +1,6 @@
 # 0004 — 線上多人：牌點了出不去、喊墩那一欄一直上下跳動點不到
 
-狀態：處理中（10-24 Francis 回「好」：網頁兩半都推上線；資料庫 0008 寫好，套線上要他本人跑）
+狀態：處理中（10-24 網頁兩半都推上線、資料庫 0008 已套；等真人再打一場長的驗）
 發現：2026-10-24（Francis 跟朋友打，房號 48DC、五個真人、第 18 局，貼了 `?trace=1` 的 log）
 嚴重度：高（中後段整場都可能發生；出牌被吃掉、叫墩按不到）
 
@@ -66,10 +66,11 @@ log 每一行尾巴的 `me=` 在 0 與 -1 之間來回跳（-1＝找不到自己
 我那一手的回話不疊：成功的一定含著前面每一手，被否決的（409）說的就是「對手那張還沒寫進去」。
 `net_test` 三十段（87→95），五刀 tamper 各紅在對的那一條；叫墩也測。
 
-### 資料庫（`supabase/migrations/0008_rooms_full_identity.sql`，線上還沒套）
+### 資料庫（`supabase/migrations/0008_rooms_full_identity.sql`，10-24 已套）
 
 `alter table public.rooms replica identity full;`——realtime 就能從 old_record 補回沒變的那幾欄，每一列推出來都是整列。
 好處：還開著舊網頁的人也一起好、以後別的欄位也不會再缺。代價：每次推播多帶一份舊的那一列（現在約 2.5KB → 5KB）。
 可以隨時改回 `replica identity default`。
 10-24 Francis 同意改；我用連線器套被自動權限擋下（改線上資料庫要他本人），請他在 Supabase 的 SQL Editor 跑那一行。
 驗：`select relreplident from pg_class where oid = 'public.rooms'::regclass;` 要回 `f`。server_test 已經套 0008 跑過。
+10-24 他在 SQL Editor 跑完，查回 `f`（他回報的，我這邊沒再查）。
