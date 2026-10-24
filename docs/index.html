@@ -4197,6 +4197,13 @@ const INBOX = {
      比較新的列（別人真的走了一步）照收，收完把這一手疊回去（replayPend）。 */
   pend:null,
   PEND_MAX:40000,
+  /* 對手那幾手廣播（已經畫上桌、伺服器那一列還沒寫進去）：{m, at, code, match, ri, played}。
+     ⚠️ 比較新的列照收，收完把還沒寫進去的那幾手疊回去（replayPeers）——跟 pend 同一件事，只是是別人的。
+     以前收一列就全部作廢：一號、二號連著出，只寫進一號的那一列先到，二號那張就從桌上消失，
+     下一列到了才又出現（2026-10-24 五人桌 log 15:20:35；湊滿的一墩退回還差一張，15:20:47）。
+     只記，不判斷：疊不疊得上、還算不算數，由 replayPeers 照當下那一列決定。不歸 settled 清——
+     settled 是「伺服器講話了」，而伺服器那一列說的正是「這幾手還沒寫進去」。 */
+  peers:[],
   ranAhead:function(snap, move){ this.opt = snap || null; this.at = Date.now(); this.pend = move || null; },
   isAhead:function(){
     if(this.at <= 0) return false;
@@ -4410,10 +4417,17 @@ function applyRow(row, hand){
     hands:[]
   };
   for(let i=0;i<g.cfg.n;i++) g.hands[i] = [];
+  const prev = G;
   G = g; MODE = "net"; NET.code = row.code;
   const s = mySeat();
   if(s >= 0) G.hands[s] = MYHAND;
-  if(pend && ANSWER !== "bid" && ANSWER !== "play") replayPend(pend);
+  /* 先疊別人的、再疊我的：對手那幾手在我那一手之前（輪到我才出得了）。
+     我那一手的回話不疊對手的：成功的那一列一定已經含著前面每一手；被否決的（409）帶的就是真相，
+     「對手那張還沒寫進去」正是它要說的——疊回去就又是對手的牌在桌上、字卻說還沒輪到我（net_test 二十八） */
+  const mine = ANSWER === "bid" || ANSWER === "play";
+  if(mine) INBOX.peers = [];
+  else replayPeers(prev);
+  if(pend && !mine) replayPend(pend);
   auditHand();                            /* 張數對不上就去把真的那一份抓回來 */
   /* 只記「我還坐在裡面」的那一桌。被移除、或牌局中把位子交給 AI 之後，
      伺服器回的那一列裡就沒有我了——那一桌不該再問「要不要回去」。 */
@@ -4462,43 +4476,69 @@ function chanStatus(st){
 }
 /* 對手的畫面：資料庫那一列要繞一圈（寫進去、WAL、realtime 再推出來）才會到別人那邊，
    差不多一秒。broadcast 不碰資料庫，五十毫秒就到。所以按下去的同時也直接喊一聲，
-   別人先把牌畫上桌——權威永遠是伺服器那一列，它一到就整個蓋掉。 */
+   別人先把牌畫上桌——權威永遠是伺服器那一列，它一到就整個蓋掉，還沒寫進去的那幾手再疊回去（replayPeers）。 */
 function sendMove(m){
   if(!NET.chan || MODE !== "net") return;
   try{ NET.chan.send({type:"broadcast", event:"move", payload:m}); }catch(e){}
 }
 /* 這是別人家的瀏覽器喊過來的，不是伺服器講的話。只拿來提早畫一格畫面，而且只接
    「現在本來就輪到他、桌上還沒有那張牌」的那一手；對不上就當沒聽見。
-   最壞的情況是有人亂喊，讓你多看一秒不存在的牌，隨後那一列到了就蓋掉。 */
+   最壞的情況是有人亂喊，讓你多看幾秒不存在的牌（最多 INBOX.TTL），之後那一列到了就蓋掉。 */
 function peerMove(m){
   if(TRACE.on) TRACE.log("peer", (m ? m.t + " seat=" + m.seat : "-") + (INBOX.peerOk(m) ? "" : " ignored"));
   if(!INBOX.peerOk(m)) return;
+  const at = {m:m, at:Date.now(), code:NET.code, match:G.match || 1, ri:G.ri, played:G.played};
+  if(!applyPeer(m)) return;
+  INBOX.peers.push(at);
+  INBOX.ranAhead();
+  render();
+}
+/* 對手那一手放上本機這一格；放不上回 false。剛喊過來（peerMove）與新的一列收下來之後疊回去（replayPeers）
+   共用這一支：兩條路「接不接」要是同一套，不然疊回去的那條會慢慢接受剛喊過來時不收的東西。 */
+function applyPeer(m){
   const s = m.seat;
   if(m.t === "bid"){
-    if(G.phase !== "bid") return;
-    if(G.bids[s] !== null && G.bids[s] !== undefined) return;
+    if(G.phase !== "bid") return false;
+    if(G.bids[s] !== null && G.bids[s] !== undefined) return false;
     if(rules(G.cfg).bidMode === "sim"){ G.bids[s] = -1; G.at = Date.now(); }
     else{
-      if(G.turn !== s) return;
-      if(!(typeof m.v === "number" && m.v >= 0 && m.v <= G.hs)) return;
-      if(!applyBid(G, s, m.v)) return;
+      if(G.turn !== s) return false;
+      if(!(typeof m.v === "number" && m.v >= 0 && m.v <= G.hs)) return false;
+      if(!applyBid(G, s, m.v)) return false;
     }
-    INBOX.ranAhead();
-    render();
-    return;
+    return true;
   }
-  if(m.t !== "play" || G.phase !== "play" || G.turn !== s) return;
+  if(m.t !== "play" || G.phase !== "play" || G.turn !== s) return false;
   const c = m.card;
-  if(!c || typeof c.id !== "string" || typeof c.s !== "number" || typeof c.r !== "number") return;
-  if(G.trick.some(t => t.card.id === c.id)) return;
+  if(!c || typeof c.id !== "string" || typeof c.s !== "number" || typeof c.r !== "number") return false;
+  if(G.trick.some(t => t.card.id === c.id)) return false;
   /* 別人的手牌本機沒有（那正是重點），所以這裡不能走 applyPlay——直接把牌放上檯面 */
   if(G.trick.length === 0) G.led = c.s;
   G.trick.push({p:s, card:{s:c.s, r:c.r, id:c.id}});
   if(G.trick.length === G.cfg.n) G.phase = "trickend";
   else G.turn = (s + 1) % G.cfg.n;
   G.at = Date.now();
+  return true;
+}
+/* 新的一列收下來了：對手還沒寫進去的那幾手疊回去（見 INBOX.peers）。
+   只疊同一桌、同一場、同一局、同一墩，而且六秒內喊的：
+   · 同一墩：上一墩輪到他時喊的那張，到了下一墩他又先出時照樣「疊得上」（輪到他、檯面上沒有那張），
+     不看墩數就會跑進新的一墩（net_test 三十）
+   · 六秒：喊了卻一直沒寫進去（亂喊、或伺服器沒收），跟 INBOX.TTL 同一個保險絲
+   已經寫進去的疊不上（檯面上有了、或早就不輪他），就從清單拿掉。
+   疊完要是跟收這一列之前是同一格，時間戳照舊——不然那張牌的動畫、收墩的停頓都從頭再來一次。 */
+function replayPeers(prev){
+  const now = Date.now(), keep = [];
+  for(const p of INBOX.peers){
+    if(now - p.at > INBOX.TTL || p.code !== NET.code || p.match !== (G.match || 1) ||
+       p.ri !== G.ri || p.played !== G.played) continue;
+    if(applyPeer(p.m)) keep.push(p);
+  }
+  INBOX.peers = keep;
+  if(!keep.length) return;
+  if(prev && sameBeat(prev, G)) G.at = prev.at;
   INBOX.ranAhead();
-  render();
+  if(TRACE.on) TRACE.log("peer", "replayed " + keep.map(p => p.m.seat).join(","));
 }
 function unsubscribe(){
   if(NET.chan && NET.sb) NET.sb.removeChannel(NET.chan);

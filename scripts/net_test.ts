@@ -84,6 +84,8 @@ window.__T = {
        ⚠️ 以前不清也沒事，是因為出牌那一手撐不過下一列（疊不回去）——plan 0007 修好之後它疊得回去，
        十一段留下的那一手就一路活到十三段，被當成這一段的牌重演（十三段紅在「逾時之後那一手沒有退回手上」） */
     UD.__t.INBOX.settled();
+    /* 對手的廣播不歸 settled 清（見 INBOX.peers）：前一段喊的那幾手，同一墩、六秒內會被這一段的列疊回去 */
+    UD.__t.INBOX.peers = [];
   },
   /* 一墩剛打完的那一列：全桌每人一張在檯面上。伺服器只在湊滿 n 張時才進 trickend（index.ts applyPlay），
      而且收這一墩的同一步就清掉檯面——trickend 配空的檯面是不可能的狀態。
@@ -669,7 +671,7 @@ try {
   const err28 = await b.eval<string>(`return UD.__t.NET.err`);
   ok(s28.rev === 1300 && s28.turn === 3 && s28.trick === "",
     `409 帶回來的同 rev 真相沒收：還留著對手沒寫進去的牌或我那張（turn=${s28.turn}、檯面座位=${s28.trick || "空"}）`);
-  ok(s28.inHand && s28.hand === nFull && !s28.ahead, `被否決之後我那張沒回到手上（${s28.hand} 張，該是 ${nFull}）`);
+  ok(s28.inHand && s28.hand === nFull && !s28.ahead, `被否決之後我那張沒回到手上，或還掛著「演到下一格」（${s28.hand} 張，該是 ${nFull}；還在手上=${s28.inHand}、還在等=${s28.ahead}）`);
   ok(!!err28, "被否決卻一聲不吭");
   /* 比畫面舊的否決照樣不收：那一列早就過時了，收了就是倒退 */
   await b.eval(`
@@ -724,6 +726,72 @@ try {
   ok(asked, "rev 變了又缺欄位的那一列丟掉了，卻沒有去問伺服器真的那一列");
   const err29 = await b.eval<string>(`return __T.err29 || ""`);
   ok(!err29, `缺欄位的那一列一套進來畫面就爆掉：${err29}`);
+
+  /* ── 三十、對手連著出兩張，伺服器那一列只寫進第一張：第二張不准從桌上消失 ──
+     2026-10-24 五人桌 48DC 的 log：15:20:34 一號、15:20:35 二號的廣播先後畫上桌，
+     15:20:35.756 伺服器寫進一號那張的列（rev 843）才到——比畫面新就照收，二號那張從桌上消失，
+     一秒後 rev 844 到了才又出現（出現→消失→再出現）。15:20:47 同一件事發生在一墩的最後一張：
+     已經湊滿的一墩退回「還差一張」，半秒後又湊滿。
+     自己那一手早就會疊回去（replayPend）；對手的廣播以前收一列就全部作廢。 */
+  await b.eval(`__T.flush(); __T.reply = "pending";
+    const E = UD.engine;
+    __T.table(); const g = __T.clone(__T.g);            /* 4 人、輪我先出 */
+    const pick = function(h, led){ return UD.legalCards(h, led)[0]; };
+    E.applyPlay(g, 0, pick(g.hands[0], g.led).id);     /* 伺服器：我出了，輪一號 */
+    const g1 = __T.clone(g), c1 = pick(g1.hands[1], g1.led); E.applyPlay(g1, 1, c1.id);
+    const g2 = __T.clone(g1), c2 = pick(g2.hands[2], g2.led); E.applyPlay(g2, 2, c2.id);
+    const g3 = __T.clone(g2), c3 = pick(g3.hands[3], g3.led); E.applyPlay(g3, 3, c3.id);
+    __T.g30 = [g, g1, g2, g3];
+    __T.say = function(seat, c){ UD.__t.peerMove({t:"play", seat:seat, card:{s:c.s, r:c.r, id:c.id}}); };
+    __T.c30 = [null, c1, c2, c3];
+    UD.__t.applyRow(__T.row(g, 1600), __T.clone(g.hands[0]));
+    __T.say(1, c1); __T.say(2, c2);
+    __T.at30 = UD.G.at;
+    return 1`);
+  const t30 = () => b.eval<{ seats: string; ph: string; turn: number; rev: number; kept: boolean }>(`
+    return {seats:UD.G.trick.map(function(t){ return t.p; }).join(","), ph:UD.G.phase, turn:UD.G.turn,
+            rev:UD.G.rev, kept:UD.G.at === __T.at30}`);
+  let v30 = await t30();
+  ok(v30.seats === "0,1,2" && v30.turn === 3, `三十段的前提不成立：兩張廣播沒畫上桌（檯面座位=${v30.seats}）`);
+  await b.eval(`UD.__t.applyRow(__T.row(__T.g30[1], 1601)); return 1`);
+  v30 = await t30();
+  ok(v30.rev === 1601 && v30.seats === "0,1,2" && v30.turn === 3,
+    `只寫進一號那張的列一到，二號那張就從桌上消失（檯面座位=${v30.seats}、turn=${v30.turn}）`);
+  ok(v30.kept, "二號那張疊回去了，時間戳卻重設——動畫從頭再演一次");
+  /* 一墩的最後一張：湊滿了（trickend），伺服器那一列還差這一張 */
+  await b.eval(`__T.say(3, __T.c30[3]); __T.at30 = UD.G.at; return 1`);
+  await b.eval(`UD.__t.applyRow(__T.row(__T.g30[2], 1602)); return 1`);
+  v30 = await t30();
+  ok(v30.rev === 1602 && v30.ph === "trickend" && v30.seats === "0,1,2,3",
+    `湊滿的一墩被還差一張的列退回去了（${v30.ph}、檯面座位=${v30.seats}）`);
+  ok(v30.kept, "湊滿的一墩疊回去了，收墩的動畫卻從頭再演一次");
+  /* 疊回去只限同一墩：下一墩又輪到三號先出時，他上一墩那張不准跑進新的一墩 */
+  await b.eval(`const g = __T.clone(__T.g30[3]);
+    g.phase = "play"; g.trick = []; g.led = null; g.played += 1; g.leader = 3; g.turn = 3;
+    UD.__t.applyRow(__T.row(g, 1603)); return 1`);
+  v30 = await t30();
+  ok(v30.rev === 1603 && v30.seats === "" && v30.turn === 3,
+    `上一墩的廣播被疊進下一墩（檯面座位=${v30.seats}）`);
+  /* 廣播了卻一直沒寫進去（亂喊、或伺服器沒收）：六秒後不再疊 */
+  await b.eval(`const g = __T.clone(__T.g30[0]);
+    UD.__t.applyRow(__T.row(g, 1700), __T.clone(g.hands[0]));
+    __T.say(1, __T.c30[1]);
+    UD.__t.INBOX.peers.forEach(function(p){ p.at -= 7000; });
+    UD.__t.applyRow(__T.row(g, 1701)); return 1`);
+  v30 = await t30();
+  ok(v30.rev === 1701 && v30.seats === "0", `六秒前的廣播還一直被疊回去（檯面座位=${v30.seats}）`);
+  /* 叫墩走同一條路：一號、二號連著喊，只寫進一號的那一列先到，二號的骰子不准收回去 */
+  await b.eval(`__T.flush();
+    const E = UD.engine, g = __T.clone(__T.g30[0]);
+    g.phase = "bid"; g.trick = []; g.led = null; g.played = 0; g.turn = 1; g.cfg.bidMode = "seq";
+    g.bids = g.bids.map(function(){ return null; }); g.bids[0] = 0;
+    UD.__t.applyRow(__T.row(g, 1800), __T.clone(g.hands[0]));
+    UD.__t.peerMove({t:"bid", seat:1, v:0}); UD.__t.peerMove({t:"bid", seat:2, v:1});
+    const g1 = __T.clone(g); E.applyBid(g1, 1, 0);
+    UD.__t.applyRow(__T.row(g1, 1801)); return 1`);
+  const b30 = await b.eval<{ rev: number; bid2: number | null; turn: number }>(`return {rev:UD.G.rev, bid2:UD.G.bids[2], turn:UD.G.turn}`);
+  ok(b30.rev === 1801 && b30.bid2 === 1 && b30.turn === 3,
+    `只寫進一號叫墩的列一到，二號的骰子就收回去了（二號=${b30.bid2}、turn=${b30.turn}）`);
 } catch (e) {
   fails.push("測試中途爆掉：" + (e as Error).message);
 } finally {
@@ -735,7 +803,7 @@ console.log("11 Up & Down — 連線那一段的測試（無頭 Chrome ＋ 假�
 console.log("  樂觀先走、遲到的同一格、真的那一列、過期、保險絲、打回票、對手廣播、亂喊、收斂點、手牌對帳、逾時、補敲、斷線補問");
 console.log("  plan 0006：飛行中的那一手、同時叫墩重放、房主離線照樣有按鈕、背景斷一次不嚷、玩家動作插隊、409 帶回房間、手機時鐘快、補敲錯開、舊頻道的列、舊伺服器的假成功");
 console.log("  plan 0007：對手那一列先到時疊回我那張、含著我那一手的列不重演、否決我那一手的同 rev 真相照收");
-console.log("  issue 0004：realtime 推來的列缺欄位（TOAST）——同 rev 照手上那列補、rev 變了不收去問伺服器");
+console.log("  issue 0004：realtime 推來的列缺欄位（TOAST）——同 rev 照手上那列補、rev 變了不收去問伺服器；對手連著出、只寫進第一手的列先到時其餘疊回去");
 console.log(`  ${checks} 項，${ms} 毫秒`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);
