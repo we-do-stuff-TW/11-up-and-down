@@ -67,6 +67,7 @@ deno run --allow-read scripts/engine_test.ts     # 牌局引擎：各種規則�
 deno run --allow-read scripts/rules_test.ts      # 兩份規則對照：畫面 vs 伺服器
 deno run -A          scripts/ui_test.ts         # 出牌的入口：無頭 Chrome 開真的牌桌
 deno run -A          scripts/net_test.ts        # 連線那一段：假伺服器重演各種時序
+deno run -A          scripts/link_test.ts       # 分享連結：?room= 讀了就擦、進得去直接進房、進不去留在大廳、房號＝複製鈕、加入被拒不收別人的桌
 deno run -A          scripts/idle_test.ts       # 畫面沒變就不動：立體不叫醒 WebGL、平面細條不重演；真的變了照畫
 deno run -A          scripts/end_test.ts        # 一場牌的兩個出口：收桌、再來一局、離開遊戲
 deno run -A          scripts/gag_test.ts        # 收桌頒獎（Thomas 爬講台）：真牌桌上停格截圖、關頁會停、沒捲軸（DIM=3 立體、PHONE=1 手機寬）
@@ -103,6 +104,10 @@ deno run -A          scripts/toast_probe.ts     # 不是測試：重演 rooms �
   舊頻道進來的列不收；issue 0004 加的：realtime 推來的列缺欄位（資料庫存在列外、這一步沒改的那幾欄）時，
   沒帶的是「沒變」不是「空的」——同一個 rev 照手上那一列補、rev 變了不收並去問伺服器；
   對手連著出牌（或叫墩）、只寫進第一手的那一列先到時，其餘幾手疊回去，不跑進下一墩、六秒後不再疊。
+- **`link_test.ts`** 分享連結：`?room=` 讀出來轉大寫、讀完就從網址擦掉（別的參數留著）、五個字的壞連結不截成四個字；
+  進得去直接打開房間頁、進不去停在大廳（四格填好、照伺服器的話講、按鈕放開）；房號是複製鈕、「分享連結」電腦複製連結、
+  手機叫系統分享選單、按取消什麼都不做；加入被拒走真的 `call()`（假的是 fetch）時不收別人那一桌；
+  authBoot 在確認 session 之後、offerReturn 之前讀連結（靜態）。抓不到 Google 登入那一趟 `?room=` 活不活得下來——要真人走。
 - **`toast_probe.ts`**（不是測試，issue 0004 的重演）用 PGlite 造一列跟線上一樣大的五人桌、打 21 局，
   印出每一局哪一欄被存到列外；亂數沒種子，每一趟界線不同。
   plan 0007 加的：對手那一列（不帶手牌）比我的回話先到時把我那張疊回去、含著我那一手的列不准把牌放回手上、

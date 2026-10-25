@@ -1138,12 +1138,22 @@ body.in-room .app{display:none}
 
 .rm-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:10px;pointer-events:none}
-.rm-mid .cap{font-size:9.5px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-3)}
+/* 小字用 ink-2 不用 ink-3：ink-3 在手機那塊比較亮的底上只有 3.35:1（要 4.5），
+   而「複製好了」就是靠這行字講的 */
+.rm-mid .cap{font-size:9.5px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-2)}
 .rm-code{font-family:"Bodoni Moda",Georgia,serif;font-size:84px;font-weight:600;line-height:1;
   letter-spacing:.1em;text-indent:.1em;color:var(--ink)}
-.rm-copy{pointer-events:auto;display:flex;align-items:center;gap:8px;font-size:11.5px;
-  color:var(--ink-3);padding:7px 13px;border-radius:99px;transition:color .18s,background .18s}
-.rm-copy:hover{background:oklch(1 0 0/.05);color:var(--ink-2)}
+/* 連線局的房號本身就是複製鈕（單人局那個數字是 span，不受影響）。
+   按下去當場縮一下，不等剪貼簿回話：.96＋壓暗 .72、按下 70ms、放開 180ms（CRAFT §5.2，同頁 .lb-enter 也是 .96） */
+button.rm-code{pointer-events:auto;padding:0;-webkit-tap-highlight-color:transparent;
+  transition:scale .18s var(--e-out),opacity .18s var(--e-out)}
+button.rm-code:active{scale:.96;opacity:.72;transition-duration:.07s}
+@media (prefers-reduced-motion:reduce){button.rm-code:active{scale:none}}
+.rm-copy{position:relative;pointer-events:auto;display:flex;align-items:center;gap:8px;font-size:11.5px;
+  color:var(--ink-2);padding:7px 13px;border-radius:99px;transition:color .18s,background .18s}
+/* 字小、鈕矮（31px），手指的熱區用透明的一層往上下撐到 40 以上，長相不變 */
+.rm-copy::before{content:"";position:absolute;inset:-5px 0}
+.rm-copy:hover{background:oklch(1 0 0/.05);color:var(--ink)}
 .rm-copy i{width:3px;height:3px;border-radius:99px;background:var(--foil-2);display:block;flex:none}
 /* 一個人打：中央那個數字是這一桌會打幾局，底下一行說明它是什麼 */
 .rm-midn{font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
@@ -1291,6 +1301,8 @@ body.rm-set .rm-sheet{opacity:0;pointer-events:none}
   .rm-mid{gap:7px}
   .rm-code{font-size:46px}
   .rm-copy{font-size:11px;padding:5px 10px}
+  /* 手機上鈕只有 26.5 高，撐到 44.5。往上只撐 6：跟房號那顆只隔 7，再多就壓到它 */
+  .rm-copy::before{inset:-6px 0 -12px}
   .rm-p,.rm-p.l,.rm-slot,.rm-slot.l{flex-direction:column;gap:6px;text-align:center}
   .rm-p.l .t,.rm-slot.l .t{text-align:center}
   .rm-p .t,.rm-slot .t{gap:3px}
@@ -2063,7 +2075,9 @@ window.I18N_EN = {
 "離開房間":"Leave room",
 "room.solo":{zh:"一個人打", en:"Solo"},
 "局 · 對 AI，不記戰績":"rounds · vs AI, not recorded",
-"按一下複製":"Tap to copy",
+"複製房號 %1":"Copy room code %1",
+"分享連結":"Share link",
+"來打 11 Up & Down，房號 %1":"Join my 11 Up & Down table, room %1",
 "複製好了":"Copied",
 "複製不了":"Couldn't copy",
 "移除":"Remove",
@@ -4131,8 +4145,12 @@ async function call(action, args){
       /* next 是自動敲的（可能兩個人同時補敲，晚到的那一發會被「這局還沒結束」打回），不必印出來 */
       if(!QUIET[action]){ NET.err = TErr(d.error); render(); }
       /* 被打回票時伺服器連同那一刻的房間與手牌一起送回來（0007 之後）：照收，畫面退回真相。
-         只退回「按之前」的話，按之前那一格可能早就是舊的了 */
-      if(d.room) applyAnswer(action, d);
+         只退回「按之前」的話，按之前那一格可能早就是舊的了。
+         ⚠️ 加入被拒（開打了、滿了）不收：那一列是別人的桌，你不在裡面。以前照收，applyRow 把
+         MODE 改成 net、NET.code 改成那一桌，人還停在大廳，心跳卻每 10 秒去敲那一桌的 state——
+         每敲一次就在那一桌的 seen 寫下你（game_seen），整桌多收一列推播；上次那一桌也被 forgetRoom 忘掉。
+         分享連結上線後這條變常見（朋友晚點才點，牌局已經開打）。 */
+      if(d.room && action !== "join") applyAnswer(action, d);
       return null;
     }
     NET.err = "";
@@ -4721,7 +4739,45 @@ async function authBoot(){
   const d = await api("hello", {});
   if(d && d.pid) MY.pid = d.pid;
   render();
-  offerReturn();
+  /* 點朋友的連結進來的：那一桌優先，「上次那一桌」這次不問 */
+  const link = linkRoom();
+  if(link) offerLink(link); else offerReturn();
+}
+
+/* 朋友貼來的連結（房間頁「分享連結」給的 ?room=ABCD）：登入完直接坐進那一桌，不必再打房號。
+   沒登入的人在 <head> 那道門禁就被送去 login.html，next 帶著整串網址，登入完回來 room 還在。
+   房號一讀到就從網址擦掉：留著的話，離開房間之後一重新整理又會被拉回那一桌。
+   ⚠️ 要等 session 確定是活的才擦（所以在 authBoot 裡、getSession 之後）：鑰匙過期時
+   authBoot 走 gotoLogin，loginHref 拿的是當下的網址——先擦掉的話，重新登入回來房號就沒了。 */
+function linkRoom(){
+  let code = "";
+  try{
+    const u = new URL(location.href);
+    if(!u.searchParams.has("room")) return "";
+    /* 跟大廳那四格同一套：轉大寫、非英數字丟掉。但不截長度——五個字的房號是壞掉的連結，
+       截成四個字可能剛好是別人的桌 */
+    code = (u.searchParams.get("room") || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    u.searchParams.delete("room");
+    history.replaceState(null, "", u.pathname + u.search + u.hash);
+  }catch(e){}
+  return /^[A-Z0-9]{4}$/.test(code) ? code : "";
+}
+/* 連結贏過「上次那一桌」：點了別人的連結就是要去那裡。
+   上次那一桌的位子不動，不在這裡 leave：每一趟回應都會經過 applyRow（call → applyAnswer），
+   舊房 leave 的回應晚到，會把舊房那一列蓋到剛進的這一桌上。位子留著跟關掉分頁走掉一樣——
+   斷線 30 秒後由 AI 代打、房主不在時桌上其他人按得動開始與移人（index.ts isLive／canDirect）。
+   進不去（開打了、滿了、房號不存在）就留在大廳：四格填好、照伺服器的話講為什麼，
+   看得到發生什麼事，打錯一個字也能改了再按。 */
+async function offerLink(code){
+  if(MODE === "net" || !$("lobby") || $("lobby").hidden) return;
+  lbLock(true); lbErr("");
+  try{ await joinRoom(code); lbLock(false); enterRoom(); return; }
+  catch(e){}
+  lbLock(false);
+  if(MODE === "net" || $("lobby").hidden) return;
+  $("lcIn").value = code;
+  paintCode();
+  lbErr(NET.err || T("找不到房號 %1", code));
 }
 
 /* 上次是關掉分頁走的？先確認那一桌還在、位子還是你的，然後直接回去——不問。
@@ -6118,14 +6174,17 @@ function paintRoom(){
       'px;--y:' + p.ty + 'px;--r:' + p.deg + 'deg"></span>';
   });
   /* 桌子中央：連線局放房號（要貼給朋友的東西），單人局放這一桌會打幾局
-     ——那是調人數、換牌組時唯一會動的數字。 */
+     ——那是調人數、換牌組時唯一會動的數字。
+     連線局要貼給朋友的有兩種：房號（點那四個大字就複製）跟連結（底下那顆，點開直接進房）。 */
   h += solo
     ? '<div class="rm-mid"><span class="cap">' + T("room.solo") + '</span>' +
       '<span class="rm-code">' + roomNumbers(rules(G.cfg)).rounds + '</span>' +
       '<span class="rm-midn">局 · 對 AI，不記戰績</span></div>'
-    : '<div class="rm-mid"><span class="cap">房號</span>' +
-      '<span class="rm-code">' + esc(NET.code) + '</span>' +
-      '<button class="rm-copy" data-room="copy"><i></i><span id="rmCopy">按一下複製</span></button></div>';
+    : '<div class="rm-mid"><span class="cap" id="rmCap" aria-live="polite">房號</span>' +
+      /* 名字要含房號本身：只寫「複製房號」會蓋掉按鈕上的字，螢幕閱讀器就念不到是哪一桌 */
+      '<button class="rm-code" data-room="copy" aria-label="' + esc(T("複製房號 %1", NET.code)) + '">' +
+        esc(NET.code) + '</button>' +
+      '<button class="rm-copy" data-room="share"><i></i><span id="rmShare" aria-live="polite">分享連結</span></button></div>';
 
   G.seats.forEach(function(s, i){
     const p = pts[(i - base + n) % n];
@@ -6264,30 +6323,64 @@ function paintRoomEdit(){
       '<span class="rm-emeta">' + (solo ? T("room.solo") : T("房號 %1", esc(NET.code))) + ' · ' +
       T("%1 人就座", G.seats.length) + '</span></footer>');
 }
-/* 房號要能一鍵貼給朋友；沒有 clipboard API（http、舊瀏覽器）就退回 execCommand */
-function copyRoomCode(){
-  const say = function(t){ const el = $("rmCopy"); if(el) el.textContent = t; };
-  const ok = function(){
-    say(T("複製好了"));
-    setTimeout(function(){ say(T("按一下複製")); }, 1800);
-  };
-  const fail = function(){ say(T("複製不了")); };
-  try{
-    if(navigator.clipboard && navigator.clipboard.writeText)
-      navigator.clipboard.writeText(NET.code).then(ok, fail);
-    else{
+/* 沒有 clipboard API（http、舊瀏覽器）就退回 execCommand */
+function copyText(txt){
+  return new Promise(function(res, rej){
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(txt).then(res, rej);
+        return;
+      }
       const t = document.createElement("textarea");
-      t.value = NET.code; t.style.position = "fixed"; t.style.opacity = "0";
+      t.value = txt; t.style.position = "fixed"; t.style.opacity = "0";
       document.body.appendChild(t); t.select();
-      document.execCommand("copy"); t.remove(); ok();
-    }
-  }catch(e){ fail(); }
+      const done = document.execCommand("copy"); t.remove();
+      if(done) res(); else rej(new Error("execCommand"));
+    }catch(e){ rej(e); }
+  });
+}
+/* 按完在原地換字。成功的 1.8 秒後換回來（back）；失敗的不換回——會自己消失的錯誤等於沒講。
+   房間頁收到新的一列會整頁重畫、字自己回去，所以計時器到點時要重新抓元素，不能拿按下去那一刻的那個。
+   失敗時也要清掉前一次成功排的計時器，不然 1.8 秒內連按、第二次失敗，「複製不了」會被前一次換掉 */
+function sayBack(id, now, back){
+  const el = $(id);
+  if(!el) return;
+  el.textContent = now;
+  clearTimeout(sayBack[id]);
+  if(back) sayBack[id] = setTimeout(function(){ const e = $(id); if(e) e.textContent = back; }, 1800);
+}
+function copyRoomCode(){
+  copyText(NET.code).then(
+    function(){ sayBack("rmCap", T("複製好了"), T("房號")); },
+    function(){ sayBack("rmCap", T("複製不了")); });
+}
+/* 連結＝牌桌網址加 ?room=，點開的人登入完直接坐進來（見 linkRoom）。
+   自己網址上的 ?lang=、?dim= 是這台的事，不跟著傳出去 */
+function roomLink(code){
+  const u = new URL("./", location.href);
+  u.search = "?room=" + encodeURIComponent(code);
+  return u.href;
+}
+/* 手機叫系統的分享選單：LINE 就在裡面，不必先複製再切過去貼。
+   電腦上那個選單裡通常沒有 LINE，直接複製連結。叫出選單又取消（AbortError）不算失敗，什麼都不做 */
+function shareRoom(){
+  const code = NET.code, url = roomLink(code);
+  const copy = function(){
+    copyText(url).then(
+      function(){ sayBack("rmShare", T("複製好了"), T("分享連結")); },
+      function(){ sayBack("rmShare", T("複製不了")); });
+  };
+  if(navigator.share && matchMedia("(pointer:coarse)").matches){
+    navigator.share({title:"11 Up & Down", text:T("來打 11 Up & Down，房號 %1", code), url:url})
+      .catch(function(e){ if(!e || e.name !== "AbortError") copy(); });
+  }else copy();
 }
 function handleRoom(a){
   if(a === "rules"){ roomView = "rules"; paintRoom(); }
   else if(a === "seats"){ roomView = "seats"; paintRoom(); }
   else if(a === "back"){ closeRoom(); }
   else if(a === "copy") copyRoomCode();
+  else if(a === "share") shareRoom();
 }
 /* 視窗換方向／換寬度時，座位在橢圓上的座標要重算 */
 let roomResize = 0;

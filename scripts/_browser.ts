@@ -41,7 +41,8 @@ async function serve(hooks: boolean): Promise<{ port: number; stop: () => Promis
     html = html
       .replace(swap, "  const run = function(){ return (window.__call || call)(action, args); };")
       .replace(expose, "  __t:{applyRow:applyRow, peerMove:peerMove, INBOX:INBOX, " +
-        "snapshot:snapshot, MY:MY, NET:NET, subscribe:subscribe, api:api, isLive:isLive, doBid:doBid},\n  engine:{")
+        "snapshot:snapshot, MY:MY, NET:NET, subscribe:subscribe, api:api, isLive:isLive, doBid:doBid, " +
+        "linkRoom:linkRoom, offerLink:offerLink},\n  engine:{")
       .replace(peek3d, peek3d + " UD.__3d = function(){ return {S:S, tweens:tweens, fades:fades, FX:FX}; };");
   }
 
