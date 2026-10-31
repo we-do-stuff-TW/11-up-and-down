@@ -13,6 +13,7 @@
 //   · 只有你和 AI、沒坐下的人：不顯示、不去拿話
 //   · 玩家打的字不翻譯（有人打「計分」，英文版不准變成 Score）
 //   · 手機：字幕貼在狀態列上面、打字鈕在右端；點字幕不跳鍵盤、點那顆跳鍵盤；打字時輪到你，打字框上面那顆膠囊
+//   · 電腦：話再多，整頁與牌桌不准長高（右欄撐高整頁，2026-11-01 回報）；藏著的那份露出來停在最新那句
 // 抓不到的：realtime 本身推不推（伺服器 policy 由 server_test 十二段驗、推播要上線真人驗）、真機鍵盤（visualViewport 這裡是假的）、
 //           立體的暗底判斷（這支只在平面驗；立體只驗「蓋著不准點穿出牌」那一段）。
 
@@ -252,6 +253,54 @@ try {
   const sp2 = await C<{ calls: string[]; ledger: boolean }>(`return {calls:__C.calls.map(c => c[0] + "@" + c[2]), ledger:!document.getElementById("chLedger").hidden}`);
   ok(sp2.calls.includes("chat@WTCH") && sp2.ledger, `坐下的那一刻沒有去補前面的話、或聊天沒出現：${JSON.stringify(sp2)}`);
 
+  /* ── 十七、電腦：話再多，整頁不准長高；藏著的那份露出來從最新那句開始 ──
+     上線後（2026-11-01）他回報「聊天越來越多，整個版面跟著放大」：聊天塞在右欄下半、沒被 contain:size 封到，
+     右欄的天生高度把 .main 那一列撐長，牌桌那一格跟著拉長（200 句時整頁 13767px、立體畫布同高整片黑）。
+     .table 平面、立體是同一格（立體畫布 inset:0 跟著它），這裡在平面量。
+     修好之後才看得到的第二件：藏著的那份 display:none 時 scrollTop 歸零，一露出來停在第一句、右下角掛 99+。
+     兩條露出來的路都用真的按鈕走：「回到牌桌」（closeRoom，開局自動收開房頁也是它）露出計分表下半那份；
+     牌局中按「房間」（openRoom，不經過 chatPaint——只有盯著框才接得住）露出開房頁那份。
+     ⚠️ 已經坐在一桌時 offerLink 不理（MODE 是 net），換桌要直接 applyRow（同第十一段）。 */
+  const many = (code: string, from: number, n: number) => `__C.hear("${code}", ${JSON.stringify(
+    Array.from({ length: n }, (_, i) => [from + i, i % 2 ? "p0" : "p1", i % 2 ? "小周" : "阿凱", "第 " + (from + i) + " 句，這把我叫 2"]))}); return 1`;
+  const shape = (sel: string) => `const t = document.querySelector(".table").getBoundingClientRect(), l = document.querySelector("${sel} .ch-list");
+    return {room:!document.getElementById("room").hidden, docH:document.documentElement.scrollHeight, vh:innerHeight, tableH:Math.round(t.height),
+            ch:l.clientHeight, sh:l.scrollHeight, gap:Math.round(l.scrollHeight - l.scrollTop - l.clientHeight),
+            jump:document.querySelector("${sel} .ch-jump").classList.contains("on")}`;
+  type Shape = { room: boolean; docH: number; vh: number; tableH: number; ch: number; sh: number; gap: number; jump: boolean };
+  const roomBtn = () => C(`document.getElementById("btnRoom").click(); return 1`);
+  const backBtn = () => C(`document.querySelector('#rmSheet [data-room="back"]').click(); return 1`);
+  await b.cdp("Emulation.setDeviceMetricsOverride", { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+  await C(`const p = __C.play(__C.row("BIG1", ["小周", "阿凱"], 1)); UD.__t.applyRow(p.row, p.hand); return 1`);
+  await wait(800);
+  const g17a = await C<Shape>(shape("#chLedger"));
+  ok(!g17a.room && g17a.ch > 0 && g17a.docH <= g17a.vh,
+    `（量尺）開局還沒聊天時，計分表下半沒有聊天、或整頁就比視窗高——這條量不出聊天有沒有撐高：${JSON.stringify(g17a)}`);
+  // 開房頁開著時來了 60 句 →「回到牌桌」：計分表下半那份剛露出來
+  await roomBtn();
+  await wait(300);
+  await C(many("BIG1", 1000, 60));
+  await wait(200);
+  await backBtn();
+  await wait(400);
+  const g17b = await C<Shape>(shape("#chLedger"));
+  ok(!g17b.room && g17b.sh > g17b.ch && g17b.gap < 8 && !g17b.jump, `回到牌桌時，計分表下半的聊天停在前面、沒停在最新那句：${JSON.stringify(g17b)}`);
+  // 牌局中再來 150 句：整頁、牌桌都不准長高，話在聊天那格裡捲、停在最新那句
+  await C(many("BIG1", 2000, 150));
+  await wait(300);
+  const g17c = await C<Shape>(shape("#chLedger"));
+  ok(g17c.docH === g17a.docH && g17c.tableH === g17a.tableH,
+    `聊了 210 句，整頁或牌桌跟著長高：整頁 ${g17a.docH}→${g17c.docH}、牌桌 ${g17a.tableH}→${g17c.tableH}`);
+  ok(g17c.sh > g17c.ch * 3 && g17c.gap < 8 && !g17c.jump, `210 句沒有在聊天那格裡捲、或沒停在最新那句：${JSON.stringify(g17c)}`);
+  // 牌局中按「房間」：開房頁那份剛露出來（藏著時多了 150 句）
+  await roomBtn();
+  await wait(400);
+  const g17d = await C<Shape>(shape("#chRoom"));
+  ok(g17d.room && g17d.ch > 0 && g17d.sh > g17d.ch && g17d.gap < 8 && !g17d.jump, `牌局中打開開房頁，聊天沒停在最新那句：${JSON.stringify(g17d)}`);
+  await backBtn();
+  await wait(300);
+  ok(await C<boolean>(`return document.getElementById("room").hidden`), "（量尺）開房頁的「回到牌桌」沒把開房頁關掉，後面幾段會疊在開房頁底下");
+
   /* ── 十四、手機：字幕貼在狀態列上面、打字鈕在右端；點字幕不跳鍵盤、點那顆跳鍵盤 ── */
   await b.cdp("Emulation.setDeviceMetricsOverride", { width: 393, height: 852, deviceScaleFactor: 1, mobile: true });
   await b.cdp("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
@@ -405,7 +454,7 @@ try {
 
 const ms = Math.round(performance.now() - t0);
 console.log("11 Up & Down — 聊天室的測試（無頭 Chrome ＋ 假伺服器，plan 0008）");
-console.log("  只有 AI、觀戰、進房補話、不重複、搬到計分表、自己那句對上、斷線補話照順序、沒送出去與重送、逾時其實送到、不排隊、換房、不翻譯、Enter／Esc、手機字幕與點開、拉寬收起、人多墊暗底、立體蓋著不准點穿出牌");
+console.log("  只有 AI、觀戰、進房補話、不重複、搬到計分表、自己那句對上、斷線補話照順序、沒送出去與重送、逾時其實送到、不排隊、換房、不翻譯、Enter／Esc、手機字幕與點開、拉寬收起、人多墊暗底、話多不撐高整頁、露出來停在最新、立體蓋著不准點穿出牌");
 console.log(`  ${checks} 項，${ms} 毫秒`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);

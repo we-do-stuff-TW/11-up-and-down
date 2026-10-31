@@ -657,9 +657,15 @@ body.is3d .av{width:18px;height:18px}
 /* 右欄不做卡也不加底色，只用一條 hairline 分欄。
    整張表的尺度綁在 .ledger 的 font-size 上——底下每個尺寸都寫成 em，1em = 10px 就是原本那一版。
    螢幕越寬右欄越寬，字也跟著一起長大：.main 的右欄是 28vw，一張表剛好要 43em，
-   所以 28vw ÷ 43 = .651vw。下限 10px（1536 以下跟原本一模一樣），上限 15px（放大 150%）。 */
+   所以 28vw ÷ 43 = .651vw。下限 10px（1536 以下跟原本一模一樣），上限 15px（放大 150%）。
+   ⚠️ contain:size 住在整個右欄上，不住在裡面任何一格：右欄的高度只能由外面給（電腦是 .main 那一列、手機是浮層的 inset:0），
+   裡面的東西再長都只能在自己那格裡捲。沒有它，右欄的「天生高度」＝裡面每一格的天生高度加起來，
+   右欄會把 .main 那一列撐過一個畫面：整頁長出捲軸，牌桌那一格（平面的檯面、立體的畫布）跟著被拉長。
+   死過兩次：先是計分表（21 局快 1400px），那次只封在表格那一格（.ledger-scroll）；
+   聊天上線（plan 0008）塞進同一欄下半、沒被封到——200 句時整頁 13767px 高、立體畫布被拉到 13705px 整片黑（2026-11-01 他回報「版面跟著放大」）。
+   右欄裡以後再加什麼都不用自己記得封。chat_test 釘「話很多時整頁不准長高」。 */
 .ledger{
-  display:flex;flex-direction:column;min-height:0;
+  display:flex;flex-direction:column;min-height:0;contain:size;
   border-left:1px solid var(--hair);
   font-size:clamp(10px, .651vw, 15px);
 }
@@ -671,10 +677,8 @@ body.is3d .av{width:18px;height:18px}
 .ledger-head .of{margin-left:auto;font-size:1.05em;color:var(--ink-3);font-family:"IBM Plex Mono",monospace}
 /* 不封高度：右欄有多長，表就寫多長。原本封在 min(66vh,640px)，
    螢幕一高底下就空掉一大片，而表其實還有十幾局沒露出來。
-   contain:size 是那個上限原本順手做到的事——沒有它，這一格的「天生高度」就是整張表
-   （21 局快 1400px），右欄會把 .main 那一列撐過一個畫面，整頁跟著長出捲軸。
-   有了它，這一格對版面的貢獻是 0、由 flex:1 撐滿右欄，牌桌那邊完全不受影響。 */
-.ledger-scroll{overflow:auto;flex:1;min-height:0;contain:size;padding:0 1.2em 1.8em}
+   那個上限原本順手做到的事（整張表不准撐高整頁）現在由 .ledger 的 contain:size 管；這一格由 flex:1 撐滿右欄剩下的高度。 */
+.ledger-scroll{overflow:auto;flex:1;min-height:0;padding:0 1.2em 1.8em}
 
 /* 一格只記那一局的得分失分。不記「拿幾墩／叫幾墩」——桌上的座位牌正在講那件事，
    計分表是打完之後的帳。少了那兩個數字，欄寬夠用了，字才放得大。
@@ -4979,8 +4983,20 @@ function chatBoxHTML(){
 function chatInit(){
   const mk = function(box, tap){
     const v = {box:box, tap:tap, list:box.querySelector(".ch-list"), inner:box.querySelector(".ch-inner"),
-      jump:box.querySelector(".ch-jump"), n:box.querySelector(".ch-n"), input:box.querySelector("input"), html:null, ack:0};
-    v.list.addEventListener("scroll", function(){ chatJump(v); }, {passive:true});
+      jump:box.querySelector(".ch-jump"), n:box.querySelector(".ch-n"), input:box.querySelector("input"), html:null, ack:0,
+      end:true, h:0};
+    v.list.addEventListener("scroll", function(){ v.end = chatAtBottom(v.list); chatJump(v); }, {passive:true});
+    /* 電腦那兩份的框是 CSS 排出來的，誰都可能讓它變大變小、藏起來又露出來：開房頁↔牌局、視窗拉寬、計分表那半長出來。
+       ⚠️ chatList() 只在「話變了」時留底；框變了它不知道。藏著的那份 scrollTop 是 0（display:none 會歸零），
+       一露出來就停在第一句、右下角掛 99+（2026-11-01 修右欄撐高整頁之後才看得到：之前聊天整串攤開，根本不用捲）。
+       所以盯著框：剛露出來從最新那句開始，框變了原本在最底的留在最底，不在最底的不拉回去。
+       手機點開那層的框由 chatLayout() 自己算、在那裡做同一件事。 */
+    if(!tap && window.ResizeObserver) new ResizeObserver(function(){
+      const h = v.list.clientHeight;
+      if(h && (!v.h || v.end)) v.list.scrollTop = v.list.scrollHeight;
+      v.h = h;
+      chatJump(v);
+    }).observe(v.list);
     v.jump.addEventListener("click", function(){
       v.list.scrollTo({top:v.list.scrollHeight, behavior:UD.REDUCED ? "auto" : "smooth"});
     });
@@ -5171,7 +5187,7 @@ function chatLayout(){
   /* 紀錄最高長到頂列底下（還看得到第幾局、王牌）；開房頁留 140 給房號那圈的上半 */
   const roof = !$("room").hidden ? 140 : (document.querySelector(".app .bar") || {getBoundingClientRect:function(){ return {bottom:0}; }}).getBoundingClientRect().bottom;
   hist.style.maxHeight = Math.max(88, H - hb - Math.max(0, roof - top0)) + "px";
-  /* 紀錄變矮（鍵盤出來、膠囊冒出來）時，原本在最底下的要留在最底下（樣品 check4 抓到的） */
+  /* 紀錄變矮（鍵盤出來、膠囊冒出來）時，原本在最底下的要留在最底下（樣品 check4 抓到的）。電腦那兩份的同一件事在 chatInit 的 ResizeObserver */
   if(stick) list.scrollTop = list.scrollHeight;
   chatJump(v);
 }
