@@ -33,16 +33,20 @@ async function serve(hooks: boolean): Promise<{ port: number; stop: () => Promis
   // 只有 net_test／idle_test 會開（hooks），ui_test 跑的頁面跟正式版一模一樣。
   if (hooks) {
     const swap = "  const run = function(){ return call(action, args); };";
+    // 聊天（plan 0008）走自己的路、不排進 api() 那條隊伍，所以假伺服器要另接一個口
+    const chatSwap = "function chatCall(action, args){ return chatPost(action, args); }";
     const expose = "  engine:{";
     const peek3d = "UD.webglOK = webglOK;";
-    for (const [what, seam] of [["api 的呼叫", swap], ["UD.engine", expose], ["立體那層的 UD.webglOK", peek3d]] as [string, string][]) {
+    for (const [what, seam] of [["api 的呼叫", swap], ["聊天的呼叫", chatSwap], ["UD.engine", expose], ["立體那層的 UD.webglOK", peek3d]] as [string, string][]) {
       if (!html.includes(seam)) throw new Error(`接縫插不進去：找不到${what}那一段`);
     }
     html = html
       .replace(swap, "  const run = function(){ return (window.__call || call)(action, args); };")
+      .replace(chatSwap, "function chatCall(action, args){ return (window.__chatCall || chatPost)(action, args); }")
       .replace(expose, "  __t:{applyRow:applyRow, peerMove:peerMove, INBOX:INBOX, " +
         "snapshot:snapshot, MY:MY, NET:NET, subscribe:subscribe, api:api, isLive:isLive, doBid:doBid, " +
-        "linkRoom:linkRoom, offerLink:offerLink},\n  engine:{")
+        "linkRoom:linkRoom, offerLink:offerLink, CHAT:CHAT, chatIn:chatIn, chatStatus:chatStatus, chatPaint:chatPaint, " +
+        "chatOpen:chatOpen, chatClose:chatClose, chatSend:chatSend},\n  engine:{")
       .replace(peek3d, peek3d + " UD.__3d = function(){ return {S:S, tweens:tweens, fades:fades, FX:FX}; };");
   }
 

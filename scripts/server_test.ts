@@ -87,7 +87,10 @@ function baseSchema(ints: boolean) {
   return `
 create schema if not exists auth;
 create table auth.users (id uuid primary key);
-create or replace function auth.uid() returns uuid language sql stable as 'select null::uuid';
+-- 跟 Supabase 一樣從這一趟的 JWT 拿 sub；測試裡用 set_config('request.jwt.claim.sub', …) 扮成某個人（十二段）。
+-- 沒設的時候是 null，跟以前的替身一樣。
+create or replace function auth.uid() returns uuid language sql stable as
+  $f$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $f$;
 do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
 do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
 do $$ begin create role service_role nologin; exception when duplicate_object then null; end $$;
@@ -112,6 +115,8 @@ create table public.hands (
   ri int not null, seat int not null, cards jsonb not null,
   primary key (code, ri, seat)
 );
+-- 線上 supabase_realtime 只有 rooms（2026-10-31 查過）；0009 會把 chat 加進去
+create publication supabase_realtime for table public.rooms;
 alter table public.rooms enable row level security;
 alter table public.hands enable row level security;
 alter table public.players enable row level security;
@@ -120,6 +125,11 @@ grant all on all tables in schema public to service_role;
 grant select on public.rooms to anon, authenticated;
 -- 0002 touch_seen：線上定義沒查到。這裡放「只改 seen、不動 rev」那一種（健檢推測線上是這一種）。
 -- 只有舊版伺服器（BEFORE=1）會叫它。
+-- Supabase 的預設：public 底下之後新建的表與函式，anon／authenticated 都拿得到全部權限——
+-- 所以每支 migration 要自己收回（0007、0009）。少了這三行，「瀏覽器身分寫不進去／叫不動」的檢查在這裡永遠綠。
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 create function public.touch_seen(p_code text, p_pid text) returns void language sql as $f$
   update public.rooms set seen = seen || jsonb_build_object(p_pid, (extract(epoch from clock_timestamp()) * 1000)::bigint)
   where code = p_code
@@ -129,7 +139,7 @@ $f$;
 async function freshDb(ints = false): Promise<PGlite> {
   const db = new PGlite();
   await db.exec(baseSchema(ints));
-  for (const m of ["0004_auth.sql", "0005_rules.sql", "0006_again.sql", "0007_one_step.sql", "0008_rooms_full_identity.sql"]) {
+  for (const m of ["0004_auth.sql", "0005_rules.sql", "0006_again.sql", "0007_one_step.sql", "0008_rooms_full_identity.sql", "0009_chat.sql"]) {
     await db.exec(await Deno.readTextFile(new URL("supabase/migrations/" + m, ROOT)));
   }
   await db.exec(`grant all on all tables in schema public to service_role;`);
@@ -584,9 +594,137 @@ try {
     /* create 開新房那一句是唯一的例外（新的一列，沒有人跟它搶）；它要找得到，找不到＝這段掃描自己壞了 */
     ok(fromRooms.length >= 1 && fromRooms.every((v) => v === "insert"),
       `index.ts 直接 ${fromRooms.filter((v) => v !== "insert").join("、") || "（一處都沒掃到，掃描壞了）"} rooms 表——牌局只准經 game_load 讀、game_commit 寫（讀也要同一個快照）`);
-    const allowed = new Set(["game_load", "game_commit", "game_seen"]);
+    /* chat_say／chat_since（plan 0008）只碰 chat 表；它們不動 rooms 由十二段量 rev 釘住 */
+    const allowed = new Set(["game_load", "game_commit", "game_seen", "chat_say", "chat_since"]);
     ok(rpcs.includes("game_commit") && rpcs.every((f) => allowed.has(f)),
-      `index.ts 叫了 ${rpcs.filter((f) => !allowed.has(f)).join("、") || "（沒掃到 game_commit）"}——只准這三支`);
+      `index.ts 叫了 ${rpcs.filter((f) => !allowed.has(f)).join("、") || "（沒掃到 game_commit）"}——只准這五支`);
+  }
+
+  /* ════════ 十二、聊天（plan 0008）════════
+     坐著的才能說、才讀得到。讀有兩條路要一起驗：
+       · 函式的 chat 動作（補漏掉的話、剛坐下拿前面的）——伺服器用 seatOf 擋；
+       · 瀏覽器身分直接查表——realtime 推不推「新的一句」給你，就是照這條 select policy 判斷的。
+         PGlite 沒有 realtime，拿「切成 authenticated、扮成那個人去 select」代替（推論：realtime 用的是同一條 policy）。
+     抓不到的：realtime 本身推不推（要上線後真人驗）、PostgREST 的權限層。 */
+  if (!BEFORE && part(12)) {
+    await freshDb();
+    /** 用某個人的瀏覽器身分查這一桌的聊天（RLS 生效）；被權限擋掉回 -1 */
+    const seenBy = async (uid: string, code: string): Promise<number> => {
+      try {
+        return await PG.db!.transaction(async (tx) => {
+          await tx.query(`set local role authenticated`);
+          await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [uid]);
+          return (await tx.query(`select id from public.chat where code = $1`, [code])).rows.length;
+        });
+      } catch { return -1; }
+    };
+    /** 用某個角色直接做一件事（寫表、叫只給函式的那兩支）：成功回 true */
+    const asRole = async (role: string, uid: string, sql: string, args: unknown[] = []): Promise<boolean> => {
+      try {
+        await PG.db!.transaction(async (tx) => {
+          await tx.query(`set local role ${role}`);
+          await tx.query(`select set_config('request.jwt.claim.sub', $1, true)`, [uid]);
+          await tx.query(sql, args);
+        });
+        return true;
+      } catch { return false; }
+    };
+    // 他在 SQL Editor 貼兩次也不能出錯（publication 那段重跑會撞「已經在裡面」，所以有包判斷）
+    let again = "";
+    try { await PG.db!.exec(await Deno.readTextFile(new URL("supabase/migrations/0009_chat.sql", ROOT))); }
+    catch (e) { again = String((e as Error).message ?? e); }
+    ok(!again, `0009 跑第二次出錯：${again}`);
+    const pub = await PG.db!.query<{ t: string }>(
+      `select tablename t from pg_publication_tables where pubname = 'supabase_realtime' order by 1`);
+    ok(pub.rows.map((r) => r.t).join() === "chat,rooms", `realtime 推的表：${pub.rows.map((r) => r.t).join()}（要 chat,rooms）`);
+    const [uH, uA, uB] = await users(3);       // 房主、坐下的、還沒坐的
+    const c = await hit(uH, { action: "create", name: "房主", cfg: {} });
+    const code = c.body.room.code as string;
+    await hit(uA, { action: "join", code, name: "小周" });
+    const before = await room(code);
+
+    const s1 = await hit(uH, { action: "say", code, text: "  哈囉\n  大家 " });
+    ok(s1.status === 200 && s1.body.msg?.body === "哈囉 大家" && s1.body.msg?.name === "房主" && s1.body.msg?.match === 1,
+      `坐著的說一句：${s1.status} ${JSON.stringify(s1.body.msg ?? s1.body.error)}（要 200、換行收成一個空白、名字是座位上的）`);
+    const s2 = await hit(uA, { action: "say", code, text: "嗨" });
+    ok(s2.status === 200 && s2.body.msg?.name === "小周", `第二個人說一句：${s2.status}`);
+    const sB = await hit(uB, { action: "say", code, text: "我偷聽" });
+    ok(sB.status === 403, `沒坐下的人說話要 403，拿到 ${sB.status}`);
+    const gB = await hit(uB, { action: "chat", code });
+    ok(gB.status === 403 && !gB.body.chat, `沒坐下的人拿聊天要 403、不帶內容，拿到 ${gB.status}`);
+
+    ok(await seenBy(uH, code) === 2 && await seenBy(uA, code) === 2,
+      `坐著的人用自己的身分讀得到兩句（房主 ${await seenBy(uH, code)}、小周 ${await seenBy(uA, code)}）`);
+    ok(await seenBy(uB, code) === 0, `沒坐下的人用自己的身分讀到 ${await seenBy(uB, code)} 句（要 0）`);
+    ok(await seenBy(crypto.randomUUID(), code) === 0, `不存在的人讀得到東西`);
+    ok(await asRole("anon", uB, `select id from public.chat`) === false, `anon 讀得進 chat 表（要被權限擋）`);
+    ok(await asRole("authenticated", uH, `insert into public.chat (code, pid, name, body) values ($1, 'x', 'x', '冒名')`, [code]) === false,
+      `瀏覽器身分直接寫得進 chat 表（只准函式寫）`);
+    /* 直接問權限，不靠「叫了會不會出事」：chat_say 不是 security definer，就算瀏覽器叫得動，寫表那一步
+       也會被表的權限擋下來——那樣驗的是第二道鎖，第一道沒收回照樣綠（弄壞驗證時抓到的） */
+    const canRun = async (role: string, fn: string) =>
+      (await PG.db!.query<{ v: boolean }>(`select has_function_privilege($1, $2, 'execute') v`, [role, fn])).rows[0].v;
+    for (const role of ["anon", "authenticated"]) {
+      for (const fn of ["public.chat_say(text,text,text,text,int)", "public.chat_since(text,bigint,int)"]) {
+        ok(!(await canRun(role, fn)), `${role} 叫得動 ${fn}（只給函式）`);
+      }
+    }
+    ok(await canRun("authenticated", "public.chat_seated(text)") && await canRun("service_role", "public.chat_say(text,text,text,text,int)"),
+      `（量尺）authenticated 要叫得動 chat_seated、service_role 要叫得動 chat_say`);
+
+    // 晚坐下的人：坐下之後前面聊的照樣補得到（兩條路都要）
+    await hit(uB, { action: "join", code, name: "阿凱" });
+    const gB2 = await hit(uB, { action: "chat", code });
+    ok(gB2.status === 200 && gB2.body.chat?.length === 2 && gB2.body.chat[0].body === "哈囉 大家",
+      `坐下之後拿前面的話：${gB2.status} ${gB2.body.chat?.length} 句（要 2 句、由舊到新）`);
+    ok(await seenBy(uB, code) === 2, `坐下之後用自己的身分讀到 ${await seenBy(uB, code)} 句（要 2）`);
+    const firstId = gB2.body.chat?.[0]?.id;
+    const gAfter = await hit(uA, { action: "chat", code, after: firstId });
+    ok(gAfter.body.chat?.length === 1 && gAfter.body.chat[0].body === "嗨", `拿某一句之後的：${gAfter.body.chat?.length} 句（要 1 句「嗨」）`);
+
+    // 字數：算字不算 JS length；100 個 emoji 在 JS 是 200，要過
+    const emoji = "🂡".repeat(100);
+    const sE = await hit(uB, { action: "say", code, text: emoji });
+    ok(sE.status === 200, `100 個 emoji 要過（JS length ${emoji.length}），拿到 ${sE.status} ${sE.body.error ?? ""}`);
+    const sLong = await hit(uB, { action: "say", code, text: "字".repeat(101) });
+    ok(sLong.status === 400, `101 字要 400，拿到 ${sLong.status}`);
+    const sBlank = await hit(uB, { action: "say", code, text: " \n\t " });
+    ok(sBlank.status === 400, `只有空白要 400，拿到 ${sBlank.status}`);
+
+    // 太快：5 秒內第 5 句擋下（uA 已經講過 1 句）
+    const fast: number[] = [];
+    for (let i = 0; i < 4; i++) fast.push((await hit(uA, { action: "say", code, text: "快" + i })).status);
+    ok(fast.join() === "200,200,200,429", `同一人 5 秒內連講：${fast.join()}（第 5 句要 429）`);
+    // 同時送 4 句：uH 已經講 1 句 → 只能再過 3 句。
+    // ⚠️ 抓不到拿掉 advisory lock：PGlite 一次只跑一句 SQL，chat_say 整支是一句，本來就不會交錯。這條守的是數法。
+    const par = await Promise.all([0, 1, 2, 3].map((i) => hit(uH, { action: "say", code, text: "並" + i })));
+    ok(par.filter((r) => r.status === 200).length === 3, `同時送 4 句過了 ${par.filter((r) => r.status === 200).length} 句（要 3）`);
+
+    // 聊天不碰牌局：rev、seen、updated_at 一個都不動
+    const after = await room(code);
+    ok(after.rev === before.rev + 1 && JSON.stringify(after.seen) !== "{}",
+      `（量尺）阿凱坐下要讓 rev +1：${before.rev} → ${after.rev}`);
+    /* 報到 4 秒內不重寫（game_seen），所以先把 seen 清掉：聊天若順手報到，這裡一定會寫 */
+    await PG.db!.query(`update public.rooms set seen = '{}'::jsonb where code = $1`, [code]);
+    const mid = await room(code);
+    await hit(uA, { action: "chat", code });
+    await hit(uB, { action: "say", code, text: "再一句" });
+    const end = await room(code);
+    ok(end.rev === mid.rev && end.updated_at === mid.updated_at && JSON.stringify(end.seen) === JSON.stringify(mid.seen),
+      `說話、拿聊天動到了 rooms：rev ${mid.rev}→${end.rev}、seen ${JSON.stringify(mid.seen) === JSON.stringify(end.seen) ? "同" : "變了"}`);
+
+    // 開房頁走掉的人：那一刻起讀不到、不能說
+    await hit(uB, { action: "leave", code });
+    ok(await seenBy(uB, code) === 0, `離開之後用自己的身分讀到 ${await seenBy(uB, code)} 句（要 0）`);
+    ok((await hit(uB, { action: "say", code, text: "我走了還講" })).status === 403, `離開之後還能說話`);
+
+    // 別桌的話不會混進來
+    const c2 = await hit(uB, { action: "create", name: "阿凱", cfg: {} });
+    const code2 = c2.body.room.code as string;
+    await hit(uB, { action: "say", code: code2, text: "別桌" });
+    const gH = await hit(uH, { action: "chat", code });
+    ok(gH.body.chat?.every((m: { code: string; body: string }) => m.code === code && m.body !== "別桌"), `別桌的話混進這一桌`);
+    ok(await seenBy(uB, code2) === 1 && await seenBy(uH, code2) === 0, `別桌：開房的讀得到自己那句、不在那桌的讀不到`);
   }
 } catch (e) {
   fails.push("測試中途爆掉：" + ((e as Error).stack ?? e));
@@ -594,7 +732,7 @@ try {
 
 const ms = Math.round(performance.now() - t0);
 console.log(`11 Up & Down — 伺服器那一步的測試（本體 index.ts ＋ 真的 Postgres）${BEFORE ? `【改之前：${BEFORE_REF}】` : ""}`);
-console.log("  鎖屏補敲、兩發 next、同時叫墩、整場、409 帶真相、報到、房主離開、權限、int[] 欄位、沒有第二道門、早到的那一手");
+console.log("  鎖屏補敲、兩發 next、同時叫墩、整場、409 帶真相、報到、房主離開、權限、int[] 欄位、沒有第二道門、早到的那一手、聊天");
 console.log(`  ${checks} 項，${ms} 毫秒，SEED=${SEED}`);
 if (fails.length) {
   console.log(`\n  ✗ ${fails.length} 項不對：\n`);

@@ -1601,6 +1601,171 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
   body.is3d .seat{padding:8px 11px;border-radius:11px}
 }
 
+/* ================= 聊天室（plan 0008） =================
+   同一桌的人邊玩邊講話。兩種長相，分界照「右欄在不在」：
+   · 電腦（牌局寬過 960、開房頁寬過 760）：右欄下半部的泡泡（他 10-30 挑的乙）。牌局在計分表下半、開房頁在規則下半。
+   · 手機（其他）：桌角兩行字幕＋一顆打字鈕，點了壓暗畫面、跳鍵盤（他 10-30 挑的 C）。
+   兩份樣品 10-31 他都回「可以了」：電腦 https://claude.ai/artifact/5Ewh1wUSLELoLVQg8Fbx8c 、手機 https://claude.ai/artifact/BL2k3rBrXxweKDQeBFsvnp 。
+   顏色只用 ink／ink-2／ink-3、線只用 hair／glass-edge、失敗用計分表扣分那個 --bad；銅色只給「你」、送出、還沒看的句數。
+   class 一律 ch- 開頭：遊戲已經有 .hist（帳號頁的戰績）、.cap（開房頁的段落標題）。 */
+.ch[hidden],.ch-cap[hidden],.ch-btn[hidden],.ch-bar[hidden],.ch-sheet[hidden]{display:none !important}
+.ch{position:relative;display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--hair)}
+.ch-hd{font-size:1em;letter-spacing:.17em;text-transform:uppercase;color:var(--ink-3);font-weight:500;padding:1.3em 1.6em 0;flex:none}
+.ch-list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:1.4em 1.6em .9em;
+  scrollbar-width:thin;scrollbar-color:oklch(.90 .02 92 / .16) transparent;
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 1.4em);mask-image:linear-gradient(to bottom,transparent,#000 1.4em)}
+/* ⚠️ 不用 justify-content:flex-end 把話推到底：舊的話會捲不回去（電腦樣品驗收員抓到的），改成裡面那層 margin-top:auto */
+.ch-inner{margin-top:auto;display:flex;flex-direction:column;gap:.35em}
+/* 名字：一串的第一個泡泡上面一次；名字最長 10 個字，放得下，不截 */
+.ch-who{font-size:1.25em;line-height:1.4;color:var(--ink-3);margin:.55em 0 .05em .85em}
+.ch-inner>.ch-who:first-child{margin-top:0}
+.ch-m{align-self:flex-start;max-width:84%;padding:.4em .75em .45em;border-radius:1.05em;background:var(--glass);
+  font-size:1.5em;line-height:1.55;color:var(--ink-2);overflow-wrap:anywhere}
+/* 自己的底比別人的亮一階。⚠️ 樣品第二輪是 .17：開房頁的灰底上 ink-2 只剩 4.42，降到 .13 */
+.ch-m.me{align-self:flex-end;background:oklch(.98 .012 92 / .13)}
+.ch-m.me+.ch-m:not(.me),.ch-m:not(.me)+.ch-m.me,.ch-fail+.ch-m:not(.me),.ch-fail+.ch-who{margin-top:.45em}
+/* 沒送出去：照揪起來聊天室那一套——泡泡變淡，底下一行字，點那行重送；重送中改字不消失，送到了才整行拿掉。
+   「變淡」不用整顆 opacity（揪起來是 .55）：這裡的底更暗，字只剩 2.5–2.8。改成拿掉泡泡的底、字退成名字那個灰（≥5）。
+   點得到的範圍撐到 40px 高，往上下借位置，不推開泡泡 */
+.ch-m.me.bad{background:transparent;color:var(--ink-3)}
+.ch-fail{position:relative;z-index:1;align-self:flex-end;font-size:1.2em;font-weight:600;line-height:1.4;color:var(--bad);
+  padding:1em .2em 1em 1.2em;margin:-.75em 0 -1em}
+.ch-fail:hover{text-decoration:underline;text-underline-offset:.2em}
+.ch-fail[aria-disabled="true"]{cursor:default;text-decoration:none}
+.ch-fail:focus-visible{outline:2px solid var(--brass);outline-offset:-6px;border-radius:6px}
+/* 打字框：頂列 .btn 那種膠囊 */
+.ch-in{flex:none;display:flex;align-items:center;padding:.6em 1.6em 1.4em;cursor:text}
+.ch-box{flex:1;min-width:0;display:flex;align-items:center;gap:.4em;height:4.4em;padding:0 .2em 0 1.4em;
+  border:1px solid var(--hair);border-radius:99px;transition:border-color .15s}
+.ch-box:focus-within{border-color:oklch(.845 .128 84 / .75)}
+.ch-box input{all:unset;flex:1;min-width:0;height:2.7em;font-size:1.5em;line-height:1.2;color:var(--ink)}
+/* iPad 橫放的牌局、直放的開房頁也走右欄這一份：字是 1.5em×10px＝15px，iOS Safari 碰到小於 16 的打字框會放大整頁（驗收員抓到）。
+   只在觸控的裝置拉到 16：滑鼠的電腦照樣品 15 */
+@media (pointer:coarse){ .ch-box input{font-size:max(16px, 1.5em)} }
+.ch-box input::placeholder,.ch-fld input::placeholder{color:var(--ink-3);opacity:1}
+.ch-send{font-size:1.4em;font-weight:600;color:var(--brass);height:3em;line-height:3em;padding:0 .75em;border-radius:99px;flex:none;
+  visibility:hidden;opacity:0;transition:opacity .12s ease,visibility 0s .12s}
+.ch-box.has .ch-send,.ch-fld.has .ch-send{visibility:visible;opacity:1;transition:opacity .15s ease,visibility 0s}
+.ch-send:hover{background:var(--brass-soft)}
+.ch-send:focus-visible{outline:2px solid var(--brass);outline-offset:-4px}
+/* 跳到最新：照揪起來聊天室 9 月他挑的那顆（不在最底下時出現；那段時間別人講的句數掛在鈕上，回到底歸零） */
+.ch-jump{position:absolute;right:1.6em;bottom:6.8em;width:4em;height:4em;padding:0;border-radius:50%;
+  display:grid;place-items:center;background:var(--felt-deep);border:1px solid var(--glass-edge);box-shadow:var(--sh-glass);color:var(--ink-2);
+  opacity:0;visibility:hidden;transform:translateY(.4em);transition:opacity .12s ease,transform .12s ease,visibility 0s .12s}
+.ch-jump.on{opacity:1;visibility:visible;transform:none;transition:opacity .14s ease,transform .2s var(--e-out),visibility 0s}
+.ch-jump:hover{color:var(--ink);border-color:var(--glass-lip)}
+.ch-jump:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.ch-jump svg{width:1.8em;height:1.8em}
+.ch-n{position:absolute;top:-.6em;right:-.6em;min-width:2em;height:2em;padding:0 .55em;border-radius:1em;
+  background:var(--brass);color:oklch(.22 .04 84);font-size:1.1em;font-weight:700;line-height:2em;text-align:center;font-variant-numeric:tabular-nums}
+.ch-n:empty{display:none}
+
+/* ---- 牌局：計分表下半。尺寸寫成 em，跟計分表一起放大（.ledger 的字級是 clamp(10px,.651vw,15px)） ---- */
+.ledger .ch{flex:0 0 50%}
+/* 計分表被聊天切在中間：切口那一條淡出，不留半截字 */
+.ledger.has-chat .ledger-scroll{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent);
+  mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent)}
+/* ---- 開房頁：規則在上（自己會捲）、聊天在中、「開始」留在最底。規則那塊的高度由 chatSnapRules() 停在段與段之間 ---- */
+.rm-part,.rm-rules{display:contents}
+@media (min-width:761px){
+  .rm-sheet.has-chat{overflow:hidden}
+  .rm-sheet.has-chat .rm-rules{display:block;flex:1 1 0;min-height:0;overflow-y:auto;margin-right:-14px;padding-right:14px;
+    scrollbar-width:thin;scrollbar-color:oklch(.90 .02 92 / .16) transparent;
+    -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent)}
+  .rm-sheet .ch{flex:1 1 0;font-size:10px}
+  .rm-sheet.has-chat .rm-tot{margin-top:0}
+  /* 段落標題照它自己的 .cap（叫墩／牌／計分那幾個） */
+  .rm-sheet .ch-hd{padding:16px 0 0;font-size:9.5px;font-weight:600;letter-spacing:.26em}
+  .rm-sheet .ch-list{padding:1.4em 0 .9em}
+  .rm-sheet .ch-in{padding:.6em 0 1.4em}
+  .rm-sheet .ch-jump{right:0}
+}
+@media (max-width:760px){ .rm-sheet .ch{display:none} }
+@media (max-width:960px){
+  .ledger .ch{display:none}
+  .ledger.has-chat .ledger-scroll{-webkit-mask-image:none;mask-image:none}
+}
+
+/* ---- 手機：桌角字幕。最近兩句留在「輪到你出牌」上面，新的一句亮一階、舊的再退一階（換字色不用透明度，對比才保得住）。
+   整體比「輪到你出牌」（15px、ink）低一級：那句才是這一屏的焦點。一句只一行：能兩行的話最壞四行高，會蓋到桌上剛出的牌 ---- */
+/* z-index 6：平面的檯面那一塊（.center）是 z-index 5、一路撐到狀態列，字幕剛好在它的框裡——4 的話整條字幕點不到（chat_test 抓到的） */
+.ch-cap{position:absolute;z-index:6;isolation:isolate;left:16px;right:68px;display:none;flex-direction:column;justify-content:flex-end;gap:2px;min-height:44px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ch-cap:empty{display:none !important}
+/* 人多時桌上的牌排到這一帶：字底下墊一層桌色的暗底（蓋住牌的下緣，字一定看得清），從字幕頂上 12px 淡進來、墊到狀態列的線。
+   只在放不下兩行時墊（chatFree()）；4 人桌那裡本來就空著，不墊——樣品第一版每一桌都墊，驗收員抓到「一次換兩個旋鈕」 */
+.ch-cap.pad::before{content:"";position:absolute;z-index:-1;left:-16px;right:-68px;bottom:-4px;height:62px;pointer-events:none;
+  background:linear-gradient(to bottom,transparent,color-mix(in oklab,var(--felt-deep) 86%,transparent) 12px)}
+.ch-l{display:flex;align-items:baseline;gap:8px;min-width:0;font-size:14px;line-height:22px;color:var(--ink-3);white-space:nowrap;
+  text-shadow:0 1px 2px rgba(0,0,0,.85),0 0 10px rgba(0,0,0,.55)}
+.ch-l b{flex:none;font-weight:600;color:var(--ink-3)}
+.ch-l span{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ch-l.new span,.ch-l.new b{color:var(--ink-2)}
+.ch-l.me b{color:var(--brass)}
+/* 沒送出去：那句退成名字的灰，後面掛紅字；沒重送成功之前一直釘在字幕最下面（字幕只有兩行，照時間排兩句後就被擠掉） */
+.ch-l.bad span{color:var(--ink-3)}
+.ch-l i{flex:none;font-style:normal;color:var(--bad);font-weight:600}
+.ch-cap:focus-visible{outline:2px solid var(--brass);outline-offset:2px;border-radius:6px}
+/* 打字鈕在字幕那條的右端、跟字幕底對齊：手牌都在狀態列下面，這裡永遠碰不到
+   （樣品第一版放左下角，平面手牌最底那排滿 4 張時會蓋到第一張）。底照立體模式狀態列 .btn，不加毛玻璃 */
+.ch-btn{position:absolute;z-index:6;right:12px;width:44px;height:44px;padding:0;border-radius:50%;display:none;place-items:center;
+  background:color-mix(in oklab,var(--felt-deep) 48%,oklch(.10 0 0 / .66));border:1px solid var(--hair);color:var(--ink-2)}
+.ch-btn svg{width:20px;height:20px}
+.ch-btn:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+@media (max-width:960px){
+  body:not(.is3d) .table{position:relative}
+  .table>.ch-cap{display:flex}
+  .table>.ch-btn{display:grid}
+}
+/* ---- 手機開房頁：字幕和打字框一直在最下面，底下墊一塊跟頁面同色的底；內容底下多留 148，捲到底時「開始」整顆在它上面 ---- */
+/* 底色就是頁面的地（body 的 --felt-deep；開房頁還沒開打，是石板灰）。量過樣品截圖：頁面兩側 21,24,26 跟它接得上，正中間那團光亮一點 */
+.ch-bar{display:none;--ch-ground:var(--felt-deep)}
+@media (max-width:760px){
+  .ch-bar{display:block;position:absolute;left:0;right:0;bottom:0;height:calc(140px + env(safe-area-inset-bottom));z-index:4;pointer-events:none;
+    background:linear-gradient(to top,var(--ch-ground) 0,var(--ch-ground) calc(116px + env(safe-area-inset-bottom)),transparent 100%)}
+  .ch-bar>*{pointer-events:auto}
+  .ch-bar .ch-cap{display:flex;left:16px;right:16px;bottom:calc(64px + env(safe-area-inset-bottom))}
+  /* 墊在右欄裡面、不墊在外面那層：右欄會裁掉自己的陰影（overflow），墊在外面的話「開始」的光暈在右欄底緣被一刀切掉，以前那條線在螢幕最底看不到（驗收員抓到） */
+  .room.has-chat .rm-sheet{padding-bottom:calc(18px + 148px + env(safe-area-inset-bottom))}
+}
+.ch-fake{position:absolute;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));height:44px;border-radius:22px;padding:0 18px;
+  display:flex;align-items:center;font-size:16px;color:var(--ink-3);border:1px solid var(--hair);cursor:text;text-align:left}
+.ch-fake:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+/* ---- 手機：點開之後。畫面壓暗，紀錄用電腦版那套泡泡，打字框貼著鍵盤。
+   位置都從「看得到的那一塊」（visualViewport）的底往上算：鍵盤出來時那一塊變矮，打字框就落在鍵盤上面（chatLayout()） ---- */
+.ch-sheet{position:fixed;left:0;right:0;top:0;height:100%;z-index:70;color:var(--ink)}
+.ch-dim{position:absolute;inset:0;background:rgba(0,0,0,.38)}
+.ch-hist{position:absolute;left:10px;right:10px;display:flex;flex-direction:column;min-height:0;border-radius:18px;font-size:10px;
+  background:var(--felt-deep);border:1px solid var(--glass-edge);box-shadow:var(--sh-glass)}
+.ch-hist.none{display:none}
+.ch-hist .ch-list{flex:1 1 auto;padding:14px 12px 10px;overscroll-behavior:contain;
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 14px);mask-image:linear-gradient(to bottom,transparent,#000 14px)}
+.ch-hist .ch-inner{gap:3.5px}
+.ch-hist .ch-who{font-size:12.5px;margin:5.5px 0 .5px 8.5px}
+.ch-hist .ch-m{padding:6px 11px 7px;border-radius:16px;font-size:15px}
+.ch-hist .ch-m.me+.ch-m:not(.me),.ch-hist .ch-m:not(.me)+.ch-m.me,.ch-hist .ch-fail+.ch-m:not(.me),.ch-hist .ch-fail+.ch-who{margin-top:4.5px}
+/* 點得到的範圍撐到 44px 高（字 12px＋上下各 14） */
+.ch-hist .ch-fail{font-size:12px;padding:14px 2px 14px 12px;margin:-11px 0 -13px}
+.ch-hist .ch-jump{right:10px;bottom:10px;width:44px;height:44px;transform:translateY(4px)}
+.ch-hist .ch-jump.on{transform:none}
+.ch-hist .ch-jump svg{width:18px;height:18px}
+.ch-hist .ch-n,.ch-btn .ch-n{top:-6px;right:-6px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;font-size:12px;line-height:20px}
+/* 打字時輪到你：鍵盤蓋住了手牌和狀態列，把狀態列那句搬到打字框上面，點它收鍵盤。
+   ⚠️ 不能只靠字的陰影浮在壓暗的桌上：底下剛好是牌的話只剩 2.6（樣品 contrast4 量的），所以墊打字框那個底、做成一顆膠囊 */
+.ch-turn{position:absolute;left:50%;transform:translateX(-50%);height:44px;padding:0 20px;border-radius:22px;display:none;align-items:center;justify-content:center;
+  white-space:nowrap;font-size:15px;color:var(--ink);background:var(--felt-deep);border:1px solid var(--glass-edge)}
+.ch-turn.on{display:flex}
+.ch-turn:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.ch-turn b{color:var(--brass);font-weight:600}
+.ch-fld{position:absolute;left:10px;right:10px;height:46px;display:flex;align-items:center;gap:4px;padding:0 1px 0 18px;border-radius:23px;
+  background:var(--felt-deep);border:1px solid var(--glass-edge);transition:border-color .15s;cursor:text}
+.ch-fld:focus-within{border-color:oklch(.845 .128 84 / .75)}
+/* 16px：iPhone 的 Safari 碰到小於 16 的打字框，點下去會把整頁放大 */
+.ch-fld input{all:unset;flex:1;min-width:0;height:44px;font-size:16px;line-height:1.2;color:var(--ink)}
+.ch-fld .ch-send{height:44px;line-height:44px;padding:0 14px;border-radius:22px;font-size:15px}
+.ch-sheet ::selection,.ch ::selection{background:var(--brass-soft);color:var(--ink)}
+
 /* ================= 動作偏好 ================= */
 /* 拿掉位移，保留顏色、透明度與狀態變化——那些是資訊不是裝飾 */
 @media (prefers-reduced-motion: reduce){
@@ -1667,6 +1832,9 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
         <div class="trick" id="trick"></div>
       </div>
       <div class="status" id="status"></div>
+      <!-- 聊天（手機）：字幕與打字鈕，位置由 chatPlace() 跟著狀態列走 -->
+      <div class="ch-cap" id="chCap" role="button" tabindex="0" aria-label="聊天" hidden></div>
+      <button class="ch-btn" id="chBtn" aria-label="聊天" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M4 5.5h16v10H9.5L5.5 19v-3.5H4z"/></svg></button>
       <div class="myhand">
         <div class="hand" id="hand"></div>
         <div class="tricks" id="tricks" aria-live="polite"></div>
@@ -1680,6 +1848,8 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
         <button class="btn ledger-close" id="scoreClose">關閉</button>
       </div>
       <div class="ledger-scroll"><table class="score" id="score"></table></div>
+      <!-- 聊天（電腦）：計分表下半。裡面由 chatBoxHTML() 填 -->
+      <section class="ch" id="chLedger" hidden></section>
     </aside>
   </main>
 </div>
@@ -1738,9 +1908,13 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
     <section class="rm-plan">
       <div class="rm-dia" id="rmDia"></div>
     </section>
-    <aside class="rm-sheet" id="rmSheet"></aside>
+    <!-- 右欄拆三段，聊天夾在中間：paintRoomSheet() 只重寫頭尾兩段。
+         聊天不能跟著 innerHTML 重寫——有人進來、房主改規則就會把打到一半的字和焦點一起洗掉 -->
+    <aside class="rm-sheet" id="rmSheet"><div class="rm-part" id="rmTop"></div><div class="rm-rules" id="rmRules"></div><section class="ch" id="chRoom" hidden></section><div class="rm-part" id="rmFoot"></div></aside>
   </div>
 
+  <!-- 聊天（手機開房頁）：字幕＋打字框一直在最下面 -->
+  <div class="ch-bar" id="chBar" hidden><div class="ch-cap" id="chCapRoom" role="button" tabindex="0" aria-label="聊天"></div><button class="ch-fake" id="chFake">說點什麼</button></div>
   <div class="rm-scrim" id="rmScrim" data-room="seats" hidden></div>
   <div class="rm-edit" id="rmEdit" hidden></div>
 </div>
@@ -1750,6 +1924,14 @@ body:not(.is3d) .bidhub,body:not(.is3d) .bidverdict{display:none}
      （那是牌局中的對話框該有的樣子），而是跟登入頁、大廳、開房頁同一張石板灰的紙。
      三頁其實是同一頁：上面那排章節名就是標題，切換只換底下那一疊。內容由
      paintMe()／paintPref()／paintRules() 填，全部長自同一份 RULE_UI 與 roundPoints()。 -->
+<!-- 聊天（手機）：點開之後那一層。牌局與開房頁共用 -->
+<div class="ch-sheet" id="chSheet" role="dialog" aria-label="聊天" hidden>
+  <div class="ch-dim" id="chDim"></div>
+  <div class="ch-hist none" id="chHist"></div>
+  <button class="ch-turn" id="chTurn"></button>
+  <div class="ch-fld" id="chFld"><input id="chIn" maxlength="100" autocomplete="off" enterkeyhint="send" placeholder="說點什麼" aria-label="說點什麼"><button class="ch-send" id="chSend">送出</button></div>
+</div>
+
 <div class="pg" id="pg" hidden>
   <div class="pg-head">
     <div class="pg-col">
@@ -2321,6 +2503,19 @@ window.I18N_EN = {
 "現在不能叫墩":"You can't bid right now",
 "這張牌不能出":"You can't play that card",
 "還沒輪到你":"It's not your turn yet",
+/* 聊天（plan 0008）。伺服器那三句不會上畫面（送不出去一律標「沒送出去」），進字典是 i18n_scan 的規矩 */
+"講太快了，等一下再說":"Slow down a little",
+"這句沒有字":"Nothing to send",
+"一句最多 100 字":"100 characters max",
+"聊天":"Chat",
+"說點什麼":"Say something",
+"送出":"Send",
+"沒送出去":"Not sent",
+"chat.retry":{zh:"沒送出去 · 點一下重送", en:"Not sent · click to retry"},
+"chat.retryTap":{zh:"沒送出去 · 點一下重送", en:"Not sent · tap to retry"},
+"重送中…":"Resending…",
+"跳到最新":"Jump to latest",
+"跳到最新，%1 句還沒看":"Jump to latest, %1 unread",
 "這局還沒結束":"This round isn't over yet",
 "這一場還沒打完":"This game isn't over yet"
 };
@@ -2451,6 +2646,8 @@ function i18nDOM(root){
     acceptNode:function(n){
       if(n.nodeType === 1){
         if(SKIP[n.nodeName]) return NodeFilter.FILTER_REJECT;
+        /* 玩家打的字（聊天）掛 translate="no"：有人打「計分」，英文版不准變成 Score */
+        if(n.getAttribute && n.getAttribute("translate") === "no") return NodeFilter.FILTER_REJECT;
         if(n.hasAttribute && n.hasAttribute("data-i18n")) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
@@ -4572,6 +4769,441 @@ function unsubscribe(){
   }else NET.state = "none";
 })();
 
+/* ================= 聊天室（plan 0008） =================
+   話只有一份（CHAT.list），畫在三個地方：電腦的泡泡（計分表下半、開房頁右欄）、手機的桌角字幕、手機點開後的泡泡。
+   長相與拍板在 CSS 那段（搜「聊天室（plan 0008）」）；伺服器那半在 supabase/functions/game 的 say／chat 與 migrations/0009。
+   ⚠️ 走自己的路，不排進 api() 那條隊伍：手機切網路時 fetch 會掛著不動，一句話卡住，後面玩家的出牌就跟著卡（api 檔頭）。
+      錯也不寫進狀態列（NET.err），只標在那句話底下（他 10-31 照建議：沒送出去標在泡泡底下、不跳對話框）。
+   ⚠️ 即時那條線也自己一條（chat-<房號>），不掛在牌局那條 room-<房號> 上：聊天這邊訂閱出錯，不准連累牌局的推播。
+   誰收得到「新的一句」由資料庫那條 select policy 決定（坐在這一桌的真人）；斷線那段漏掉的，接回來時整批補（chatFetch）。 */
+const CHAT = {code:null, list:[], chan:null, seq:0, was:false, open:false, kb:false,
+  views:null, pad:false, padKey:"", free:null, ledgerOn:false, fetching:null};
+const CHAT_TMO = 10000;       /* 一趟最多等多久，到了就當沒送出去（伺服器其實收到的話，推播或補話會把它對上） */
+const CHAT_KEEP = 200;        /* 畫面上最多留幾句：一場打下來不會比這個多，多了也只是捲不完 */
+
+/** 這一桌聊不聊得起來：連線局、你坐在桌上、桌上還有別的真人。
+ *  只有你和 AI 時不顯示（他 10-31 照建議）；觀戰的人沒有座位，坐下才看得到（伺服器也擋，入座後前面聊的照樣補得到） */
+function chatOn(){
+  if(MODE !== "net" || !NET.code || !G || !G.seats) return false;
+  const me = mySeat();
+  if(me < 0 || !G.seats[me] || G.seats[me].kind !== "human") return false;
+  return G.seats.some(function(s, i){ return i !== me && s.kind === "human" && !!s.cid; });
+}
+/** 打字時輪到你了沒（狀態列那句要不要搬到打字框上面） */
+function chatMyTurn(){
+  if(!G || $("room").hidden === false) return false;
+  const me = mySeat();
+  if(me < 0) return false;
+  if(G.phase === "play") return G.turn === me;
+  if(G.phase === "bid") return rules(G.cfg).bidMode === "sim" ? (G.bids[me] === null || G.bids[me] === undefined) : G.turn === me;
+  return false;
+}
+
+/* ---- 跟伺服器講話 ---- */
+/** 說一句、拿話。回 {error} 或伺服器的回應。不會 throw */
+function chatCall(action, args){ return chatPost(action, args); }
+async function chatPost(action, args){
+  const code = CHAT.code;
+  const ac = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = ac ? setTimeout(function(){ ac.abort(); }, CHAT_TMO) : 0;
+  try{
+    const jwt = await withTimeout(accessToken(), NET.tmoTok, "token");
+    if(!jwt) return {error:"no session"};
+    const res = await fetch(API, {
+      method:"POST",
+      headers:{"Content-Type":"application/json", apikey:SB_KEY, Authorization:"Bearer " + jwt},
+      body:JSON.stringify(Object.assign({action:action, token:MY.token, code:code}, args || {})),
+      signal: ac ? ac.signal : undefined
+    });
+    const d = await res.json().catch(function(){ return {}; });
+    if(TRACE.on) TRACE.log("chat", action + " " + res.status + (d.error ? " err=" + d.error : ""));
+    if(!res.ok || d.error) return {error:d.error || String(res.status), status:res.status};
+    return d;
+  }catch(e){
+    if(TRACE.on) TRACE.log("chat!", action + " " + String(e && e.message));
+    return {error:String((e && e.message) || e)};
+  }finally{ if(timer) clearTimeout(timer); }
+}
+
+/* ---- 這一桌的話 ---- */
+/** 聊天跟著 NET.code 走：進房、換房、離房都在這裡收。不另外掛在 subscribe()／離房那幾條路上——
+ *  那樣要記得每一條都接，漏一條就是舊房的話跑進新房（或新房聽不到） */
+function chatFollow(){
+  const code = MODE === "net" ? (NET.code || null) : null;
+  if(CHAT.code === code) return;
+  if(CHAT.chan && NET.sb) NET.sb.removeChannel(CHAT.chan);
+  CHAT.chan = null;
+  CHAT.code = code; CHAT.list = []; CHAT.was = false; CHAT.fetching = null; CHAT.padKey = "";
+  if(CHAT.open) chatClose();
+  if(CHAT.views) CHAT.views.forEach(function(v){ v.html = null; v.ack = 0; });
+  if(!code || !NET.sb) return;
+  const ch = NET.sb.channel("chat-" + code);
+  CHAT.chan = ch;
+  ch.on("postgres_changes", {event:"INSERT", schema:"public", table:"chat", filter:"code=eq." + code},
+      function(p){ if(CHAT.chan === ch && p && p.new) chatIn([p.new], code); })
+    .subscribe(function(st){ if(CHAT.chan === ch) chatStatus(st); });
+}
+/** 接上（含每一次重接）的那一刻補一次：斷著那段的推播不會補送（牌局那條 chanStatus 同一個道理） */
+function chatStatus(st){
+  if(TRACE.on) TRACE.log("chat-rt", st);
+  if(st === "SUBSCRIBED") chatFetch();
+}
+/** 補話：一律拿最新的一批（after:0），不從「我手上最大的 id」往後拿。
+ *  ⚠️ id 是全站共用的流水號，自己那句的回話、推播都可能比別人更早的那句先到；拿最大 id 往後問，
+ *     斷線時漏掉的那句（id 比較小）就永遠補不回來。一批最多 100 句，一趟幾 KB，只在接上、回到前景、剛坐下時跑。 */
+function chatFetch(){
+  if(!CHAT.code || !chatOn()) return;
+  if(CHAT.fetching){ CHAT.fetching.again = true; return; }   /* 跑的時候又被叫：跑完再補一趟，中間那句不會漏 */
+  const code = CHAT.code, run = CHAT.fetching = {again:false};
+  chatCall("chat", {after:0}).then(function(d){
+    if(CHAT.fetching === run) CHAT.fetching = null;
+    if(code !== CHAT.code) return;
+    if(d && d.chat) chatIn(d.chat, code);
+    if(run.again) chatFetch();
+  });
+}
+/** 收話（推播、補話都走這裡）。同一句只收一次；自己那句先畫出來了的，對上去，不出現兩次 */
+function chatIn(rows, code){
+  if(code !== CHAT.code || !rows || !rows.length) return;
+  let changed = false;
+  rows.forEach(function(r){
+    const id = r ? Number(r.id) : 0;
+    if(!id || CHAT.list.some(function(m){ return m.id === id; })) return;
+    const mine = r.pid === MY.pid;
+    /* 對上「還沒有 id 的自己那句」：送出中、或回話逾時被標成沒送出去的（伺服器其實收到了） */
+    const local = mine ? CHAT.list.filter(function(m){ return m.local && !m.id && m.body === r.body; })[0] : null;
+    if(local){ local.id = id; local.state = "sent"; }
+    else CHAT.list.push({id:id, pid:r.pid, name:r.name, body:r.body, mine:mine, state:"sent"});
+    changed = true;
+  });
+  if(!changed) return;
+  chatSort();
+  chatPaint();
+}
+/** 有 id 的照 id 排；還沒有 id 的（送出中、沒送出去）照送出的順序排在最後 */
+function chatSort(){
+  CHAT.list.sort(function(a, b){
+    if(a.id && b.id) return a.id - b.id;
+    if(a.id || b.id) return a.id ? -1 : 1;
+    return a.seq - b.seq;
+  });
+  if(CHAT.list.length > CHAT_KEEP) CHAT.list.splice(0, CHAT.list.length - CHAT_KEEP);
+}
+/** 說一句：先畫出來，回話到了再對上 id */
+function chatSend(text){
+  text = String(text || "").replace(/\s+/g, " ").trim();
+  if(!text || !chatOn()) return;
+  const m = {local:true, seq:++CHAT.seq, pid:MY.pid, name:"", body:text, mine:true, state:"sending"};
+  CHAT.list.push(m);
+  chatSort();
+  chatPaint({stick:true});        /* 自己講的一定帶到最底下 */
+  chatSay(m);
+}
+function chatSay(m){
+  const code = CHAT.code;
+  chatCall("say", {text:m.body}).then(function(d){
+    if(code !== CHAT.code) return;
+    const id = d && d.msg ? Number(d.msg.id) : 0;
+    if(id){
+      /* 推播比回話先到、已經畫成另一句了（不該發生：同一個人同一句會被 chatIn 對上），收掉這一份 */
+      if(m.id !== id && CHAT.list.some(function(x){ return x !== m && x.id === id; })) CHAT.list.splice(CHAT.list.indexOf(m), 1);
+      else m.id = id;
+      m.state = "sent";
+    }else if(!m.id) m.state = "fail";
+    chatSort();
+    chatPaint();
+  });
+}
+function chatRetry(seq){
+  const m = CHAT.list.filter(function(x){ return x.seq === seq; })[0];
+  if(!m || m.state !== "fail") return;
+  m.state = "retry";
+  chatPaint();
+  chatSay(m);
+}
+
+/* ---- 畫 ---- */
+const CHAT_SVG_DOWN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5l6 6 6-6"/></svg>';
+/** 泡泡。tap：手機那份（英文寫 tap，電腦寫 click） */
+function chatBubbles(tap){
+  let h = "", prev = null;
+  CHAT.list.forEach(function(m){
+    const bad = m.state === "fail" || m.state === "retry";
+    if(!m.mine && (!prev || prev.mine || prev.pid !== m.pid)) h += '<div class="ch-who">' + esc(m.name) + '</div>';
+    h += '<div class="ch-m' + (m.mine ? " me" : "") + (bad ? " bad" : "") + '">' + esc(m.body) + '</div>';
+    if(m.state === "fail") h += '<button class="ch-fail" data-chat-retry="' + m.seq + '" translate="no">' + T(tap ? "chat.retryTap" : "chat.retry") + '</button>';
+    else if(m.state === "retry") h += '<button class="ch-fail" aria-disabled="true" translate="no">' + T("重送中…") + '</button>';
+    prev = m;
+  });
+  return h;
+}
+/** 桌角字幕：最近兩句。自己沒送出去的那句釘在最下面，直到重送成功 */
+function chatCapHTML(){
+  const pin = CHAT.list.filter(function(m){ return m.mine && (m.state === "fail" || m.state === "retry"); }).pop() || null;
+  const rest = CHAT.list.filter(function(m){ return m !== pin; });
+  const shown = rest.slice(pin ? -1 : -2);       /* ⚠️ slice(-0) 會回整串：釘住一句時只取 1 */
+  if(pin) shown.push(pin);
+  const newest = rest[rest.length - 1];
+  return shown.map(function(m){
+    return '<div class="ch-l' + (m.mine ? " me" : "") + (m === newest ? " new" : "") + (m === pin ? " bad" : "") + '">' +
+      '<b>' + esc(m.mine ? T("你") : m.name) + '</b><span>' + esc(m.body) + '</span>' +
+      (m === pin ? '<i>' + T(m.state === "retry" ? "重送中…" : "沒送出去") + '</i>' : "") + '</div>';
+  }).join("");
+}
+const chatAtBottom = el => el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+/** 一份泡泡清單。先記「原本在不在最底下」，改完在底下的留在底下（不在底下的不拉回去，右下角那顆記句數） */
+function chatList(v, o){
+  const stick = (o && o.stick) || chatAtBottom(v.list);
+  const h = chatBubbles(v.tap);
+  if(h !== v.html){ v.html = h; v.inner.innerHTML = h; }
+  if(stick) v.list.scrollTop = v.list.scrollHeight;
+  chatJump(v);
+}
+function chatJump(v){
+  const others = CHAT.list.filter(function(m){ return !m.mine; }).length;
+  const shown = v.list.clientHeight > 0, bottom = !shown || chatAtBottom(v.list);
+  if(bottom) v.ack = others;            /* 看不到的那幾份（手機時的電腦版、關著的點開層）一律當作看過了 */
+  const n = Math.max(0, others - v.ack);
+  v.jump.classList.toggle("on", !bottom);
+  v.n.textContent = n ? (n > 99 ? "99+" : String(n)) : "";
+  v.jump.setAttribute("aria-label", n ? T("跳到最新，%1 句還沒看", n) : T("跳到最新"));
+}
+/** 電腦那兩份的骨架（計分表下半、開房頁右欄）。字都是中文原文，掛上去之後 i18nDOM 照字典換 */
+function chatBoxHTML(){
+  return '<div class="ch-hd">聊天</div>' +
+    '<div class="ch-list" role="log" aria-label="聊天"><div class="ch-inner" translate="no"></div></div>' +
+    '<button class="ch-jump" aria-label="跳到最新">' + CHAT_SVG_DOWN + '<span class="ch-n"></span></button>' +
+    '<div class="ch-in"><div class="ch-box"><input maxlength="100" autocomplete="off" enterkeyhint="send" placeholder="說點什麼" aria-label="說點什麼">' +
+    '<button class="ch-send">送出</button></div></div>';
+}
+function chatInit(){
+  const mk = function(box, tap){
+    const v = {box:box, tap:tap, list:box.querySelector(".ch-list"), inner:box.querySelector(".ch-inner"),
+      jump:box.querySelector(".ch-jump"), n:box.querySelector(".ch-n"), input:box.querySelector("input"), html:null, ack:0};
+    v.list.addEventListener("scroll", function(){ chatJump(v); }, {passive:true});
+    v.jump.addEventListener("click", function(){
+      v.list.scrollTo({top:v.list.scrollHeight, behavior:UD.REDUCED ? "auto" : "smooth"});
+    });
+    v.inner.addEventListener("click", function(e){
+      const b = e.target.closest("[data-chat-retry]");
+      if(b) chatRetry(+b.getAttribute("data-chat-retry"));
+    });
+    return v;
+  };
+  $("chLedger").innerHTML = chatBoxHTML();
+  $("chRoom").innerHTML = chatBoxHTML();
+  $("chHist").innerHTML = '<div class="ch-list" role="log" aria-label="聊天"><div class="ch-inner" translate="no"></div></div>' +
+    '<button class="ch-jump" aria-label="跳到最新">' + CHAT_SVG_DOWN + '<span class="ch-n"></span></button>';
+  if(window.i18nDOM){ i18nDOM($("chLedger")); i18nDOM($("chRoom")); i18nDOM($("chHist")); }
+  CHAT.views = [mk($("chLedger"), false), mk($("chRoom"), false), mk($("chHist"), true)];
+  /* 電腦：Enter 送出、Esc 離開打字框。送出鈕按下去時焦點留在打字框（不然打完一句要再點一次框） */
+  CHAT.views.slice(0, 2).forEach(function(v){
+    const box = v.box.querySelector(".ch-box"), send = v.box.querySelector(".ch-send");
+    const go = function(){ const t = v.input.value; if(!t.trim()) return; v.input.value = ""; box.classList.remove("has"); chatSend(t); };
+    v.input.addEventListener("input", function(){ box.classList.toggle("has", !!v.input.value.trim()); });
+    v.input.addEventListener("keydown", function(e){
+      if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); go(); }
+      if(e.key === "Escape"){ e.stopPropagation(); v.input.blur(); }
+    });
+    send.addEventListener("mousedown", function(e){ e.preventDefault(); });
+    send.addEventListener("click", function(){ go(); v.input.focus(); });
+    v.box.querySelector(".ch-in").addEventListener("mousedown", function(e){
+      if(e.target !== v.input && !e.target.closest(".ch-send")){ e.preventDefault(); v.input.focus(); }
+    });
+  });
+  /* 手機：點字幕＝打開但不跳鍵盤（只想看前面講什麼）；點那顆、點開房頁的打字框＝直接跳鍵盤。
+     ⚠️ focus() 要在點擊的那一刻同步叫，iOS 才肯把鍵盤叫出來（隔一個 await 就不出來） */
+  const capOpen = function(e){ if(e.type === "click" || e.key === "Enter" || e.key === " "){ e.preventDefault(); chatOpen(false); } };
+  ["chCap", "chCapRoom"].forEach(function(id){ $(id).addEventListener("click", capOpen); $(id).addEventListener("keydown", capOpen); });
+  $("chBtn").addEventListener("click", function(){ chatOpen(true); });
+  $("chFake").addEventListener("click", function(){ chatOpen(true); });
+  $("chDim").addEventListener("click", chatClose);
+  /* ⚠️ 那顆只在打字時（焦點在打字框）才出現：按下去的那一刻焦點一離開它就藏起來，放開時已經不在，click 永遠不會來
+     （chat_test 抓到的；手機也是 mousedown 先搶焦點、click 才到）。所以按下去不搶焦點，由 chatClose 自己收鍵盤 */
+  $("chTurn").addEventListener("mousedown", function(e){ e.preventDefault(); });
+  $("chTurn").addEventListener("click", chatClose);
+  const inp = $("chIn"), fld = $("chFld"), send = $("chSend");
+  const go = function(){ const t = inp.value; if(!t.trim()) return; inp.value = ""; fld.classList.remove("has"); chatSend(t); };
+  inp.addEventListener("input", function(){ fld.classList.toggle("has", !!inp.value.trim()); });
+  inp.addEventListener("keydown", function(e){
+    if(e.key === "Enter" && !e.isComposing){ e.preventDefault(); go(); }
+    if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); chatClose(); }
+  });
+  inp.addEventListener("focus", function(){ CHAT.kb = true; chatLayout(); });
+  inp.addEventListener("blur", function(){ CHAT.kb = false; chatLayout(); });
+  /* 送出時鍵盤不收（像 LINE）：按下去不搶焦點。真機上鍵盤會不會閃一下要真機驗 */
+  send.addEventListener("mousedown", function(e){ e.preventDefault(); });
+  send.addEventListener("pointerdown", function(e){ e.preventDefault(); });
+  send.addEventListener("click", function(){ go(); inp.focus({preventScroll:true}); });
+  fld.addEventListener("mousedown", function(e){
+    if(e.target !== inp && !e.target.closest(".ch-send")){ e.preventDefault(); inp.focus({preventScroll:true}); }
+  });
+  if(window.visualViewport){
+    visualViewport.addEventListener("resize", chatLayout);
+    visualViewport.addEventListener("scroll", chatLayout);
+  }
+  addEventListener("resize", function(){ chatPaint(); });
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) chatFetch(); });
+  if(window.onLang) onLang(function(){ if(CHAT.views) CHAT.views.forEach(function(v){ v.html = null; }); chatPaint(); });
+  if(window.ResizeObserver) new ResizeObserver(function(){ chatSnapRules(); }).observe($("rmSheet"));
+  UD.onOverlays = chatPlace;            /* 立體模式：狀態列被 placeOverlays 搬動時，字幕跟著走 */
+}
+
+/** 全部重畫一次。render()、paintRoomSheet()、收話、送出、視窗變大小都走這裡 */
+function chatPaint(o){
+  if(!CHAT.views){ if(!$("chLedger")) return; chatInit(); }
+  chatFollow();
+  const on = chatOn();
+  if(on && !CHAT.was) chatFetch();      /* 剛坐下、剛進房：前面聊的補回來 */
+  CHAT.was = on;
+  const inRoom = !$("room").hidden;
+  /* 點開那層只屬於手機的長相：聊不了了、或視窗拉寬到右欄出現了，就收起來（電腦是右欄裡的打字框） */
+  if(CHAT.open && (!on || !matchMedia(inRoom ? "(max-width:760px)" : "(max-width:960px)").matches)) chatClose();
+  const ledgerOn = on && !inRoom;
+  $("chLedger").hidden = !ledgerOn;
+  document.querySelector(".ledger").classList.toggle("has-chat", ledgerOn);
+  $("chRoom").hidden = !on;
+  $("rmSheet").classList.toggle("has-chat", on);
+  $("room").classList.toggle("has-chat", on);
+  $("chBar").hidden = !on || CHAT.open;
+  $("chCap").hidden = $("chBtn").hidden = !ledgerOn || CHAT.open;
+  CHAT.views.forEach(function(v){ chatList(v, o); });
+  const cap = chatCapHTML();
+  ["chCap", "chCapRoom"].forEach(function(id){ const el = $(id); if(el.__h !== cap){ el.__h = cap; el.innerHTML = cap; } });
+  $("chCap").setAttribute("translate", "no"); $("chCapRoom").setAttribute("translate", "no");
+  chatPlace();
+  chatSnapRules();
+  /* 計分表變矮（聊天出來）或變高：進行中那一局留在看得到的地方 */
+  if(ledgerOn !== CHAT.ledgerOn){ CHAT.ledgerOn = ledgerOn; requestAnimationFrame(centerLedger); }
+  if(CHAT.open) chatLayout();
+}
+
+/* ---- 手機：字幕跟著狀態列走 ---- */
+/** 字幕的底貼在狀態列上緣往上 4px；人多放不下兩行時墊暗底 */
+function chatPlace(){
+  const cap = $("chCap"), btn = $("chBtn");
+  if(!CHAT.views || cap.hidden) return;
+  const st = $("status"), tb = st.offsetParent;
+  if(!tb || !st.offsetHeight || getComputedStyle(cap).display === "none") return;
+  const b = Math.round(tb.clientHeight - st.offsetTop + 4) + "px";
+  if(cap.style.bottom !== b){ cap.style.bottom = b; btn.style.bottom = b; }
+  cap.classList.toggle("pad", chatPad(st, tb));
+}
+/** 「輪到你出牌」上面空出來的桌面放不放得下兩行字幕（22×2＋離狀態列 4＋離上面的東西 4＝52，樣品量的）。
+ *  ⚠️ 不能看桌上「現在」有什麼：牌一張張飛過去、收墩時整疊飛走，暗底會跟著一閃一閃。
+ *     立體看「這一局桌上東西該在的位置」（出牌位、每個人的墩堆、骰子、牌庫，全部算進來，UD.chatFree3d）；
+ *     平面看檯面那一塊的框（它本來就留了一張牌的高度，人多、出的牌多到換行時才變高）。這一桌一旦放不下就一直墊
+ *     （換人數、換平面立體、視窗變寬窄才重來）：不然每一局第一墩換行時冒出來一次，收墩又收回去。 */
+function chatPad(st, tb){
+  const is3d = document.body.classList.contains("is3d");
+  const top = st.getBoundingClientRect().top, t0 = tb.getBoundingClientRect();
+  /* 兩種模式都量 DOM 那幾塊（平面的檯面、牌庫；座位牌——立體模式自己那塊釘在右下角、在狀態列下面，不算） */
+  let low = -1e9;
+  const me = mySeat();
+  [$("trick"), $("deckwrap")].concat([].slice.call(document.querySelectorAll("#seats .seat"))).forEach(function(el){
+    if(!el || (is3d && +el.dataset.seat === me)) return;
+    const r = el.getBoundingClientRect();
+    if(!r.height || r.right < t0.left || r.left > t0.right || r.top >= top) return;
+    low = Math.max(low, r.bottom);
+  });
+  let free = top - low;
+  if(is3d && UD.chatFree3d){ const f3 = UD.chatFree3d(top - t0.top); if(typeof f3 === "number") free = Math.min(free, f3); }
+  CHAT.free = free;
+  const table = [is3d, tb.clientWidth, G.cfg.n].join("|");
+  if(table !== CHAT.padKey){ CHAT.padKey = table; CHAT.pad = false; }
+  if(free < 52) CHAT.pad = true;
+  return CHAT.pad;
+}
+
+/* ---- 手機：點開之後 ---- */
+let CHAT_SAFE = null;
+function chatSafeBottom(){
+  if(CHAT_SAFE === null){
+    const p = document.createElement("div");
+    p.style.cssText = "position:fixed;left:0;bottom:0;height:0;visibility:hidden;padding-bottom:env(safe-area-inset-bottom)";
+    document.body.appendChild(p);
+    CHAT_SAFE = parseFloat(getComputedStyle(p).paddingBottom) || 0;
+    p.remove();
+  }
+  return CHAT_SAFE;
+}
+function chatOpen(kb){
+  if(!chatOn() || !CHAT.views) return;
+  CHAT.open = true;
+  $("chSheet").hidden = false;
+  chatPaint({stick:true});
+  if(kb) $("chIn").focus({preventScroll:true});
+  chatLayout();
+}
+function chatClose(){
+  CHAT.open = false;
+  $("chSheet").hidden = true;
+  if(document.activeElement === $("chIn")) $("chIn").blur();
+  CHAT.kb = false;
+  if(CHAT.views) chatPaint();
+}
+/** 位置都從「看得到的那一塊」的底往上算：打字框、（輪到你時）那顆膠囊、紀錄。
+ *  鍵盤出來時 visualViewport 變矮、iOS 還會把頁面往上推，整層跟著那一塊走，打字框才會剛好落在鍵盤上面 */
+function chatLayout(){
+  const sh = $("chSheet");
+  if(!CHAT.views || sh.hidden) return;
+  const vv = window.visualViewport;
+  const H = vv ? vv.height : innerHeight, top0 = vv ? vv.offsetTop : 0;
+  sh.style.top = Math.round(top0) + "px";
+  sh.style.height = Math.round(H) + "px";
+  const v = CHAT.views[2], list = v.list, stick = chatAtBottom(list);
+  const FH = 46;
+  const fb = CHAT.kb ? 8 : 12 + chatSafeBottom();
+  $("chFld").style.bottom = fb + "px";
+  const tb = fb + FH + 4, turn = $("chTurn");
+  const turnOn = CHAT.kb && chatMyTurn();
+  turn.style.bottom = tb + "px";
+  turn.classList.toggle("on", turnOn);
+  if(turnOn){
+    const msg = $("status").querySelector(".msg");
+    const h = msg ? msg.innerHTML : T("輪到<b>你</b>出牌");
+    if(turn.__h !== h){ turn.__h = h; turn.innerHTML = h; }
+  }
+  const hb = turnOn ? tb + 44 + 4 : fb + FH + 8;
+  const hist = $("chHist");
+  hist.style.bottom = hb + "px";
+  hist.classList.toggle("none", !CHAT.list.length);   /* 還沒人講話：只有打字框，不畫空的框 */
+  /* 紀錄最高長到頂列底下（還看得到第幾局、王牌）；開房頁留 140 給房號那圈的上半 */
+  const roof = !$("room").hidden ? 140 : (document.querySelector(".app .bar") || {getBoundingClientRect:function(){ return {bottom:0}; }}).getBoundingClientRect().bottom;
+  hist.style.maxHeight = Math.max(88, H - hb - Math.max(0, roof - top0)) + "px";
+  /* 紀錄變矮（鍵盤出來、膠囊冒出來）時，原本在最底下的要留在最底下（樣品 check4 抓到的） */
+  if(stick) list.scrollTop = list.scrollHeight;
+  chatJump(v);
+}
+
+/* ---- 電腦開房頁：規則那塊停在段與段之間 ---- */
+/** 規則那塊的高度停在最後一段整段放得下的地方（加上淡出那 18px），多出來的給聊天。
+ *  ⚠️ 平分高度的話，切口常落在某段小標正下方：小標留著、底下幾列全被淡掉，看起來那一段是空的（電腦樣品驗收員抓到「計分」）。 */
+function chatSnapRules(){
+  const rules = $("rmRules");
+  if(!rules) return;
+  rules.style.flex = "";
+  if(!$("rmSheet").classList.contains("has-chat") || $("room").hidden || !matchMedia("(min-width:761px)").matches) return;
+  const FADE = 18, avail = rules.clientHeight;
+  if(!avail) return;
+  const top = rules.getBoundingClientRect().top - rules.scrollTop;
+  let best = 0;
+  rules.querySelectorAll(".rm-sect").forEach(function(sc){
+    const b = sc.getBoundingClientRect().bottom - top;
+    if(b + FADE <= avail) best = b;
+  });
+  if(best) rules.style.flex = "0 0 " + Math.ceil(best + FADE) + "px";
+}
+/* 電腦：沒在打字時按 Enter 就跳到打字框（計分表下半、開房頁右欄，看得到的那一份） */
+document.addEventListener("keydown", function(e){
+  if(e.key !== "Enter" || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || !CHAT.views) return;
+  const t = e.target;
+  if(t && (t.closest && t.closest("input,textarea,select,button,a,[contenteditable],[role=button]"))) return;
+  if(!$("pg").hidden || document.body.classList.contains("score-open") || !$("endOv").hidden) return;
+  const v = CHAT.views.slice(0, 2).filter(function(x){ return !x.box.hidden && x.box.getClientRects().length && x.list.clientHeight; })[0];
+  if(v){ e.preventDefault(); v.input.focus(); }
+});
+
 /* ================= 身分 ================= */
 /* 名字是別人給的字（Google 的顯示名稱，或對手自己打的），頭像是外部網址。
    兩者都會被串進 HTML，所以進畫面前一律逸出——屬性值也要，所以引號一起。 */
@@ -5660,6 +6292,7 @@ function render(){
      連線模式每 420ms 敲一次伺服器，敲一次就重畫一次，不補的話會看到那張牌跳一下 */
   }else if(G.phase === "trickend" && $("trick").classList.contains("is-won")) pushWinner();
   if(UD.sync3d) UD.sync3d();
+  chatPaint();
   /* 音效層跟 3D 一樣，是加上去的一層：把當下的牌局狀態遞過去，
      它自己跟上一次比對，差在哪就發什麼聲。平面與立體共用這一份——
      聲音照的是引擎的狀態，不是畫面上的 DOM。載入失敗就什麼都不會發生。 */
@@ -6119,6 +6752,8 @@ function closeRoom(){
   /* 牌桌剛才是 display:none，畫布量起來是 0×0；一露臉就得補量一次，
      不然立體桌會停在錯的尺寸（或根本沒開始畫）。 */
   if(UD.onShow) UD.onShow();
+  /* 聊天從開房頁右欄搬到計分表下半（手機：從底下那條搬到桌角）。render() 比這裡早跑，那時開房頁還開著 */
+  chatPaint();
 }
 
 /* 你永遠坐在正下方，下一位在你左手邊——跟出牌方向一致。
@@ -6253,11 +6888,12 @@ function paintRoomSheet(){
   const C = rules(G.cfg), host = amHost(), lobby = G.phase === "lobby";
   const solo = MODE !== "net";
   const N = roomNumbers(C), hs = G.hs || 5;
-  let h = '<div class="rm-hd"><h2>這一桌的規則</h2>' +
+  const top = '<div class="rm-hd"><h2>這一桌的規則</h2>' +
     (host && lobby
       ? '<button class="rm-lnk" data-room="rules">' + T("rm.edit") + '</button>'
       : '<span class="rm-by">' + (lobby ? "房主決定" : "開打了，鎖住") + '</span>') +
     '</div>';
+  let h = "";
   RM_GROUPS.forEach(function(g){
     h += '<div class="rm-sect"><span class="cap">' + T(g[0]) + '</span>' +
       g[1].map(function(k){
@@ -6272,8 +6908,11 @@ function paintRoomSheet(){
       const p = roundPoints(e[0], e[1], hs, C);
       return '<div class="rm-r"><span class="k">' + T("叫 %1，拿 %2", e[0], e[1]) + '</span>' +
         '<i class="d"></i><span class="v">' + (p >= 0 ? T("＋") : "−") + Math.abs(p) + '</span></div>';
-    }).join("") + '</div>' +
-    '<div class="rm-tot"><span>' + T("%1 張牌 · %2 個人", N.size, G.seats.length) + '</span>' +
+    }).join("") + '</div>';
+  /* 右欄三段（規則、聊天、底下這段）——聊天那段不在這裡畫，見 index.html 的 #rmSheet */
+  setHTML($("rmTop"), top);
+  setHTML($("rmRules"), h);
+  h = '<div class="rm-tot"><span>' + T("%1 張牌 · %2 個人", N.size, G.seats.length) + '</span>' +
     '<span>' + T('<b>%1</b> 張到頂 · <b>%2</b> 局', N.peak, N.rounds) + '</span></div>';
 
   if(lobby && host)
@@ -6284,7 +6923,8 @@ function paintRoomSheet(){
   else
     h += '<button class="rm-go" data-room="back">回到牌桌</button>';
   if(roomErr) h += '<p class="rm-err">' + esc(roomErr) + '</p>';
-  setHTML($("rmSheet"), h);
+  setHTML($("rmFoot"), h);
+  chatPaint();
 }
 function paintRoomEdit(){
   const C = rules(G.cfg), N = roomNumbers(C), hs = G.hs || 5;
@@ -10108,7 +10748,57 @@ function placeOverlays(){
     b = Math.max(Math.min(b, h - ring - 4 - sh), h - top - 24, h * .13);
   }
   document.body.style.setProperty("--status-b", Math.round(b) + "px");
+  if(UD.onOverlays) UD.onOverlays();       /* 聊天的字幕貼在狀態列上面，狀態列一搬它就要跟（chatPlace） */
 }
+
+/* 聊天（plan 0008）：「輪到你出牌」上面那一帶，這一局桌上的東西最低到哪（給主程式的 chatPad() 決定字幕要不要墊暗底）。
+   看「該在的位置」不看「現在的位置」，跟 handTop 同一個理由：牌在飛、收墩整疊飛走的時候答案不能跟著跳，暗底才不會一閃一閃。
+   算進來的：每個人的出牌位、墩堆（這一局最多拿 hs 墩，全部的位置）、別人手上那把牌背、叫完收回面前的骰子（兩顆的寬度）、牌庫。
+   回傳 statusTop（相對於畫布那一層）減掉最低那個的下緣，單位 px。 */
+let chatFreeKey = "", chatFreeVal = null;
+UD.chatFree3d = function(statusTop){
+  const G = UD.G;
+  if(!S || !G || !G.cfg) return null;
+  const host = CANVAS.parentNode, w = host.clientWidth, h = host.clientHeight;
+  const n = G.cfg.n, hs = Math.max(1, G.hs || 1), cp = S.camera.position;
+  const key = [w, h, n, hs, S.me, Math.round(statusTop), cp.x.toFixed(3), cp.y.toFixed(3), cp.z.toFixed(3)].join("|");
+  if(key === chatFreeKey) return chatFreeVal;
+  let low = -1e9;
+  const box = function(pts){
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for(const v of pts){
+      const q = toScreen(v.x, v.y, v.z, w, h);
+      x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y);
+    }
+    if(x1 < 0 || x0 > w || y0 >= statusTop) return;
+    low = Math.max(low, y1);
+  };
+  const tmp = new THREE.Object3D();
+  tmp.rotation.order = "YXZ";
+  const card = function(sp){
+    tmp.position.set(sp.x, sp.y || 0, sp.z);
+    tmp.rotation.set(sp.rx, sp.ry || 0, sp.rz || 0);
+    tmp.scale.setScalar(sp.s || 1);
+    tmp.updateMatrixWorld(true);
+    box(CORNERS.map(p => _v().set(p[0], p[1], p[2]).applyMatrix4(tmp.matrixWorld)));
+  };
+  const a = DIE_A * S.diceS;
+  for(let i = 0; i < n; i++){
+    card(playSlot(i, 0));
+    for(let k = 0; k < hs; k++) card(pileSlot(i, k, n));
+    if(i !== S.me) for(let k = 0; k < hs; k++) card(fanSlot(i, k, hs));
+    for(const p of bidMark(i, 2)){
+      const pts = [];
+      for(const dx of [-a/2, a/2]) for(const dy of [0, a]) for(const dz of [-a/2, a/2]) pts.push(_v().set(p.x + dx, dy, p.z + dz));
+      box(pts);
+    }
+  }
+  const d = deckSpot();
+  card({x:d.x, y:.2, z:d.z, rx:-Math.PI/2, ry:d.ry, s:S.tableS});
+  chatFreeKey = key;
+  chatFreeVal = low === -1e9 ? statusTop : statusTop - low;
+  return chatFreeVal;
+};
 
 /* ================= 版面與輸入 ================= */
 /* 取景框從「桌上真的有東西的地方」算出來，不是寫死的座標：
@@ -10303,6 +10993,11 @@ CANVAS.addEventListener("pointerleave", function(){
    能不能出、真的出牌，兩種呈現共用同一份。按下去那一刻牌還在原地，所以問的就是那一刻。 */
 UD.tap.hit = function(ev){
   if(!S || CANVAS.hidden) return null;    /* 切回平面時這條線要斷乾淨，別再回答 */
+  /* 只有手指真的落在牌桌畫面上才找牌。上面蓋著任何接得住點擊的東西（聊天、計分表浮層、狀態列上的鈕）就不算。
+     ⚠️ 以前不看：手機立體模式打開計分表、或打開聊天點在紀錄上，射線穿過去把底下那張能出的牌出掉，事前不問、事後收不回
+     （plan 0008 驗收員用觸控重播出來的；計分表那條是更早就有的）。
+     手牌那排透明按鈕、座位名牌、狀態列的字都是 pointer-events:none，點下去的 target 本來就是畫布，出牌不受影響。 */
+  if(ev.target && ev.target !== CANVAS) return null;
   const id = hitCard(ev);
   if(id) S.hover = null;
   return id;

@@ -68,6 +68,7 @@ deno run --allow-read scripts/rules_test.ts      # 兩份規則對照：畫面 v
 deno run -A          scripts/ui_test.ts         # 出牌的入口：無頭 Chrome 開真的牌桌
 deno run -A          scripts/net_test.ts        # 連線那一段：假伺服器重演各種時序
 deno run -A          scripts/link_test.ts       # 分享連結：?room= 讀了就擦、進得去直接進房、進不去留在大廳、房號＝複製鈕、加入被拒不收別人的桌
+deno run -A          scripts/chat_test.ts       # 聊天室（plan 0008）：補話不重複照順序、自己那句對上、沒送出去與重送、不排進牌局隊伍、換房、手機字幕與點開
 deno run -A          scripts/idle_test.ts       # 畫面沒變就不動：立體不叫醒 WebGL、平面細條不重演；真的變了照畫
 deno run -A          scripts/end_test.ts        # 一場牌的兩個出口：收桌、再來一局、離開遊戲
 deno run -A          scripts/gag_test.ts        # 收桌頒獎（Thomas 爬講台）：真牌桌上停格截圖、關頁會停、沒捲軸（DIM=3 立體、PHONE=1 手機寬）
@@ -314,6 +315,11 @@ anon key 誰都有，那不叫身分。伺服器用 `auth.getUser(jwt)` 換出 `
 收到自己那份。`rooms` 表是公開狀態（檯面上的牌、叫墩、分數），本來就該所有人看得到，
 但同樣沒有寫入 policy：牌局只能透過 edge function 推進。
 
-`results`（戰績）是唯一有 select policy 的表，比對的是 `auth.uid()`——本人讀得到自己那份，
+`results`（戰績）有一條 select policy，比對的是 `auth.uid()`——本人讀得到自己那份，
 拿別人的 id 也查不到別人的。寫入一樣只有 edge function（service_role）做得到：
 一場 21 局打完時寫，`(code, user_id)` 是唯一索引，重送不會變成兩筆。
+
+`chat`（聊天，migration 0009）也有一條 select policy：坐在那一桌（真人座位）的人才讀得到——realtime 推不推「新的一句」給你
+就是照它判斷。policy 不能直接查 `players`（那張表一條 policy 都沒有，瀏覽器身分查永遠是空的），
+所以包成 security definer 的 `chat_seated()`。寫入一樣只有 edge function：`say` 動作經 `chat_say` 寫進去，
+不碰 `rooms`、不動 rev（`server_test` 十二段）。

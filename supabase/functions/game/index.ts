@@ -507,6 +507,11 @@ const no = (error: string, status = 409): Out => ({ kind: "no", error, status })
 const WAIT_MAX = 3000, WAIT_POLL = 150;
 const NOT_YET = "還沒輪到你";
 
+/** 聊天（plan 0008）：一句最多幾個字（算字，不算 JS 的 length——跟 0009 的 check 同一把尺）、補話一次最多幾句。
+ *  「太快」的門檻住在 0009 的 chat_say（5 秒 4 句），這裡不另算一份。 */
+const CHAT_MAX = 100, CHAT_PAGE = 100;
+const CHAT_FAST = "講太快了，等一下再說";
+
 /** 這一手是不是「早到了」：桌面還停在前一家，而這一手確實是你的、你也還沒做過。
  *  ⚠️ 只有這種值得等。以前沒有這條：早到的一律馬上 409「這張牌不能出」——牌是合法的、理由是錯的，
  *  人只好再點一次（10-21 log：最後一張牌被打回，4.3 秒後再點同一張就過了）。
@@ -654,6 +659,32 @@ Deno.serve(async (req) => {
       // 心跳與「畫面可能舊了，問一次」：只報到，不寫牌局
       case "state":
         return await step(() => IDLE);
+
+      /* 聊天（plan 0008）：說一句、拿某一句之後的話。
+         ⚠️ 不走 step()、不碰 rooms：rev 一動，全桌每一台都會收到一列 rooms 推播、重畫一次牌桌，
+         而牌局的寫入只准走 game_commit（server_test 十段）。也不報到（seen）：心跳本來就 10 秒一次，講話不必多寫一次 rooms。
+         坐不坐著用剛讀的那一桌判斷，跟 0009 那條 select policy 是同一個定義（seatOf）。 */
+      case "say": {
+        const s = seatOf(first.R, pid);
+        if (s < 0) return json({ error: "你不在座位上" }, 403);
+        // 打字框只有一行；貼上來的換行、連續空白收成一個空白
+        const text = String((body as { text?: unknown }).text ?? "").replace(/\s+/g, " ").trim();
+        if (!text) return json({ error: "這句沒有字" }, 400);
+        if ([...text].length > CHAT_MAX) return json({ error: "一句最多 100 字" }, 400);
+        const { data, error } = await sb.rpc("chat_say", {
+          p_code: code, p_pid: pid, p_name: first.R.seats[s].name, p_body: text, p_match: first.R.match ?? 1,
+        });
+        if (error) return json({ error: error.message }, 500);
+        if (!data) return json({ error: CHAT_FAST }, 429);
+        return json({ ok: true, pid, msg: data, now: Date.now() });
+      }
+      case "chat": {
+        if (seatOf(first.R, pid) < 0) return json({ error: "你不在座位上" }, 403);
+        const after = Math.max(0, Math.floor(Number((body as { after?: unknown }).after) || 0));
+        const { data, error } = await sb.rpc("chat_since", { p_code: code, p_after: after, p_limit: CHAT_PAGE });
+        if (error) return json({ error: error.message }, 500);
+        return json({ ok: true, pid, chat: data ?? [], now: Date.now() });
+      }
 
       // 舊版客端還在用 sit（挑座位）。部署函式與推前端之間一定有一小段空窗，
       // 這條別名讓那段時間線上的舊頁面照樣坐得下來——座位改成動態之後，

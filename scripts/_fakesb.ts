@@ -154,6 +154,8 @@ const SIG: Record<string, [string, string][]> = {
     ["p_now", "bigint"], ["p_hands", "jsonb"]],
   game_seen: [["p_code", "text"], ["p_pid", "text"], ["p_now", "bigint"]],
   touch_seen: [["p_code", "text"], ["p_pid", "text"]],     // 舊版伺服器用的（線上定義沒查到，測試裡的見 server_test）
+  chat_say: [["p_code", "text"], ["p_pid", "text"], ["p_name", "text"], ["p_body", "text"], ["p_match", "int"]],
+  chat_since: [["p_code", "text"], ["p_after", "bigint"], ["p_limit", "int"]],
 };
 const VOID = new Set(["game_seen", "touch_seen"]);
 
