@@ -315,9 +315,11 @@ try {
     "高檔：換了牌面，畫面停在舊牌面（換貼圖之後沒有叫醒重畫）");
 
   /* 量到太慢自己降檔：換了管線（牌底下的接觸陰影跟著打開），要再畫一次——
-     降檔是在畫完那一格之後才判斷的，不叫醒的話畫面停在舊管線畫的那一格 */
+     降檔是在畫完那一格之後才判斷的，不叫醒的話畫面停在舊管線畫的那一格。
+     plan 0009 起降檔看的是 GPU 延遲的欠帳（FX.debt），不是 CPU 時間：把欠帳先塞滿、暖機期跳過，
+     再畫一格（S.dirty = 1）讓 fence 放出去，下一筆延遲一回來就降 */
   await zero(A);
-  await A.eval(`const d = UD.__3d(); d.FX.forced = false; d.FX.frames = 31; d.FX.ms = 1000; d.S.dirty = 1; return 1`);
+  await A.eval(`const d = UD.__3d(); d.FX.forced = false; d.FX.builtT = -1e9; d.FX.skip = 99; d.FX.debt = 3000; d.S.dirty = 1; return 1`);
   await A.until(`return UD.fx().tier === "mid"`, "自己降檔到中檔", 10000);
   await settle(A, "自己降檔");
   ok(await frames(A) > 1 && await A.eval(`return __I.fresh()`),

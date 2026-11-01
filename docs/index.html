@@ -9451,11 +9451,20 @@ function placeChairs(){
 
    取值與比較的過程見 design/fidelity/（九層各自可開關的原型）。 */
 const FX_REFINE_MAX = 24;        /* 靜止之後最多疊幾格 */
-const FX_SLOW_MS = 26;           /* 每格超過這個就降一檔 */
+/* 自動降檔的門檻（看 GPU 真的做完一格的延遲，不看 CPU；理由在 fxPace() 上面） */
+const FX_WARM_MS = 1500;         /* 換管線／開機後這段時間不算：著色器編譯、貼圖上傳 */
+const FX_WARM_SKIP = 3;          /* 而且至少跳過前幾筆：慢的機器 1.5 秒內可能連一格都還沒畫完 */
+const FX_SLOW = 60;              /* 一筆延遲超過這個毫秒數＝這一格追不上 */
+const FX_DEBT_MAX = 1500;        /* 「追不上的部分」累積到這麼多毫秒就降一檔：慢得越兇降得越快
+                                    （每格慢 60ms 要 25 格≈3 秒；一格慢 1 秒只要兩格）。順的每一格還 100ms */
+const FX_GAP_MAX = 1000;         /* 單一樣本最多算到這裡：分頁被切走、電腦睡著那一格不該一筆就降檔，
+                                    但也不能丟掉——丟掉的話，慢到一格超過它的機器反而永遠不降 */
 const FX = {
   tier:"low", mods:null, comp:null, gtao:null, vig:null,
   accA:null, accB:null, accN:0, quad:null, qscene:null, qcam:null, blend:null, show:null,
-  ms:0, frames:0, decal:true, forced:false
+  ms:0, frames:0, decal:true, forced:false,
+  lag:0, lagMs:0, debt:0, skip:0, builtT:0, fence:null, fenceT:0, paceT:0, rafT:0,
+  fpsEl:undefined, fpsN:0, fpsT:0
 };
 /* 暗角。放在 OutputPass 之後——這一層是加在色調映射之後的顯示空間裡的。
    原本這裡還疊了一層底片顆粒（2026-09-15 拿掉）：顆粒每一格換一次隨機種子，
@@ -9524,6 +9533,7 @@ function fxBuild(){
      以前靠下一列 sync() 無條件 dirty = 4 補畫，sync() 改成沒變不畫之後，那一格就一直停著。
      放在這裡（唯一的入口），哪條路換管線都一樣。 */
   if(S) S.dirty = 4;
+  FX.builtT = performance.now(); FX.skip = 0; FX.debt = 0; FX.lagMs = 0;   /* 新管線的前幾格是編譯，不進平均 */
   if(!FX.mods || FX.tier === "low" || !S || !S.boxW){ fxDecal(true); return; }
   const M = FX.mods;
   const rt = new THREE.WebGLRenderTarget(1, 1, {type:THREE.HalfFloatType, samples:4});
@@ -9608,19 +9618,77 @@ function fxRender(){
     S.r.setRenderTarget(null); S.r.render(FX.qscene, FX.qcam);
     FX.accN++;
   }
-  /* 自己降檔。前 30 格不算——貼圖上傳與著色器編譯都在那時候，量到的是啟動成本不是穩態 */
+  /* CPU 交指令的時間，只給 UD.fx() 看；降不降檔不看它（issue 0006 缺陷一） */
   const dt = performance.now() - t0;
   FX.ms = FX.ms ? FX.ms * .9 + dt * .1 : dt;
-  if(!FX.forced && ++FX.frames > 30 && FX.ms > FX_SLOW_MS && FX.tier !== "low"){
-    FX.frames = 0; FX.ms = 0;
-    FX.tier = FX.tier === "high" ? "mid" : "low";
-    fxBuild();
+}
+/* ================= 自動降檔：看 GPU 真的做完一格要多久 =================
+   ⚠️ 以前看 fxRender() 的 CPU 時間（上面的 dt）：GPU 追不上時 CPU 照樣 2ms 就把指令交完，
+   門檻 26ms 在真正慢的機器上永遠到不了（issue 0006 缺陷一：10-28 量到頁面自以為 77ms、實際 450ms）。
+   這裡在「有東西在動」的那一格畫完之後放一支 fence（WebGL2 fenceSync），之後每一格用 0 毫秒的 clientWaitSync
+   問「做完了沒」；第一次聽到做完的那一格的時間戳，減掉放 fence 那一格的時間戳＝GPU 從收到到做完的延遲
+   （含排在前面還沒做完的格）。順的時候是一到兩格（60Hz 約 17–33ms）；GPU 追不上時這個數字跟著堆上去。
+   沒有 WebGL2 的退回看相鄰兩格 rAF 的間隔（GPU 追不上時瀏覽器會把 rAF 放慢；Chrome 一定會，Firefox 不保證）。
+   換管線／開機後 FX_WARM_MS 內、而且前 FX_WARM_SKIP 筆不算（著色器編譯、貼圖上傳：缺陷二，以前第一筆 1.5 秒的編譯
+   留在平均裡 30 格後就誤降檔）。降不降看的是「追不上的部分」累積了多少（FX.debt），不是連續幾格：
+   每秒 3 格的機器一支 fence 三秒才回一筆，數格數要等一分鐘；算時間的話一兩筆就夠。
+   fence 每一格都要問，不只在動的那幾格問：動完停手之後再問，量到的會是「停了多久」，不是 GPU。 */
+function fxPoll(t){
+  if(!FX.fence) return;
+  const gl = S.r.getContext();
+  const st = gl.clientWaitSync(FX.fence, 0, 0);
+  if(st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) return;
+  gl.deleteSync(FX.fence); FX.fence = null;
+  fxSample(t - FX.fenceT);
+}
+function fxMark(t, prevT){
+  const gl = S.r.getContext();
+  if(gl && gl.fenceSync){
+    if(!FX.fence){ FX.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); FX.fenceT = t; }
+  }else{
+    if(FX.paceT === prevT) fxSample(t - prevT);   /* 只拿「連續重畫」的相鄰兩格 */
+    FX.paceT = t;
   }
+}
+function fxSample(ms){
+  FX.lag = ms;                                       /* 給 ?fps=1 看的最新一筆 */
+  if(performance.now() - FX.builtT < FX_WARM_MS || FX.skip < FX_WARM_SKIP){ FX.skip++; return; }
+  if(ms > FX_GAP_MAX) ms = FX_GAP_MAX;
+  FX.lagMs = FX.lagMs ? FX.lagMs * .8 + ms * .2 : ms;
+  if(FX.forced || FX.tier === "low") return;
+  FX.debt = ms > FX_SLOW ? Math.min(3000, FX.debt + ms - FX_SLOW) : Math.max(0, FX.debt - 100);
+  if(FX.debt < FX_DEBT_MAX) return;
+  FX.tier = FX.tier === "high" ? "mid" : "low";
+  fxBuild();                                         /* 裡面會把 builtT／skip／debt／lagMs 歸零 */
+}
+/* ?fps=1：右上角一行真數字——每秒畫了幾格、GPU 延遲、畫布像素、檔位。只看網址，不存起來（缺陷三的教訓） */
+function fxFps(t, drew){
+  if(FX.fpsEl === undefined){
+    let on = false;
+    try{ on = new URLSearchParams(location.search).get("fps") === "1"; }catch(e){}
+    FX.fpsEl = null;
+    if(on){
+      const el = document.createElement("div");
+      el.id = "fps";
+      /* 貼在畫布的右上角（.table 立體時是 relative），不蓋頂列的按鈕、不蓋右欄 */
+      el.style.cssText = "position:absolute;right:10px;top:10px;z-index:5;font:11px/1.4 ui-monospace,Menlo,monospace;" +
+        "color:#e8e0c8;background:rgba(0,0,0,.72);padding:3px 8px;border-radius:6px;pointer-events:none;white-space:nowrap";
+      CANVAS.parentNode.appendChild(el);
+      FX.fpsEl = el; FX.fpsT = t;
+    }
+  }
+  if(!FX.fpsEl) return;
+  if(drew) FX.fpsN++;
+  if(t - FX.fpsT < 1000) return;
+  const pr = S.r.getPixelRatio();
+  FX.fpsEl.textContent = "每秒 " + FX.fpsN + " 格 · 延遲 " + Math.round(FX.lag) + "ms（平均 " + Math.round(FX.lagMs) + "）· " +
+    Math.round(S.boxW * pr) + "×" + Math.round(S.boxH * pr) + " · " + ({high:"高", mid:"中", low:"低"})[FX.tier] + (FX.forced ? "（鎖）" : "（自動）");
+  FX.fpsN = 0; FX.fpsT = t;
 }
 /* console 摸得到：UD.fx() 看現在幾檔、UD.fx("high") 現場換一檔 */
 UD.fx = function(t){
   if(t){ try{ localStorage.setItem("ud.fx", t); }catch(e){} FX.tier = t; FX.forced = true; if(S) { fxBuild(); S.dirty = 4; } }
-  return {tier:FX.tier, ms:+FX.ms.toFixed(1), post:!!FX.comp, ao:!!FX.gtao, refine:fxRefine(), addons:!!FX.mods};
+  return {tier:FX.tier, ms:+FX.ms.toFixed(1), lag:+FX.lagMs.toFixed(0), post:!!FX.comp, ao:!!FX.gtao, refine:fxRefine(), addons:!!FX.mods};
 };
 
 let AO_GEO = null, AO_MAT = null;
@@ -10575,6 +10643,8 @@ function glowApply(key, k, kd){
 
 function frame(t){
   if(!S) return;
+  const prevT = FX.rafT; FX.rafT = t;
+  fxPoll(t);                        /* 上一支 fence 做完了沒：每一格都問，不只動的那幾格 */
   const stepped = stepTweens(t);
 
   /* 只有真的在動的補間才算「在動」：定格那一秒排在後面的還沒開始，畫面不用重畫 */
@@ -10646,17 +10716,22 @@ function frame(t){
      「只有補間」的變化（例如輪到我先出、每張都能出：牌只是浮上來）就靠這一行至少畫一格。
      平常 60fps 時跑完那一格 dirty 本來就還沒歸零（上一格在動），這一行不會多畫任何一格。 */
   else if(stepped && S.dirty === 0) S.dirty = 1;
+  let drew = false;
   if(S.dirty > 0){
     S.dirty--;
     fxReset();                        /* 有東西在動：精算的累積重新來 */
     placeOverlays();
     fxRender();
+    fxMark(t, prevT);                 /* 這一格是「有東西在動」畫的：拿它量 GPU 追不追得上 */
+    drew = true;
   }
   else if(fxPending() || (fireMoved && !fxRefine())){
     /* 停手了：要嘛抖動取樣還在疊（畫面自己收斂），要嘛這台機器不疊、火照跳。
        高檔疊完之後就停手——第 25 格之後每一格的權重不到 1/25，火在不在燒都看不出來。 */
     fxRender();
+    drew = true;
   }
+  fxFps(t, drew);
 }
 
 /* ================= 疊在畫布上的 DOM ================= */
